@@ -22,14 +22,36 @@
 using namespace llvm;
 using namespace clang;
 
-std::stringstream out;
+std::vector<std::unique_ptr<std::stringstream> > outStack = []() -> std::vector<std::unique_ptr<std::stringstream> >
+{
+	std::vector<std::unique_ptr<std::stringstream> > res;
+	res.emplace_back(std::make_unique<std::stringstream>());
+	return res;
+}();
+
+std::stringstream& out()
+{
+	return *outStack.back();
+}
+
+void pushStream()
+{
+	outStack.emplace_back(std::make_unique<std::stringstream>());
+}
+
+std::string popStream()
+{
+	std::string const str = out().str();
+	outStack.pop_back();
+	return str;
+}
 
 #define CHECK_LOC  if (checkFilename(Decl)) {} else return true
 
 static std::map<std::string, std::string> type2include =
 {
-	{"time_t", "core.stdc.time"},
-	{"Nullable", "std.typecons" },
+	{ "time_t", "core.stdc.time" },
+	{ "Nullable", "std.typecons" },
 	{ "intptr_t", "core.stdc.stdint" },
 	{ "int8_t", "core.stdc.stdint" },
 	{ "uint8_t", "core.stdc.stdint" },
@@ -106,17 +128,17 @@ bool needSemiComma(Decl* decl)
 
 struct Spliter
 {
-	char const* str;
+	std::string const str;
 	bool first = true;
 
-	Spliter(char const*s) :str(s) {}
+	Spliter(std::string const& s) :str(s) {}
 
 	void split()
 	{
 		if (first)
 			first = false;
 		else
-			out << str;
+			out() << str;
 	}
 };
 
@@ -184,9 +206,9 @@ class VisitorToD
 		if (rc && not rc->isTrailingComment())
 		{
 			using namespace std;
-			out << indent_str();
+			out() << std::endl << indent_str();
 			string const comment = rc->getRawText(sm).str();
-			out << replace(comment, "\r\n", line_return.str()) << std::endl;
+			out() << replace(comment, "\r\n", line_return.str()) << std::endl;
 		}
 	}
 
@@ -195,7 +217,58 @@ class VisitorToD
 		SourceManager& sm = Context->getSourceManager();
 		const RawComment* rc = Context->getRawCommentForDeclNoCache(t);
 		if (rc && rc->isTrailingComment())
-			out << " " << rc->getRawText(sm).str() << std::endl;
+			out() << '\t' << rc->getRawText(sm).str();
+	}
+
+	// trim from both ends
+	static inline std::string trim(std::string const& s) {
+		auto const pos1 = s.find_first_not_of("\r\n\t ");
+		auto const pos2 = s.find_last_not_of("\r\n\t ");
+		return pos1 == std::string::npos ?
+			std::string() :
+			s.substr(pos1, (pos2 - pos1) + 1);
+	}
+
+	std::vector<std::string> split(std::string const& instr)
+	{
+		std::vector<std::string> result;
+		auto prevIter = std::begin(instr);
+		auto iter = std::begin(instr);
+		do
+		{
+			iter = std::find(prevIter, std::end(instr), '\n');
+			result.push_back(trim(std::string(prevIter, iter)));
+			prevIter = iter + 1;
+		} while (iter != std::end(instr));
+		return result;
+	}
+
+	void printStmtComment(SourceLocation& locStart, SourceLocation const& locEnd, SourceLocation const& nextStart)
+	{
+		auto& sm = Context->getSourceManager();
+		std::string comment = Lexer::getSourceText(CharSourceRange(SourceRange(locStart, locEnd), true), sm, LangOptions()).str();
+		auto semiComma = comment.find_first_of(",;}");
+		if (semiComma != std::string::npos)
+			comment = comment.substr(semiComma + 1, comment.size() - (semiComma + 1));
+		std::vector<std::string> comments = split(comment);
+		//if (comments.back() == std::string())
+		comments.pop_back();
+		Spliter split(indent_str());
+		if (comments.empty())
+			out() << std::endl;
+		if(not comments.empty())
+			out() << " ";
+		size_t index = 0;
+		for (auto const& c : comments)
+		{
+			//if (index < (comments.size() - 1))
+			split.split();
+			out() << c;
+			//if(index < (comments.size() - 1))
+			out() << std::endl;
+			++index;
+		}
+		locStart = nextStart;
 	}
 
 public:
@@ -214,7 +287,7 @@ public:
 		//SourceManager& sm = Context->getSourceManager();
 		//SourceLocation prevDeclEnd;
 		//for(auto c: Context->Comments.getComments())
-		//	out << c->getRawText(sm).str() << std::endl;
+		//	out() << c->getRawText(sm).str() << std::endl;
 
 		for (auto c : Decl->decls())
 		{
@@ -224,23 +297,28 @@ public:
 				//CharSourceRange newSourceRange = CharSourceRange::getTokenRange(prevDeclEnd, newDeclStart);
 				
 				//std::string text = Lexer::getSourceText(newSourceRange, sm, LangOptions(), 0);
-				//out << text;
+				//out() << text;
 
 				/*bool invalid1 = true;
 				bool invalid2 = true;
 				char const* a = sm.getCharacterData(prevSourceRange.getEnd(), &invalid1);
 				char const* b = sm.getCharacterData(newSourceRange.getBegin(), &invalid2);
 				if(not invalid1 && not invalid2)
-					out << std::string(a + 3, b);*/
+					out() << std::string(a + 3, b);*/
 
 				//prevDeclEnd = c->getLocEnd();
-				printCommentBefore(c);
-				out << indent_str();
+				pushStream();
 				TraverseDecl(c);
-				if (needSemiComma(c))
-					out << ';';
-				//printCommentAfter(c);
-				out << std::endl << std::endl;
+				std::string const decl = popStream();
+				if (not decl.empty())
+				{
+					printCommentBefore(c);
+					out() << indent_str() << decl;
+					if (needSemiComma(c))
+						out() << ';';
+					printCommentAfter(c);
+					out() << std::endl << std::endl;
+				}
 			}
 		}
 
@@ -249,23 +327,23 @@ public:
 
 	bool TraverseTypedefDecl(TypedefDecl *Decl)
 	{
-		out << "alias " << mangleName(Decl->getNameAsString()) << " = ";
+		out() << "alias " << mangleName(Decl->getNameAsString()) << " = ";
 		PrintType(Decl->getUnderlyingType());
 		return true;
 	}
 
 	bool TraverseFieldDecl(FieldDecl *Decl)
 	{
-		//out << indent_str();
+		//out() << indent_str();
 		//TraverseNestedNameSpecifierLoc(Decl->getQualifierLoc());
 		PrintType(Decl->getType());
-		out << " " << mangleName(Decl->getNameAsString());
+		out() << " " << mangleName(Decl->getNameAsString());
 		if (Decl->hasInClassInitializer())
 		{
-			out << " = ";
+			out() << " = ";
 			TraverseStmt(Decl->getInClassInitializer());
 		}
-		//out << ";" << std::endl;
+		//out() << ";" << std::endl;
 		return true;
 	}
 
@@ -291,7 +369,7 @@ public:
 			)
 		{
 			PrintType(QualType(NNS->getAsType(), 0));
-			out << ".";
+			out() << ".";
 		}
 		return true;
 	}
@@ -330,15 +408,15 @@ public:
 		if(isStdArray(Type->desugar()))
 		{
 			TraverseTemplateArgument(Type->getArg(0));
-			out << '[';
+			out() << '[';
 			TraverseTemplateArgument(Type->getArg(1));
-			out << ']';
+			out() << ']';
 			return true;
 		}
-		out << mangleType(Type->getTemplateName().getAsTemplateDecl()->getNameAsString());
+		out() << mangleType(Type->getTemplateName().getAsTemplateDecl()->getNameAsString());
 		auto const argNum = Type->getNumArgs();
 		bool const needParen = (argNum > 1) || (argNum == 1 && tempArgHasTempArg(Type->getArg(0)));
-		out << (needParen ? "!(": "!");
+		out() << (needParen ? "!(": "!");
 		Spliter spliter(", ");
 		for (unsigned int i = 0; i < argNum; ++i)
 		{
@@ -346,7 +424,7 @@ public:
 			TraverseTemplateArgument(Type->getArg(i));
 		}
 		if(needParen)
-			out << ")";
+			out() << ")";
 		return true;
 	}
 
@@ -366,54 +444,62 @@ public:
 				name == "uint64_t"	? std::string("ulong") :*/
 				name;
 		}();
-		out << converted;
+		out() << converted;
 		return true;
 	}
 
 	bool TraverseCompoundStmt(CompoundStmt *Stmt)
 	{
-		out << "{" << std::endl << std::flush;
+		SourceLocation locStart = Stmt->getLBracLoc().getLocWithOffset(1);
+		out() << "{";
 		++indent;
 		for (auto child : Stmt->children())
 		{
-			out << indent_str();
+			printStmtComment(locStart, child->getLocStart().getLocWithOffset(-1), child->getLocEnd().getLocWithOffset(0));
+			out() << indent_str();
 			TraverseStmt(child);
 			if (needSemiComma(child))
-				out << ";";
-			out << std::endl;
+				out() << ";";
 		}
+		printStmtComment(locStart, Stmt->getRBracLoc().getLocWithOffset(-1), Stmt->getRBracLoc().getLocWithOffset(-1));
 		--indent;
-		out << indent_str() << "}";
+		out() << indent_str();
+		out() << "}";
 		return true;
 	}
 
 	bool TraverseNamespaceDecl(NamespaceDecl *Decl)
 	{
-		out << "// -> module " << mangleName(Decl->getNameAsString()) << ';' << std::endl;
+		out() << "// -> module " << mangleName(Decl->getNameAsString()) << ';' << std::endl;
 		for (auto decl : Decl->decls())
 		{
-			printCommentBefore(decl);
-			out << indent_str();
+			pushStream();
 			TraverseDecl(decl);
-			if (needSemiComma(decl))
-				out << ';';
-			printCommentAfter(decl);
-			out << std::endl << std::endl;
+			std::string const declstr = popStream();
+			if (not declstr.empty())
+			{
+				printCommentBefore(decl);
+				out() << indent_str() << declstr;
+				if (needSemiComma(decl))
+					out() << ';';
+				printCommentAfter(decl);
+				out() << std::endl << std::endl;
+			}
 		}
-		out << "// <- module " << mangleName(Decl->getNameAsString()) << " end" << std::endl << std::flush;
+		out() << "// <- module " << mangleName(Decl->getNameAsString()) << " end" << std::endl << std::flush;
 		return true;
 	}
 
 	bool TraverseCXXCatchStmt(CXXCatchStmt* Stmt)
 	{
-		out << "catch(";
+		out() << "catch(";
 		TraverseVarDeclImpl(Stmt->getExceptionDecl());
-		out << ")" << std::endl;
+		out() << ")" << std::endl;
 		for (auto c : Stmt->children())
 		{
-			out << indent_str();
+			out() << indent_str();
 			TraverseStmt(c);
-			out << ";" << std::endl;
+			out() << ";" << std::endl;
 		}
 		return true;
 	}
@@ -443,10 +529,10 @@ public:
 
 		const bool isClass = Decl->isClass();// || Decl->isPolymorphic();
 		char const* struct_class = Decl->isClass() ? "class" : "struct";
-		out << struct_class << " " << mangleName(Decl->getNameAsString());
+		out() << struct_class << " " << mangleName(Decl->getNameAsString());
 		traverseTmpSpecs();
 
-		out << std::endl << indent_str() << "{" << std::endl << std::flush;
+		out() << std::endl << indent_str() << "{";
 		++indent;
 
 		static char const* AccessSpecifierStr[] =
@@ -462,26 +548,31 @@ public:
 			AccessSpecifier::AS_public;
 		for (auto decl : Decl->decls())
 		{
-			AccessSpecifier newAccess = decl->getAccess();
-			if (newAccess == AccessSpecifier::AS_none)
-				newAccess = AccessSpecifier::AS_public;
-			if (newAccess != access)
-			{
-				--indent;
-				out << indent_str() << AccessSpecifierStr[newAccess] << ":" << std::endl;
-				++indent;
-				access = newAccess;
-			}
-			printCommentBefore(decl);
-			out << indent_str();
+			pushStream();
 			TraverseDecl(decl);
-			if (needSemiComma(decl))
-				out << ";";
-			printCommentAfter(decl);
-			out << std::endl;
+			std::string const declstr = popStream();
+			if (not declstr.empty())
+			{
+				AccessSpecifier newAccess = decl->getAccess();
+				if (newAccess == AccessSpecifier::AS_none)
+					newAccess = AccessSpecifier::AS_public;
+				if (newAccess != access)
+				{
+					--indent;
+					out() << indent_str() << AccessSpecifierStr[newAccess] << ":" << std::endl;
+					++indent;
+					access = newAccess;
+				}
+				printCommentBefore(decl);
+				out() << indent_str() << declstr;
+				if (needSemiComma(decl))
+					out() << ";";
+				printCommentAfter(decl);
+				out() << std::endl;
+			}
 		}
 		--indent;
-		out << indent_str() << "}";
+		out() << indent_str() << "}";
 
 		return true;
 	}
@@ -491,19 +582,19 @@ public:
 		TraverseCXXRecordDeclImpl(Decl->getTemplatedDecl(), [Decl, this]
 		{
 			auto& tmpParams = *Decl->getTemplateParameters();
-			out << "(";
+			out() << "(";
 			Spliter spliter1(", ");
 			for (decltype(tmpParams.size()) i = 0, size = tmpParams.size(); i != size; ++i)
 			{
 				spliter1.split();
 				TraverseDecl(tmpParams.getParam(i));
 			}
-			out << ')';
+			out() << ')';
 		});
 		return true;
 	}
 
-	TemplateParameterList* getTemplateParameters(ClassTemplateSpecializationDecl* Decl)
+	TemplateParameterList* getTemplateParameters(ClassTemplateSpecializationDecl*)
 	{
 		return nullptr;
 	}
@@ -543,13 +634,13 @@ public:
 			auto& specializedTmpParams = *Decl->getSpecializedTemplate()->getTemplateParameters();
 			auto& tmpArgs = Decl->getTemplateArgs();
 			assert(tmpArgs.size() == specializedTmpParams.size());
-			out << '(';
+			out() << '(';
 			Spliter spliter2(", ");
 			for (decltype(tmpArgs.size()) i = 0, size = tmpArgs.size(); i != size; ++i)
 			{
 				spliter2.split();
 				TraverseDecl(specializedTmpParams.getParam(i));
-				out << " : ";
+				out() << " : ";
 				TraverseTemplateArgument(tmpArgs.get(i));
 			}
 			if (tmpParams)
@@ -560,7 +651,7 @@ public:
 					TraverseDecl(tmpParams->getParam(i));
 				}
 			}
-			out << ')';
+			out() << ')';
 		});
 		template_args_stack.pop_back();
 		return true;
@@ -586,7 +677,7 @@ public:
 
 	bool TraverseCXXTryStmt(CXXTryStmt *Stmt)
 	{
-		out << "try" << std::endl;
+		out() << "try" << std::endl;
 		TraverseStmt(Stmt->getTryBlock());
 		return true;
 	}
@@ -594,7 +685,7 @@ public:
 	
 	bool TraversePredefinedExpr(PredefinedExpr*)
 	{
-		out << "__PRETTY_FUNCTION__";
+		out() << "__PRETTY_FUNCTION__";
 		return true;
 	}
 
@@ -607,7 +698,7 @@ public:
 	{
 		PrintType(Expr->getTypeAsWritten());
 		Spliter spliter(", ");
-		out << "(";
+		out() << "(";
 		for (decltype(Expr->arg_size()) i = 0; i < Expr->arg_size(); ++i)
 		{
 			auto arg = Expr->getArg(i);
@@ -617,16 +708,16 @@ public:
 				TraverseStmt(arg);
 			}
 		}
-		out << ")";
+		out() << ")";
 		return true;
 	}
 
 	bool TraverseUnresolvedLookupExpr(UnresolvedLookupExpr  *Expr)
 	{
-		out << mangleName(Expr->getName().getAsString());
+		out() << mangleName(Expr->getName().getAsString());
 		if (Expr->hasExplicitTemplateArgs())
 		{
-			out << "!(";
+			out() << "!(";
 			Spliter spliter(", ");
 			for (size_t i = 0; i < Expr->getNumTemplateArgs(); ++i)
 			{
@@ -634,14 +725,14 @@ public:
 				auto tmpArg = Expr->getTemplateArgs()[i];
 				TraverseTemplateArgumentLoc(tmpArg);
 			}
-			out << ')';
+			out() << ')';
 		}
 		return true;
 	}
 
 	bool TraverseCXXForRangeStmt(CXXForRangeStmt  *Stmt)
 	{
-		out << "foreach(";
+		out() << "foreach(";
 		DeclStmt* varDecl = Stmt->getLoopVarStmt();
 		if(varDecl->isSingleDecl() == false)
 			abort();
@@ -651,39 +742,39 @@ public:
 		in_foreach_decl = true;
 		TraverseVarDeclImpl(static_cast<VarDecl*>(singleDecl));
 		in_foreach_decl = false;
-		out << "; ";
+		out() << "; ";
 		TraverseStmt(Stmt->getRangeInit());
-		out << ")" << std::endl;
+		out() << ")" << std::endl;
 		TraverseCompoundStmtOrNot(Stmt->getBody());
 		return true;
 	}
 
 	bool TraverseDoStmt(DoStmt  *Stmt)
 	{
-		out << "do" << std::endl;
+		out() << "do" << std::endl;
 		TraverseCompoundStmtOrNot(Stmt->getBody());
-		out << "while(";
+		out() << "while(";
 		TraverseStmt(Stmt->getCond());
-		out << ")";
+		out() << ")";
 		return true;
 	}
 
 	bool TraverseSwitchStmt(SwitchStmt *Stmt)
 	{
-		out << "switch(";
+		out() << "switch(";
 		TraverseStmt(Stmt->getCond());
-		out << ")" << std::endl << indent_str();
+		out() << ")" << std::endl << indent_str();
 		TraverseStmt(Stmt->getBody());
 		return true;
 	}
 
 	bool TraverseCaseStmt(CaseStmt *Stmt)
 	{
-		out << "case ";
+		out() << "case ";
 		TraverseStmt(Stmt->getLHS());
-		out << ":" << std::endl;
+		out() << ":" << std::endl;
 		++indent;
-		out << indent_str();
+		out() << indent_str();
 		TraverseStmt(Stmt->getSubStmt());
 		--indent;
 		return true;
@@ -691,25 +782,25 @@ public:
 
 	bool TraverseBreakStmt(BreakStmt*)
 	{
-		out << "break";
+		out() << "break";
 		return true;
 	}
 
 	bool TraverseStaticAssertDecl(StaticAssertDecl *Decl)
 	{
-		out << "static assert(";
+		out() << "static assert(";
 		TraverseStmt(Decl->getAssertExpr());
-		out << ", ";
+		out() << ", ";
 		TraverseStmt(Decl->getMessage());
-		out << ")";
+		out() << ")";
 		return true;
 	}
 
 	bool TraverseDefaultStmt(DefaultStmt *Stmt)
 	{
-		out << "default:" << std::endl;
+		out() << "default:" << std::endl;
 		++indent;
-		out << indent_str();
+		out() << indent_str();
 		TraverseStmt(Stmt->getSubStmt());
 		--indent;
 		return true;
@@ -724,7 +815,7 @@ public:
 		else
 		{
 			PrintType(Init->getType());
-			out << '(';
+			out() << '(';
 			Spliter spliter(", ");
 			for (auto arg : Init->arguments())
 			{
@@ -734,7 +825,7 @@ public:
 					TraverseStmt(arg);
 				}
 			}
-			out << ')';
+			out() << ')';
 		}
 		return true;
 	}
@@ -747,30 +838,30 @@ public:
 		if (type.getTypePtr()->getTypeClass() == Type::TypeClass::Auto)
 		{
 			if (type.isConstQualified())
-				out << "const";
+				out() << "const";
 			if (in_foreach_decl == false)
 			{
-				out << ' ';
+				out() << ' ';
 				TraverseType(type);
 			}
 		}
 		else
 		{
 			if (type.isConstQualified())
-				out << "const(";
+				out() << "const(";
 			TraverseType(type);
 			if (type.isConstQualified())
-				out << ')';
+				out() << ')';
 		}
 	}
 
 	bool TraverseConstructorInitializer(CXXCtorInitializer *Init)
 	{
 		if(Init->getMember())
-			out << mangleName(Init->getMember()->getNameAsString());
+			out() << mangleName(Init->getMember()->getNameAsString());
 		if (TypeSourceInfo *TInfo = Init->getTypeSourceInfo())
 			PrintType(TInfo->getType());
-		out << " = ";
+		out() << " = ";
 		TraverseStmt(Init->getInit());
 
 		if (Init->getNumArrayIndices() && getDerived().shouldVisitImplicitCode())
@@ -784,6 +875,7 @@ public:
 
 	void startCtorBody(CXXConstructorDecl *Decl)
 	{
+		out() << std::endl;
 		auto ctor_init_count = Decl->getNumCtorInitializers();
 		if (ctor_init_count != 0)
 		{
@@ -791,9 +883,9 @@ public:
 			{
 				if (init->isWritten())
 				{
-					out << indent_str();
+					out() << indent_str();
 					TraverseConstructorInitializer(init);
-					out << ";" << std::endl;
+					out() << ";" << std::endl;
 				}
 			}
 		}
@@ -804,17 +896,17 @@ public:
 		if (Decl->isOverloadedOperator() && Decl->getOverloadedOperator() == OverloadedOperatorKind::OO_ExclaimEqual)
 			return false;
 		PrintType(Decl->getReturnType());
-		out << " ";
+		out() << " ";
 		if (Decl->isOverloadedOperator())
 		{
 			auto const opKind = Decl->getOverloadedOperator();
 			if (opKind == OverloadedOperatorKind::OO_EqualEqual)
-				out << "opEqual";
+				out() << "opEqual";
 			else
-				out << "opBinary(string op: \"" << opStrTab[opKind] << "\")";
+				out() << "opBinary(string op: \"" << opStrTab[opKind] << "\")";
 		}
 		else
-			out << mangleName(Decl->getNameAsString());
+			out() << mangleName(Decl->getNameAsString());
 		return true;
 	}
 
@@ -823,13 +915,13 @@ public:
 		auto record = Decl->getParent();
 		if (record->isStruct() && Decl->getNumParams() == 0)
 			return false;
-		out << "this";
+		out() << "this";
 		return true;
 	}
 
 	bool printFuncBegin(CXXDestructorDecl*)
 	{
-		out << "~this";
+		out() << "~this";
 		return true;
 	}
 
@@ -840,37 +932,53 @@ public:
 		if (printFuncBegin(Decl) == false)
 			return true;
 		templPrinter();
-		out << "(";
-		Spliter spliter(", ");
+		out() << "(";
+		TypeSourceInfo* declSourceInfo = Decl->getTypeSourceInfo();
+		TypeLoc declTypeLoc = declSourceInfo->getTypeLoc();
+		FunctionTypeLoc funcTypeLoc = declTypeLoc.castAs<FunctionTypeLoc>();
+		SourceLocation locStart = funcTypeLoc.getLParenLoc().getLocWithOffset(1);
+		++indent;
+		size_t index = 0;
 		for (auto decl : Decl->params())
 		{
-			spliter.split();
+			printStmtComment(locStart, decl->getLocStart().getLocWithOffset(-1), decl->getLocEnd().getLocWithOffset(1));
+			out() << indent_str();
 			TraverseDecl(decl);
+			if(index != Decl->getNumParams() - 1)
+				out() << ',';
+			++index;
 		}
-		out << ")";
+		printStmtComment(locStart, funcTypeLoc.getRParenLoc(), locStart);
+		--indent;
+		out() << indent_str();
+		out() << ")";
+
 		if(Decl->getBody()) //(Decl->doesThisDeclarationHaveABody())
 		{
-			out << std::endl << std::flush;
+			out() << std::endl << std::flush;
 
-			out << indent_str() << "{" << std::endl;
+			out() << indent_str() << "{";
+			locStart = Decl->getBody()->getLocStart().getLocWithOffset(1);
+
 			++indent;
 
 			startCtorBody(Decl);
 
 			for (auto child : Decl->getBody()->children())
 			{
-				out << indent_str();
+				printStmtComment(locStart, child->getLocStart().getLocWithOffset(-1), child->getLocEnd().getLocWithOffset(0));
+				out() << indent_str();
 				TraverseStmt(child);
 				if(needSemiComma(child))
-					out << ";";
-				out << std::endl;
+					out() << ";";
 			}
-
+			printStmtComment(locStart, Decl->getBody()->getLocEnd().getLocWithOffset(0), Decl->getBody()->getLocEnd().getLocWithOffset(0));
 			--indent;
-			out << indent_str() << "}";
+			out() << indent_str();
+			out() << "}";
 		}
 		else
-			out << ";";
+			out() << ";";
 		return true;
 
 	}
@@ -890,14 +998,14 @@ public:
 	{
 		auto FDecl = Decl->getTemplatedDecl();
 		return TraverseFunctionDeclImpl(FDecl, [FDecl, Decl, this] {
-			out << "(";
+			out() << "(";
 			Spliter spliter(", ");
 			for (TemplateArgument const& tmpArg : Decl->getInjectedTemplateArgs())
 			{
 				spliter.split();
 				PrintType(tmpArg.getAsType());
 			}
-			out << ")";
+			out() << ")";
 		});
 	}
 
@@ -905,8 +1013,8 @@ public:
 	{
 		//PrintingPolicy pp = LangOptions();
 		//pp.Bool = 1;
-		//out << Type->getNameAsCString(pp);
-		out << [Type]
+		//out() << Type->getNameAsCString(pp);
+		out() << [Type]
 		{
 			switch (Type->getKind())
 			{
@@ -979,22 +1087,22 @@ public:
 				return TraverseType(innerType);
 		}
 		PrintType(pointee);
-		out << '*';
+		out() << '*';
 		return true;
 	}
 
 	bool TraverseCXXNullPtrLiteralExpr(CXXNullPtrLiteralExpr*)
 	{
-		out << "null";
+		out() << "null";
 		return true;
 	}
 
 	bool TraverseEnumConstantDecl(EnumConstantDecl *Decl)
 	{
-		out << mangleName(Decl->getNameAsString());
+		out() << mangleName(Decl->getNameAsString());
 		if (Decl->getInitExpr())
 		{
-			out << " = ";
+			out() << " = ";
 			TraverseStmt(Decl->getInitExpr());
 		}
 		return true;
@@ -1002,54 +1110,54 @@ public:
 
 	bool TraverseEnumDecl(EnumDecl *Decl)
 	{
-		out << "enum " << mangleName(Decl->getNameAsString());
+		out() << "enum " << mangleName(Decl->getNameAsString());
 		if (Decl->isFixed())
 		{
-			out << " : ";
+			out() << " : ";
 			TraverseType(Decl->getIntegerType());
 		}
-		out << std::endl << indent_str() << "{" << std::endl;
+		out() << std::endl << indent_str() << "{" << std::endl;
 		++indent;
 		for (auto e : Decl->enumerators())
 		{
-			out << indent_str();
+			out() << indent_str();
 			TraverseDecl(e);
-			out << "," << std::endl;
+			out() << "," << std::endl;
 		}
 		--indent;
-		out << indent_str() << "}";
+		out() << indent_str() << "}";
 		return true;
 	}
 
 	bool TraverseEnumType(EnumType *Type)
 	{
-		out << mangleName(Type->getDecl()->getNameAsString());
+		out() << mangleName(Type->getDecl()->getNameAsString());
 		return true;
 	}
 
 	bool TraverseIntegerLiteral(IntegerLiteral *Stmt)
 	{
-		out << Stmt->getValue().toString(10, true);
+		out() << Stmt->getValue().toString(10, true);
 		return true;
 	}
 
 	bool TraverseDecltypeType(DecltypeType* Type)
 	{
-		out << "typeof(";
+		out() << "typeof(";
 		TraverseStmt(Type->getUnderlyingExpr());
-		out << ')';
+		out() << ')';
 		return true;
 	}
 
 	bool TraverseAutoType(AutoType*)
 	{
-		out << "auto";
+		out() << "auto";
 		return true;
 	}
 
 	/*bool TraverseMemberPointerType(MemberPointerType *Type)
 	{
-	//out << Type->getTypeClassName();
+	//out() << Type->getTypeClassName();
 	return true;
 	}*/
 	
@@ -1066,20 +1174,20 @@ public:
 	bool TraverseParmVarDecl(ParmVarDecl *Decl)
 	{
 		PrintType(Decl->getType());
-		out <<  " " << mangleName(Decl->getNameAsString());
+		out() <<  " " << mangleName(Decl->getNameAsString());
 		return true;
 	}
 
 	bool TraverseRValueReferenceType(RValueReferenceType *Type)
 	{
 		PrintType(Type->getPointeeType());
-		out << "&&";
+		out() << "&&";
 		return true;
 	}
 
 	bool TraverseLValueReferenceType(LValueReferenceType *Type)
 	{
-		out << "ref ";
+		out() << "ref ";
 		PrintType(Type->getPointeeType());
 		return true;
 	}
@@ -1089,14 +1197,14 @@ public:
 		//Type->dump();
 		IdentifierInfo* identifier = Type->getIdentifier();
 		if (identifier)
-			out << mangleType(identifier->getName());
+			out() << mangleType(identifier->getName());
 		else if (Type->getDecl())
 			TraverseDecl(Type->getDecl());
 		else
 		{
 			auto param = template_args_stack[Type->getDepth()][Type->getIndex()];
 			TraverseDecl(param);
-			//out << "type-parameter-" << Type->getDepth() << '-' << Type->getIndex();
+			//out() << "type-parameter-" << Type->getDepth() << '-' << Type->getIndex();
 		}
 		return true;
 	}
@@ -1105,7 +1213,7 @@ public:
 	{
 		IdentifierInfo* identifier = Decl->getIdentifier();
 		if (identifier)
-			out << mangleType(identifier->getName());
+			out() << mangleType(identifier->getName());
 		return true;
 	}
 
@@ -1113,7 +1221,7 @@ public:
 	{
 		IdentifierInfo* identifier = Decl->getIdentifier();
 		if (identifier)
-			out << mangleName(identifier->getName());
+			out() << mangleName(identifier->getName());
 		return true;
 	}
 	
@@ -1131,11 +1239,11 @@ public:
 				if (first)
 					first = false;
 				else
-					out << indent_str();
+					out() << indent_str();
 				TraverseDecl(d);
-				out << ";";
+				out() << ";";
 				printCommentAfter(d);
-				out << std::endl;
+				out() << std::endl;
 			}
 		}
 		return true;
@@ -1148,10 +1256,10 @@ public:
 
 	bool TraverseReturnStmt(ReturnStmt* Stmt)
 	{
-		out << "return";
+		out() << "return";
 		if (Stmt->getRetValue())
 		{
-			out << ' ';
+			out() << ' ';
 			TraverseStmt(Stmt->getRetValue());
 		}
 		return true;
@@ -1166,7 +1274,7 @@ public:
 			auto iter = Stmt->arg_begin(), end = Stmt->arg_end();
 			TraverseStmt(*iter);
 			Spliter spliter(", ");
-			out << opStr[0];
+			out() << opStr[0];
 			for (++iter; iter != end; ++iter)
 			{
 				if ((*iter)->getStmtClass() != Stmt::StmtClass::CXXDefaultArgExprClass)
@@ -1175,7 +1283,7 @@ public:
 					TraverseStmt(*iter);
 				}
 			}
-			out << opStr[1];
+			out() << opStr[1];
 		}
 		else if (kind == OverloadedOperatorKind::OO_Arrow)
 		{
@@ -1187,12 +1295,12 @@ public:
 			if (numArgs == 2)
 			{
 				TraverseStmt(*Stmt->arg_begin());
-				out << " ";
+				out() << " ";
 			}
 			assert(kind < 1 && kind < (sizeof(opStrTab) / sizeof(char const*)));
-			out << opStrTab[kind];
+			out() << opStrTab[kind];
 			if (numArgs == 2)
-				out << " ";
+				out() << " ";
 			TraverseStmt(*(Stmt->arg_end() - 1));
 		}
 		return true;
@@ -1208,16 +1316,16 @@ public:
 	{
 		if (Stmt->getStmtClass() == Stmt::StmtClass::CompoundStmtClass)
 		{
-			out << indent_str();
+			out() << indent_str();
 			TraverseStmt(Stmt);
 		}
 		else
 		{
 			++indent;
-			out << indent_str();
+			out() << indent_str();
 			TraverseStmt(Stmt);
 			if(needSemiComma(Stmt))
-				out << ";";
+				out() << ";";
 			--indent;
 		}
 	}
@@ -1225,9 +1333,9 @@ public:
 	bool TraverseArraySubscriptExpr(ArraySubscriptExpr* Expr)
 	{
 		TraverseStmt(Expr->getLHS());
-		out << '[';
+		out() << '[';
 		TraverseStmt(Expr->getRHS());
-		out << ']';
+		out() << ']';
 		return true;
 	}
 
@@ -1236,41 +1344,41 @@ public:
 		const llvm::fltSemantics& sem = Expr->getSemantics();
 		llvm::SmallString<1000> str;
 		Expr->getValue().toString(str);
-		out << str.c_str();
+		out() << str.c_str();
 		if (APFloat::semanticsSizeInBits(sem) < 64)
-			out << 'f';
+			out() << 'f';
 		else if (APFloat::semanticsSizeInBits(sem) > 64)
-			out << 'l';
+			out() << 'l';
 		return true;
 	}
 
 	bool TraverseForStmt(ForStmt* Stmt)
 	{
-		out << "for(";
+		out() << "for(";
 		TraverseStmt(Stmt->getInit());
-		out << "; ";
+		out() << "; ";
 		TraverseStmt(Stmt->getCond());
-		out << "; ";
+		out() << "; ";
 		TraverseStmt(Stmt->getInc());
-		out << ")" << std::endl;
+		out() << ")" << std::endl;
 		TraverseCompoundStmtOrNot(Stmt->getBody());
 		return true;
 	}
 
 	bool TraverseIfStmt(IfStmt* Stmt)
 	{
-		out << "if(";
+		out() << "if(";
 		TraverseStmt(Stmt->getCond());
-		out << ")" << std::endl;
+		out() << ")" << std::endl;
 		TraverseCompoundStmtOrNot(Stmt->getThen());
 		if(Stmt->getElse())
 		{
-			out << std::endl << indent_str() << "else ";
+			out() << std::endl << indent_str() << "else ";
 			if (Stmt->getElse()->getStmtClass() == Stmt::IfStmtClass)
 				TraverseStmt(Stmt->getElse());
 			else
 			{
-				out << std::endl;
+				out() << std::endl;
 				TraverseCompoundStmtOrNot(Stmt->getElse());
 			}
 		}
@@ -1285,7 +1393,7 @@ public:
 
 	bool TraverseCXXThrowExpr(CXXThrowExpr* Stmt)
 	{
-		out << "throw ";
+		out() << "throw ";
 		TraverseStmt(Stmt->getSubExpr());
 		return true;
 	}
@@ -1298,33 +1406,32 @@ public:
 
 	bool TraverseCXXFunctionalCastExpr(CXXFunctionalCastExpr* Stmt)
 	{
-		//out << "cast(";
 		PrintType(Stmt->getTypeInfoAsWritten()->getType());
-		out << '(';
+		out() << '(';
 		TraverseStmt(Stmt->getSubExpr());
-		out << ')';
+		out() << ')';
 		return true;
 	}
 
 	bool TraverseParenType(ParenType* Type)
 	{
-		out << '(';
+		out() << '(';
 		PrintType(Type->getInnerType());
-		out << ')';
+		out() << ')';
 		return true;
 	}
 
 	bool TraverseFunctionProtoType(FunctionProtoType* Type)
 	{
 		PrintType(Type->getReturnType());
-		out << " function(";
+		out() << " function(";
 		Spliter spliter(", ");
 		for (auto const& p : Type->getParamTypes())
 		{
 			spliter.split();
 			PrintType(p);
 		}
-		out << ')';
+		out() << ')';
 		return true;
 	}
 
@@ -1341,7 +1448,7 @@ public:
 
 	bool TraverseStringLiteral(StringLiteral* Stmt)
 	{
-		out << "\"";
+		out() << "\"";
 		std::string literal;
 		auto str = Stmt->getString();
 		if (Stmt->isUTF16() || Stmt->isWide())
@@ -1380,38 +1487,38 @@ public:
 				pos += 2;
 			}
 		}
-		out << literal;
-		out << "\"";
+		out() << literal;
+		out() << "\"";
 		return true;
 	}
 
 	bool TraverseCXXBoolLiteralExpr(CXXBoolLiteralExpr* Stmt)
 	{
-		out << (Stmt->getValue() ? "true" : "false");
+		out() << (Stmt->getValue() ? "true" : "false");
 		return true;
 	}
 
 	bool TraverseUnaryExprOrTypeTraitExpr(UnaryExprOrTypeTraitExpr* Expr)
 	{
-		//out << '(';
+		//out() << '(';
 		if(Expr->isArgumentType())
 			PrintType(Expr->getArgumentType());
 		else
 			TraverseStmt(Expr->getArgumentExpr());
-		//out << ')';
+		//out() << ')';
 		switch (Expr->getKind())
 		{
 		case UnaryExprOrTypeTrait::UETT_AlignOf:
-			out << ".alignof";
+			out() << ".alignof";
 			break;
 		case UnaryExprOrTypeTrait::UETT_SizeOf:
-			out << ".sizeof";
+			out() << ".sizeof";
 			break;
 		case UnaryExprOrTypeTrait::UETT_OpenMPRequiredSimdAlign:
-			out << ".OpenMPRequiredSimdAlign";
+			out() << ".OpenMPRequiredSimdAlign";
 			break;
 		case UnaryExprOrTypeTrait::UETT_VecStep:
-			out << ".VecStep";
+			out() << ".VecStep";
 			break;
 		}
 		return true;
@@ -1425,37 +1532,37 @@ public:
 	
 	bool TraverseLambdaExpr(LambdaExpr* S)
 	{
-		out << "[";
+		out() << "[";
 		Spliter spliter(", ");
 		for (auto& capture : S->captures())
 		{
 			spliter.split();
 			TraverseLambdaCapture(S, &capture);
 		}
-		out << "]";
+		out() << "]";
 
 		TypeLoc TL = S->getCallOperator()->getTypeSourceInfo()->getTypeLoc();
 		FunctionProtoTypeLoc Proto = TL.castAs<FunctionProtoTypeLoc>();
 
 		if (S->hasExplicitParameters() && S->hasExplicitResultType()) 
 		{
-			out << '(';
+			out() << '(';
 			// Visit the whole type.
 			TraverseTypeLoc(TL);
-			out << ')' << std::endl;
+			out() << ')' << std::endl;
 		}
 		else 
 		{
 			if (S->hasExplicitParameters()) {
 				Spliter spliter2(", ");
-				out << '(';
+				out() << '(';
 				// Visit parameters.
 				for (unsigned I = 0, N = Proto.getNumParams(); I != N; ++I) 
 				{
 					spliter2.split();
 					TraverseDecl(Proto.getParam(I));
 				}
-				out << ')' << std::endl;
+				out() << ')' << std::endl;
 			}
 			else if (S->hasExplicitResultType()) {
 				TraverseTypeLoc(Proto.getReturnLoc());
@@ -1469,7 +1576,7 @@ public:
 			//if (Expr *NE = T->getNoexceptExpr())
 			//	TRY_TO_TRAVERSE_OR_ENQUEUE_STMT(NE);
 		}
-		out << indent_str();
+		out() << indent_str();
 		TraverseStmt(S->getBody());
 		return true;
 		//return TRAVERSE_STMT_BASE(LambdaBody, LambdaExpr, S, Queue);
@@ -1477,9 +1584,9 @@ public:
 
 	bool TraverseCallExpr(CallExpr* Stmt)
 	{
-		//out << indent_str();
+		//out() << indent_str();
 		TraverseStmt(Stmt->getCallee());
-		out << "(";
+		out() << "(";
 		Spliter spliter(", ");
 		for (auto c : Stmt->arguments())
 		{
@@ -1489,7 +1596,7 @@ public:
 				TraverseStmt(c);
 			}
 		}
-		out << ")";// << std::endl;
+		out() << ")";// << std::endl;
 		return true;
 	}
 
@@ -1501,7 +1608,7 @@ public:
 
 	bool TraverseCXXThisExpr(CXXThisExpr*)
 	{
-		out << "this";
+		out() << "this";
 		return true;
 	}
 
@@ -1537,35 +1644,35 @@ public:
 		if (isStdArray(base->getType()) && memberName == "assign")
 		{
 			TraverseStmt(base);
-			out << "[] = ";
+			out() << "[] = ";
 			return true;
 		}
 		if (base->getStmtClass() != Stmt::StmtClass::CXXThisExprClass)
 		{
 			TraverseStmt(base);
-			out << '.';
+			out() << '.';
 		}
 		auto const kind = declName.getNameKind();
 		if (kind == DeclarationName::NameKind::CXXConversionFunctionName)
 		{
-			out << "opCast!(";
+			out() << "opCast!(";
 			PrintType(declName.getCXXNameType());
-			out << ')';
+			out() << ')';
 		}
 		else
-			out << memberName;
+			out() << memberName;
 		auto TAL = Stmt->getTemplateArgs();
 		auto const tmpArgCount = Stmt->getNumTemplateArgs();
 		Spliter spliter(", ");
 		if (tmpArgCount != 0)
 		{
-			out << "!(";
+			out() << "!(";
 			for (unsigned I = 0; I < tmpArgCount; ++I)
 			{
 				spliter.split();
 				TraverseTemplateArgumentLoc(TAL[I]);
 			}
-			out << ')';
+			out() << ')';
 		}
 
 		return true;
@@ -1573,14 +1680,8 @@ public:
 
 	bool TraverseCXXMemberCallExpr(CXXMemberCallExpr* Stmt)
 	{
-		auto self = Stmt->getImplicitObjectArgument();
-		/*if (self->getStmtClass() != Stmt::StmtClass::CXXThisExprClass)
-		{
-			TraverseStmt(self);
-			out << '.';
-		}*/
 		TraverseStmt(Stmt->getCallee());
-		out << '(';
+		out() << '(';
 		Spliter spliter(", ");
 		for (auto c : Stmt->arguments())
 		{
@@ -1590,24 +1691,24 @@ public:
 				TraverseStmt(c);
 			}
 		}
-		out << ')';
+		out() << ')';
 		return true;
 	}
 
 	bool TraverseCXXStaticCastExpr(CXXStaticCastExpr* Stmt)
 	{
-		out << "cast(";
+		out() << "cast(";
 		PrintType(Stmt->getTypeInfoAsWritten()->getType());
-		out << ')';
+		out() << ')';
 		TraverseStmt(Stmt->getSubExpr());
 		return true;
 	}
 
 	bool TraverseCStyleCastExpr(CStyleCastExpr* Stmt)
 	{
-		out << "cast(";
+		out() << "cast(";
 		PrintType(Stmt->getTypeInfoAsWritten()->getType());
-		out << ')';
+		out() << ')';
 		TraverseStmt(Stmt->getSubExpr());
 		return true;
 	}
@@ -1633,7 +1734,7 @@ public:
 	bool TraverseBinaryOperator(BinaryOperator* Stmt)
 	{
 		TraverseStmt(Stmt->getLHS());
-		out << " " << Stmt->getOpcodeStr().str() << " ";
+		out() << " " << Stmt->getOpcodeStr().str() << " ";
 		TraverseStmt(Stmt->getRHS());
 		return true;
 	}
@@ -1652,11 +1753,11 @@ public:
 			//TraverseStmt(Stmt->getSubExpr());
 			for (auto c : Stmt->children())
 				TraverseStmt(c);
-			out << Stmt->getOpcodeStr(Stmt->getOpcode()).str();
+			out() << Stmt->getOpcodeStr(Stmt->getOpcode()).str();
 		}
 		else
 		{
-			out << Stmt->getOpcodeStr(Stmt->getOpcode()).str();
+			out() << Stmt->getOpcodeStr(Stmt->getOpcode()).str();
 			//TraverseStmt(Stmt->getSubExpr());
 			for (auto c : Stmt->children())
 				TraverseStmt(c);
@@ -1678,45 +1779,45 @@ public:
 		if (decl->getKind() == Decl::Kind::EnumConstant)
 		{
 			PrintType(decl->getType());
-			out << '.';
+			out() << '.';
 		}
-		out << mangleName(Expr->getNameInfo().getAsString());
+		out() << mangleName(Expr->getNameInfo().getAsString());
 		return true;
 	}
 
 	bool TraverseRecordType(RecordType* Type)
 	{
-		out << mangleType(Type->getDecl()->getNameAsString());
+		out() << mangleType(Type->getDecl()->getNameAsString());
 		return true;
 	}
 
 	bool TraverseConstantArrayType(ConstantArrayType* Type)
 	{
 		PrintType(Type->getElementType());
-		out << '[' << Type->getSize().toString(10, false) << ']';
+		out() << '[' << Type->getSize().toString(10, false) << ']';
 		return true;
 	}
 
 	bool TraverseInitListExpr(InitListExpr* Expr)
 	{
-		out << "{ " << std::endl;
+		out() << "{ " << std::endl;
 		++indent;
 		for (auto c : Expr->inits())
 		{
-			out << indent_str();
+			out() << indent_str();
 			TraverseStmt(c);
-			out << ',' << std::endl;
+			out() << ',' << std::endl;
 		}
 		--indent;
-		out << indent_str() << "}";
+		out() << indent_str() << "}";
 		return true;
 	}
 
 	bool TraverseParenExpr(ParenExpr* Expr)
 	{
-		out << '(';
+		out() << '(';
 		TraverseStmt(Expr->getSubExpr());
-		out << ')';
+		out() << ')';
 		return true;
 	}
 
@@ -1728,33 +1829,33 @@ public:
 			Decl = Decl->getOutOfLineDefinition();
 
 		if (Decl->isStaticDataMember() || Decl->isStaticLocal())
-			out << "static ";
+			out() << "static ";
 		PrintType(Decl->getType());
-		out << " ";
+		out() << " ";
 		if (!Decl->isOutOfLine())
 		{
 			if (auto qualifier = Decl->getQualifier())
 				TraverseNestedNameSpecifier(qualifier);
 		}
-		out << mangleName(Decl->getNameAsString());
+		out() << mangleName(Decl->getNameAsString());
 		if (Decl->getInit() && !in_foreach_decl)
 		{
-			out << " = ";
+			out() << " = ";
 			TraverseStmt(Decl->getInit());
 		}
 	}
 
 	bool TraverseVarDecl(VarDecl* Decl)
 	{
-		//out << indent_str();
+		//out() << indent_str();
 		TraverseVarDeclImpl(Decl);
-		//out << ";" << std::endl << std::flush;
+		//out() << ";" << std::endl << std::flush;
 		return true;
 	}
 
 	/*bool TraverseType(QualType const& Type)
 	{
-		//out << Type.getAsString();
+		//out() << Type.getAsString();
 		//if(Type.hasQualifiers())
 		//Qualifiers quals = Type.getQualifiers();
 		Base::TraverseType(Type);
@@ -1764,19 +1865,19 @@ public:
 
 	bool VisitDecl(Decl *Decl)
 	{
-		out << indent_str() << "/*" << Decl->getDeclKindName() << " Decl*/";
+		out() << indent_str() << "/*" << Decl->getDeclKindName() << " Decl*/";
 		return true;
 	}
 
 	bool VisitStmt(Stmt *Stmt)
 	{
-		out << indent_str() << "/*" << Stmt->getStmtClassName() << " Stmt*/";
+		out() << indent_str() << "/*" << Stmt->getStmtClassName() << " Stmt*/";
 		return true;
 	}
 
 	bool VisitType(Type *Type)
 	{
-		out << indent_str() << "/*" << Type->getTypeClassName() << " Type*/";
+		out() << indent_str() << "/*" << Type->getTypeClassName() << " Type*/";
 		return true;
 	}
 
@@ -1864,7 +1965,7 @@ public:
 		for (auto const& import : imports)
 			file << "import " << import << ";" << std::endl;
 		file << std::endl;
-		file << out.str();
+		file << out().str();
 	}
 
 private:
@@ -1878,15 +1979,16 @@ public:
 	std::set<std::string> filenames;
 
 	void InclusionDirective(
-		SourceLocation hash_loc,
-		const Token &include_token,
+		SourceLocation,		//hash_loc,
+		const Token&,		//include_token,
 		StringRef file_name,
-		bool is_angled,
-		CharSourceRange filename_range,
-		const FileEntry *file,
-		StringRef search_path,
-		StringRef relative_path,
-		const Module *imported)
+		bool,				//is_angled,
+		CharSourceRange,	//filename_range,
+		const FileEntry*,	//file,
+		StringRef,			//search_path,
+		StringRef,			//relative_path,
+		const Module*		//imported
+		)
 	{
 		std::string const filename = file_name;
 		if (filenames.count(filename) == false)
@@ -1919,7 +2021,4 @@ bool VisitorToDAction::BeginSourceFileAction(CompilerInstance &ci, StringRef)
 
 void VisitorToDAction::EndSourceFileAction()
 {
-	CompilerInstance &ci = getCompilerInstance();
-	Preprocessor &pp = ci.getPreprocessor();
-	auto find_includes_callback = dynamic_cast<Find_Includes*>(pp.getPPCallbacks());
 }
