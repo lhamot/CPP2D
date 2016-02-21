@@ -243,7 +243,7 @@ class VisitorToD
 		return result;
 	}
 
-	void printStmtComment(SourceLocation& locStart, SourceLocation const& locEnd, SourceLocation const& nextStart)
+	void printStmtComment(SourceLocation& locStart, SourceLocation const& locEnd, SourceLocation const& nextStart = SourceLocation())
 	{
 		auto& sm = Context->getSourceManager();
 		std::string comment = Lexer::getSourceText(CharSourceRange(SourceRange(locStart, locEnd), true), sm, LangOptions()).str();
@@ -455,13 +455,13 @@ public:
 		++indent;
 		for (auto child : Stmt->children())
 		{
-			printStmtComment(locStart, child->getLocStart().getLocWithOffset(-1), child->getLocEnd().getLocWithOffset(0));
+			printStmtComment(locStart, child->getLocStart().getLocWithOffset(-1), child->getLocEnd());
 			out() << indent_str();
 			TraverseStmt(child);
 			if (needSemiComma(child))
 				out() << ";";
 		}
-		printStmtComment(locStart, Stmt->getRBracLoc().getLocWithOffset(-1), Stmt->getRBracLoc().getLocWithOffset(-1));
+		printStmtComment(locStart, Stmt->getRBracLoc().getLocWithOffset(-1));
 		--indent;
 		out() << indent_str();
 		out() << "}";
@@ -948,7 +948,7 @@ public:
 				out() << ',';
 			++index;
 		}
-		printStmtComment(locStart, funcTypeLoc.getRParenLoc(), locStart);
+		printStmtComment(locStart, funcTypeLoc.getRParenLoc());
 		--indent;
 		out() << indent_str();
 		out() << ")";
@@ -966,13 +966,13 @@ public:
 
 			for (auto child : Decl->getBody()->children())
 			{
-				printStmtComment(locStart, child->getLocStart().getLocWithOffset(-1), child->getLocEnd().getLocWithOffset(0));
+				printStmtComment(locStart, child->getLocStart().getLocWithOffset(-1), child->getLocEnd());
 				out() << indent_str();
 				TraverseStmt(child);
 				if(needSemiComma(child))
 					out() << ";";
 			}
-			printStmtComment(locStart, Decl->getBody()->getLocEnd().getLocWithOffset(0), Decl->getBody()->getLocEnd().getLocWithOffset(0));
+			printStmtComment(locStart, Decl->getBody()->getLocEnd());
 			--indent;
 			out() << indent_str();
 			out() << "}";
