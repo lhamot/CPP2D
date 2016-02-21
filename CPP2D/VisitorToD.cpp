@@ -156,6 +156,12 @@ std::string mangleName(std::string const& name)
 {
 	if (name == "version")
 		return "version_";
+	if (name == "out")
+		return "out_";
+	if (name == "in")
+		return "in_";
+	if (name == "debug")
+		return "debug_";
 	else if (name == "Exception")
 		return "Exception_";
 	else
@@ -251,9 +257,6 @@ class VisitorToD
 	{
 		auto& sm = Context->getSourceManager();
 		std::string comment = Lexer::getSourceText(CharSourceRange(SourceRange(locStart, locEnd), true), sm, LangOptions()).str();
-		auto semiComma = comment.find_first_of(",;}");
-		if (semiComma != std::string::npos)
-			comment = comment.substr(semiComma + 1, comment.size() - (semiComma + 1));
 		std::vector<std::string> comments = split(comment);
 		//if (comments.back() == std::string())
 		comments.pop_back();
@@ -261,16 +264,35 @@ class VisitorToD
 		if (comments.empty())
 			out() << std::endl;
 		if(not comments.empty())
-			out() << " ";
-		size_t index = 0;
-		for (auto const& c : comments)
 		{
-			//if (index < (comments.size() - 1))
-			split.split();
-			out() << c;
-			//if(index < (comments.size() - 1))
-			out() << std::endl;
-			++index;
+			auto& firstComment = comments.front();
+			auto commentPos1 = firstComment.find("//");
+			auto commentPos2 = firstComment.find("/*");
+			size_t trimPos = 0;
+			if (commentPos1 != std::string::npos)
+			{
+				if (commentPos2 != std::string::npos)
+					trimPos = std::min(commentPos1, commentPos2);
+				else
+					trimPos = commentPos1;
+			}
+			else if (commentPos2 != std::string::npos)
+				trimPos = commentPos2;
+			else
+				firstComment = "";
+
+			if (not firstComment.empty())
+				firstComment = firstComment.substr(trimPos);
+
+			out() << " ";
+			size_t index = 0;
+			for (auto const& c : comments)
+			{
+				split.split();
+				out() << c;
+				out() << std::endl;
+				++index;
+			}
 		}
 		locStart = nextStart;
 	}
@@ -388,7 +410,8 @@ public:
 		{
 			QualType qual = type.getAsType();
 			auto kind = qual.getTypePtr()->getTypeClass();
-			return kind == Type::TypeClass::TemplateSpecialization;
+			return kind == Type::TypeClass::TemplateSpecialization
+				|| kind == Type::TypeClass::Elaborated;
 		}
 		case TemplateArgument::ArgKind::Declaration:
 			return true;
@@ -401,10 +424,14 @@ public:
 		case TemplateArgument::ArgKind::TemplateExpansion:
 			return true;
 		case TemplateArgument::ArgKind::Expression:
-			return true;
+		{
+			Expr* expr = type.getAsExpr();
+			return expr->isTypeDependent() || expr->isValueDependent();
+		}
 		case TemplateArgument::ArgKind::Pack:
 			return true;
 		}
+		return true;
 	}
 
 	bool TraverseTemplateSpecializationType(TemplateSpecializationType *Type)
@@ -417,7 +444,8 @@ public:
 			out() << ']';
 			return true;
 		}
-		out() << mangleType(Type->getTemplateName().getAsTemplateDecl()->getNameAsString());
+		auto name = Type->getTemplateName().getAsTemplateDecl()->getNameAsString();
+		out() << mangleType(name);
 		auto const argNum = Type->getNumArgs();
 		bool const needParen = (argNum > 1) || (argNum == 1 && tempArgHasTempArg(Type->getArg(0)));
 		out() << (needParen ? "!(": "!");
@@ -458,11 +486,9 @@ public:
 		SourceLocation locStart = Stmt->getLBracLoc().getLocWithOffset(1);
 		out() << "{";
 		++indent;
+		initList();
 		for (auto child : Stmt->children())
 		{
-			out() << indent_str(); 
-			initList();
-			out() << std::endl;
 			printStmtComment(locStart, child->getLocStart().getLocWithOffset(-1), child->getLocEnd());
 			out() << indent_str();
 			TraverseStmt(child);
@@ -745,15 +771,17 @@ public:
 		out() << mangleName(Expr->getName().getAsString());
 		if (Expr->hasExplicitTemplateArgs())
 		{
-			out() << "!(";
+			auto const argNum = Expr->getNumTemplateArgs();
+			bool const needParen = (argNum > 1) || (argNum == 1 && tempArgHasTempArg(Expr->getTemplateArgs()[0].getArgument()));
+			out() << (needParen? "!(" : "!");
 			Spliter spliter(", ");
-			for (size_t i = 0; i < Expr->getNumTemplateArgs(); ++i)
+			for (size_t i = 0; i < argNum; ++i)
 			{
 				spliter.split();
 				auto tmpArg = Expr->getTemplateArgs()[i];
 				TraverseTemplateArgumentLoc(tmpArg);
 			}
-			out() << ')';
+			out() << (needParen ? ")" : "");
 		}
 		return true;
 	}
@@ -834,13 +862,28 @@ public:
 		return true;
 	}
 
+	bool TraverseCXXNewExpr(CXXNewExpr *Expr)
+	{
+		out() << "new ";
+		TraverseStmt(Expr->getInitializer());
+		return true;
+	}
+
 	bool TraverseCXXConstructExpr(CXXConstructExpr *Init)
 	{
+		if (Init->isElidable())  // Elidable ?
+		{
+			TraverseStmt(*Init->arg_begin());
+			return true;
+		}
+
+		/*if (Init->getNumArgs() == 0)
+			return true;
 		if (Init->isElidable())  // Elidable ?
 			TraverseStmt(*Init->arg_begin());
 		else if(Init->getConstructor()->isExplicit() == false && Init->getNumArgs() == 1)
 			TraverseStmt(*Init->arg_begin());  // Implicite convertion is enough
-		else
+		else*/
 		{
 			PrintType(Init->getType());
 			out() << '(';
@@ -866,12 +909,9 @@ public:
 		if (type.getTypePtr()->getTypeClass() == Type::TypeClass::Auto)
 		{
 			if (type.isConstQualified())
-				out() << "const";
+				out() << "const ";
 			if (in_foreach_decl == false)
-			{
-				out() << ' ';
 				TraverseType(type);
-			}
 		}
 		else
 		{
@@ -903,7 +943,6 @@ public:
 
 	void startCtorBody(CXXConstructorDecl *Decl)
 	{
-		out() << std::endl;
 		auto ctor_init_count = Decl->getNumCtorInitializers();
 		if (ctor_init_count != 0)
 		{
@@ -911,9 +950,9 @@ public:
 			{
 				if (init->isWritten())
 				{
-					out() << indent_str();
+					out() << std::endl << indent_str();
 					TraverseConstructorInitializer(init);
-					out() << ";" << std::endl;
+					out() << ";";
 				}
 			}
 		}
@@ -1557,15 +1596,6 @@ public:
 	
 	bool TraverseLambdaExpr(LambdaExpr* S)
 	{
-		out() << "[";
-		Spliter spliter(", ");
-		for (auto& capture : S->captures())
-		{
-			spliter.split();
-			TraverseLambdaCapture(S, &capture);
-		}
-		out() << "]";
-
 		TypeLoc TL = S->getCallOperator()->getTypeSourceInfo()->getTypeLoc();
 		FunctionProtoTypeLoc Proto = TL.castAs<FunctionProtoTypeLoc>();
 
@@ -1691,13 +1721,14 @@ public:
 		Spliter spliter(", ");
 		if (tmpArgCount != 0)
 		{
-			out() << "!(";
+			bool const needParen = (tmpArgCount > 1) || (tmpArgCount == 1 && tempArgHasTempArg(TAL[0].getArgument()));
+			out() << (needParen? "!(": "!");
 			for (unsigned I = 0; I < tmpArgCount; ++I)
 			{
 				spliter.split();
 				TraverseTemplateArgumentLoc(TAL[I]);
 			}
-			out() << ')';
+			out() << (needParen ? ")" : "");
 		}
 
 		return true;
