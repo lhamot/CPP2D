@@ -94,6 +94,8 @@ static const std::set<Stmt::StmtClass> noSemiCommaStmtKind =
 	Stmt::StmtClass::CXXForRangeStmtClass,
 	Stmt::StmtClass::WhileStmtClass,
 	Stmt::StmtClass::CompoundStmtClass,
+	Stmt::StmtClass::CXXCatchStmtClass,
+	Stmt::StmtClass::CXXTryStmtClass,
 	//Stmt::StmtClass::DeclStmtClass,
 };
 
@@ -154,6 +156,8 @@ std::string mangleName(std::string const& name)
 {
 	if (name == "version")
 		return "version_";
+	else if (name == "Exception")
+		return "Exception_";
 	else
 		return name;
 }
@@ -448,13 +452,17 @@ public:
 		return true;
 	}
 
-	bool TraverseCompoundStmt(CompoundStmt *Stmt)
+	template<typename InitList>
+	bool TraverseCompoundStmtImpl(CompoundStmt *Stmt, InitList initList)
 	{
 		SourceLocation locStart = Stmt->getLBracLoc().getLocWithOffset(1);
 		out() << "{";
 		++indent;
 		for (auto child : Stmt->children())
 		{
+			out() << indent_str(); 
+			initList();
+			out() << std::endl;
 			printStmtComment(locStart, child->getLocStart().getLocWithOffset(-1), child->getLocEnd());
 			out() << indent_str();
 			TraverseStmt(child);
@@ -466,6 +474,31 @@ public:
 		out() << indent_str();
 		out() << "}";
 		return true;
+	}
+
+	bool TraverseCompoundStmt(CompoundStmt *Stmt)
+	{
+		return TraverseCompoundStmtImpl(Stmt, []{});
+	}
+
+	template<typename InitList>
+	bool TraverseCXXTryStmtImpl(CXXTryStmt *Stmt, InitList initList)
+	{
+		out() << "try" << std::endl << indent_str();
+		auto tryBlock = Stmt->getTryBlock();
+		TraverseCompoundStmtImpl(tryBlock, initList);
+		auto handlerCount = Stmt->getNumHandlers();
+		for (decltype(handlerCount) i = 0; i < handlerCount; ++i)
+		{
+			out() << std::endl << indent_str();
+			TraverseStmt(Stmt->getHandler(i));
+		}
+		return true;
+	}
+
+	bool TraverseCXXTryStmt(CXXTryStmt *Stmt)
+	{
+		return TraverseCXXTryStmtImpl(Stmt, [] {});
 	}
 
 	bool TraverseNamespaceDecl(NamespaceDecl *Decl)
@@ -492,15 +525,18 @@ public:
 
 	bool TraverseCXXCatchStmt(CXXCatchStmt* Stmt)
 	{
-		out() << "catch(";
-		TraverseVarDeclImpl(Stmt->getExceptionDecl());
-		out() << ")" << std::endl;
-		for (auto c : Stmt->children())
+		out() << "catch";
+		if (Stmt->getExceptionDecl())
 		{
-			out() << indent_str();
-			TraverseStmt(c);
-			out() << ";" << std::endl;
+			out() << '(';
+			isCatchParameter = true;
+			TraverseVarDeclImpl(Stmt->getExceptionDecl());
+			isCatchParameter = false;
+			out() << ')';
 		}
+		out() << std::endl;
+		out() << indent_str();
+		TraverseStmt(Stmt->getHandlerBlock());
 		return true;
 	}
 
@@ -674,14 +710,6 @@ public:
 		else
 			return true;
 	}
-
-	bool TraverseCXXTryStmt(CXXTryStmt *Stmt)
-	{
-		out() << "try" << std::endl;
-		TraverseStmt(Stmt->getTryBlock());
-		return true;
-	}
-
 	
 	bool TraversePredefinedExpr(PredefinedExpr*)
 	{
@@ -952,30 +980,26 @@ public:
 		--indent;
 		out() << indent_str();
 		out() << ")";
-
-		if(Decl->getBody()) //(Decl->doesThisDeclarationHaveABody())
+		Stmt* body = Decl->getBody();
+		if(body)
 		{
 			out() << std::endl << std::flush;
-
-			out() << indent_str() << "{";
-			locStart = Decl->getBody()->getLocStart().getLocWithOffset(1);
-
-			++indent;
-
-			startCtorBody(Decl);
-
-			for (auto child : Decl->getBody()->children())
+			if (body->getStmtClass() == Stmt::CXXTryStmtClass)
 			{
-				printStmtComment(locStart, child->getLocStart().getLocWithOffset(-1), child->getLocEnd());
+				out() << indent_str() << '{' << std::endl;
+				++indent;
 				out() << indent_str();
-				TraverseStmt(child);
-				if(needSemiComma(child))
-					out() << ";";
+				TraverseCXXTryStmtImpl(static_cast<CXXTryStmt*>(body), [&] {startCtorBody(Decl); });
+				out() << std::endl;
+				--indent;
+				out() << indent_str() << '}';
 			}
-			printStmtComment(locStart, Decl->getBody()->getLocEnd());
-			--indent;
-			out() << indent_str();
-			out() << "}";
+			else
+			{
+				out() << indent_str();
+				assert(body->getStmtClass() == Stmt::CompoundStmt);
+				TraverseCompoundStmtImpl(static_cast<CompoundStmt*>(body), [&] {startCtorBody(Decl); });
+			}
 		}
 		else
 			out() << ";";
@@ -1187,7 +1211,8 @@ public:
 
 	bool TraverseLValueReferenceType(LValueReferenceType *Type)
 	{
-		out() << "ref ";
+		if(not isCatchParameter)
+			out() << "ref ";
 		PrintType(Type->getPointeeType());
 		return true;
 	}
@@ -1922,6 +1947,7 @@ private:
 	size_t indent = 0;
 	ASTContext *Context;
 	bool in_foreach_decl = false;
+	bool isCatchParameter = false;
 
 	std::vector<std::vector<NamedDecl*> > template_args_stack;
 };
