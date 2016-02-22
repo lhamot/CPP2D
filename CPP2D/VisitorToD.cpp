@@ -869,35 +869,39 @@ public:
 		return true;
 	}
 
+	void PrintCXXConstructExprParams(CXXConstructExpr *Init)
+	{
+		PrintType(Init->getType());
+		out() << '(';
+		Spliter spliter(", ");
+		for (auto arg : Init->arguments())
+		{
+			if (arg->getStmtClass() != Stmt::StmtClass::CXXDefaultArgExprClass)
+			{
+				spliter.split();
+				TraverseStmt(arg);
+			}
+		}
+		out() << ')';
+	}
+
 	bool TraverseCXXConstructExpr(CXXConstructExpr *Init)
 	{
+		//Can't put the " = " here can called by ReturnStmt
 		if (Init->isElidable())  // Elidable ?
 		{
+			//out() << "/*el*/";
+			assert(Init->getNumArgs() == 0);
 			TraverseStmt(*Init->arg_begin());
 			return true;
 		}
-
-		/*if (Init->getNumArgs() == 0)
-			return true;
-		if (Init->isElidable())  // Elidable ?
-			TraverseStmt(*Init->arg_begin());
-		else if(Init->getConstructor()->isExplicit() == false && Init->getNumArgs() == 1)
+		else if (Init->getConstructor()->isExplicit() == false && Init->getNumArgs() == 1)
+		{
+			//out() << "/*im*/";
 			TraverseStmt(*Init->arg_begin());  // Implicite convertion is enough
-		else*/
-		{
-			PrintType(Init->getType());
-			out() << '(';
-			Spliter spliter(", ");
-			for (auto arg : Init->arguments())
-			{
-				if (arg->getStmtClass() != Stmt::StmtClass::CXXDefaultArgExprClass)
-				{
-					spliter.split();
-					TraverseStmt(arg);
-				}
-			}
-			out() << ')';
 		}
+		else
+			PrintCXXConstructExprParams(Init);
 		return true;
 	}
 
@@ -1894,10 +1898,28 @@ public:
 				TraverseNestedNameSpecifier(qualifier);
 		}
 		out() << mangleName(Decl->getNameAsString());
-		if (Decl->getInit() && !in_foreach_decl)
+		auto init = Decl->getInit();
+		if (init && !in_foreach_decl)
 		{
-			out() << " = ";
-			TraverseStmt(Decl->getInit());
+			if (Decl->isDirectInit())
+			{
+				if(init->getStmtClass() != Stmt::StmtClass::CXXConstructExprClass)
+					TraverseStmt(init);
+				else
+				{
+					auto const constr = static_cast<CXXConstructExpr*>(init);
+					if (constr->getNumArgs() != 0)
+					{
+						out() << " = ";
+						PrintCXXConstructExprParams(constr);
+					}
+				}
+			}
+			else
+			{
+				out() << " = ";
+				TraverseStmt(init);
+			}
 		}
 	}
 
