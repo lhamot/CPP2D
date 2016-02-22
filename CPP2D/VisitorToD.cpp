@@ -63,12 +63,15 @@ static std::map<std::string, std::string> type2include =
 	{ "uint64_t", "core.stdc.stdint" },
 	{ "uint64_t", "core.stdc.stdint" },
 	{ "Array", "std.container.array" },
+	{ "RedBlackTree", "std.container.rbtree" },
+	{ "string", "" },
 };
 
 static std::map<std::string, std::string> type2type =
 {
 	{ "optional", "Nullable" },
 	{ "vector", "Array" },
+	{ "set", "RedBlackTree" },
 };
 
 
@@ -168,25 +171,48 @@ std::string mangleName(std::string const& name)
 		return name;
 }
 
+std::set<std::string> includes_in_file;
+
 class VisitorToD
 	: public RecursiveASTVisitor<VisitorToD>
 {
 	typedef RecursiveASTVisitor<VisitorToD> Base;
 
 
-	std::string mangleType(std::string const& name)
+	std::string mangleType(NamedDecl const* decl)
 	{
-		auto result = [&]
+		std::string const& name = decl->getNameAsString();
+		auto type = mangleName(name);
+		auto iter = type2type.find(type);
+		if (iter != type2type.end())
+			type = iter->second;
+
+		auto dtype_to_dinclude = type2include.find(type);
+		if (dtype_to_dinclude != type2include.end())
 		{
-			auto const name2 = mangleName(name);
-			auto iter = type2type.find(name);
-			if (iter == type2type.end())
-				return name2;
-			else
-				return iter->second;
-		}();
-		extern_types.insert(result);
-		return result;
+			if(not dtype_to_dinclude->second.empty())
+				extern_includes.insert(dtype_to_dinclude->second);
+		}
+		else
+		{
+			std::string decl_inc = getFile(decl);
+			for (std::string include : includes_in_file)
+			{
+				if (decl_inc.find(include) != std::string::npos)
+				{
+					if (include.find(".h") == include.size() - 2)
+						include = include.substr(0, include.size() - 2);
+					if (include.find(".hpp") == include.size() - 4)
+						include = include.substr(0, include.size() - 4);
+					std::transform(std::begin(include), std::end(include), std::begin(include), tolower);
+					std::replace(std::begin(include), std::end(include), '/', '.');
+					std::replace(std::begin(include), std::end(include), '\\', '.');
+					extern_includes.insert(include);
+					break;
+				}
+			}
+		}
+		return type;
 	}
 
 	std::string replace(std::string str, std::string const& in, std::string const& out)
@@ -444,8 +470,7 @@ public:
 			out() << ']';
 			return true;
 		}
-		auto name = Type->getTemplateName().getAsTemplateDecl()->getNameAsString();
-		out() << mangleType(name);
+		out() << mangleType(Type->getTemplateName().getAsTemplateDecl());
 		auto const argNum = Type->getNumArgs();
 		bool const needParen = (argNum > 1) || (argNum == 1 && tempArgHasTempArg(Type->getArg(0)));
 		out() << (needParen ? "!(": "!");
@@ -462,7 +487,7 @@ public:
 
 	bool TraverseTypedefType(TypedefType* Type)
 	{
-		std::string const name = mangleType(Type->getDecl()->getNameAsString());
+		std::string const name = mangleType(Type->getDecl());
 		std::string const converted = [&]() -> std::string
 		{
 			return
@@ -907,9 +932,6 @@ public:
 
 	void PrintType(QualType const& type)
 	{
-		//std::cout << type.getNonReferenceType().getAsString() << std::endl;
-		//extern_types.insert(type.getNonReferenceType().getAsString());
-
 		if (type.getTypePtr()->getTypeClass() == Type::TypeClass::Auto)
 		{
 			if (type.isConstQualified())
@@ -1265,7 +1287,7 @@ public:
 		//Type->dump();
 		IdentifierInfo* identifier = Type->getIdentifier();
 		if (identifier)
-			out() << mangleType(identifier->getName());
+			out() << identifier->getName().str();
 		else if (Type->getDecl())
 			TraverseDecl(Type->getDecl());
 		else
@@ -1281,7 +1303,7 @@ public:
 	{
 		IdentifierInfo* identifier = Decl->getIdentifier();
 		if (identifier)
-			out() << mangleType(identifier->getName());
+			out() << identifier->getName().str();
 		return true;
 	}
 
@@ -1847,7 +1869,7 @@ public:
 
 	bool TraverseRecordType(RecordType* Type)
 	{
-		out() << mangleType(Type->getDecl()->getNameAsString());
+		out() << mangleType(Type->getDecl());
 		return true;
 	}
 
@@ -1959,7 +1981,7 @@ public:
 		return true;
 	}
 
-	std::set<std::string> extern_types;
+	std::set<std::string> extern_includes;
 	std::string modulename;
 
 private:
@@ -1972,6 +1994,8 @@ private:
 		auto& mgr = fsl.getManager();
 		if (clang::FileEntry const* f = mgr.getFileEntryForID(fsl.getFileID()))
 			return f->getName();
+		else
+			return nullptr;
 	}
 
 	bool checkFilename(Decl const* d)
@@ -2033,12 +2057,8 @@ public:
 		Visitor.TraverseTranslationUnitDecl(Context.getTranslationUnitDecl());
 
 		std::set<std::string> imports;
-		for (auto const& type : Visitor.extern_types)
-		{
-			auto include_iter = type2include.find(type);
-			if (include_iter != type2include.end())
-				imports.insert(include_iter->second);
-		}
+		for (auto const& include : Visitor.extern_includes)
+			imports.insert(include);
 
 		std::ofstream file(modulename + ".d");
 		for (auto const& import : imports)
@@ -2055,8 +2075,6 @@ private:
 class Find_Includes : public PPCallbacks
 {
 public:
-	std::set<std::string> filenames;
-
 	void InclusionDirective(
 		SourceLocation,		//hash_loc,
 		const Token&,		//include_token,
@@ -2069,12 +2087,7 @@ public:
 		const Module*		//imported
 		)
 	{
-		std::string const filename = file_name;
-		if (filenames.count(filename) == false)
-		{
-			filenames.insert(filename);
-			//std::cout << filename << std::endl;
-		}
+		includes_in_file.insert(file_name);
 	}
 };
 
