@@ -54,6 +54,9 @@ static std::map<std::string, std::string> type2type =
 	{ "std::vector", "std.container.array.Array" },
 	{ "std::set", "std.container.rbtree.RedBlackTree" },
 	{ "std::logic_error", "object.error" },
+	{ "std::runtime_error", "object.Exception" },
+	{ "boost::shared_mutex", "core.sync.rwmutex.ReadWriteMutex" },
+	{ "boost::mutex", "core.sync.mutex.Mutex" },
 	{ "time_t", "core.stdc.time.time_t" },
 	{ "intptr_t", "core.stdc.stdint.intptr_t" },
 	{ "int8_t", "core.stdc.stdint.int8_t" },
@@ -65,7 +68,9 @@ static std::map<std::string, std::string> type2type =
 	{ "int64_t", "core.stdc.stdint.int64_t" },
 	{ "uint64_t", "core.stdc.stdint.uint64_t" },
 	{ "Array", "std.container.array" },
+	{ "SafeInt", "std.experimental.safeint.SafeInt" },
 	{ "RedBlackTree", "std.container.rbtree" },
+	{ "std::map", "cpp_std.map" },
 	{ "std::string", "string" },
 };
 
@@ -479,6 +484,14 @@ public:
 			TraverseTemplateArgument(Type->getArg(0));
 			out() << '[';
 			TraverseTemplateArgument(Type->getArg(1));
+			out() << ']';
+			return true;
+		}
+		else if (isStdUnorderedMap(Type->desugar()))
+		{
+			TraverseTemplateArgument(Type->getArg(1));
+			out() << '[';
+			TraverseTemplateArgument(Type->getArg(0));
 			out() << ']';
 			return true;
 		}
@@ -1716,6 +1729,16 @@ public:
 		return
 			name.substr(0, boost_array.size()) == boost_array ||
 			name.substr(0, std_array.size()) == std_array;
+	}
+	
+	bool isStdUnorderedMap(QualType const& type)
+	{
+		QualType const rawType = type.isCanonical() ?
+			type :
+			type.getCanonicalType();
+		std::string const name = rawType.getAsString();
+		static std::string const std_unordered_map = "class std::unordered_map<";
+		return name.substr(0, std_unordered_map.size()) == std_unordered_map;
 	}
 
 	bool TraverseCXXDependentScopeMemberExpr(CXXDependentScopeMemberExpr* Stmt)
