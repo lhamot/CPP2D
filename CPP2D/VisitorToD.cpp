@@ -48,30 +48,25 @@ std::string popStream()
 
 #define CHECK_LOC  if (checkFilename(Decl)) {} else return true
 
-static std::map<std::string, std::string> type2include =
-{
-	{ "time_t", "core.stdc.time" },
-	{ "Nullable", "std.typecons" },
-	{ "intptr_t", "core.stdc.stdint" },
-	{ "int8_t", "core.stdc.stdint" },
-	{ "uint8_t", "core.stdc.stdint" },
-	{ "int16_t", "core.stdc.stdint" },
-	{ "uint16_t", "core.stdc.stdint" },
-	{ "int32_t", "core.stdc.stdint" },
-	{ "uint32_t", "core.stdc.stdint" },
-	{ "int64_t", "core.stdc.stdint" },
-	{ "uint64_t", "core.stdc.stdint" },
-	{ "uint64_t", "core.stdc.stdint" },
-	{ "Array", "std.container.array" },
-	{ "RedBlackTree", "std.container.rbtree" },
-	{ "string", "" },
-};
-
 static std::map<std::string, std::string> type2type =
 {
-	{ "optional", "Nullable" },
-	{ "vector", "Array" },
-	{ "set", "RedBlackTree" },
+	{ "boost::optional", "std.typecons.Nullable" },
+	{ "std::vector", "std.container.array.Array" },
+	{ "std::set", "std.container.rbtree.RedBlackTree" },
+	{ "std::logic_error", "object.error" },
+	{ "time_t", "core.stdc.time.time_t" },
+	{ "intptr_t", "core.stdc.stdint.intptr_t" },
+	{ "int8_t", "core.stdc.stdint.int8_t" },
+	{ "uint8_t", "core.stdc.stdint.uint8_t" },
+	{ "int16_t", "core.stdc.stdint.int16_t" },
+	{ "uint16_t", "core.stdc.stdint.uint16_t" },
+	{ "int32_t", "core.stdc.stdint.int32_t" },
+	{ "uint32_t", "core.stdc.stdint.uint32_t" },
+	{ "int64_t", "core.stdc.stdint.int64_t" },
+	{ "uint64_t", "core.stdc.stdint.uint64_t" },
+	{ "Array", "std.container.array" },
+	{ "RedBlackTree", "std.container.rbtree" },
+	{ "std::string", "string" },
 };
 
 
@@ -181,24 +176,41 @@ class VisitorToD
 
 	std::string mangleType(NamedDecl const* decl)
 	{
+		NamedDecl const* can_decl = nullptr;
 		std::string const& name = decl->getNameAsString();
-		auto type = mangleName(name);
-		auto iter = type2type.find(type);
-		if (iter != type2type.end())
-			type = iter->second;
-
-		auto dtype_to_dinclude = type2include.find(type);
-		if (dtype_to_dinclude != type2include.end())
+		std::string qual_name = name;
+		if (Decl const* can_decl_notype = decl->getCanonicalDecl())
 		{
-			if(not dtype_to_dinclude->second.empty())
-				extern_includes.insert(dtype_to_dinclude->second);
+			auto const kind = can_decl_notype->getKind();
+			if (Decl::Kind::firstNamed <= kind && kind <= Decl::Kind::lastNamed)
+			{
+				can_decl = static_cast<NamedDecl const*>(can_decl_notype);
+				qual_name = can_decl->getQualifiedNameAsString();
+			}
+		}
+
+		auto qual_type_to_d = type2type.find(qual_name);
+		if (qual_type_to_d != type2type.end())
+		{
+			//There is a convertion to D
+			auto const& d_qual_type = qual_type_to_d->second;
+			auto const dot_pos = d_qual_type.find_last_of('.');
+			auto const module = dot_pos == std::string::npos ?
+				std::string() :
+				d_qual_type.substr(0, dot_pos);
+			if (not module.empty()) //Need an import
+				extern_includes.insert(module);
+			return d_qual_type.substr(dot_pos + 1);
 		}
 		else
 		{
-			std::string decl_inc = getFile(decl);
+			std::string decl_inc = getFile(can_decl? can_decl: decl);
 			for (std::string include : includes_in_file)
 			{
-				if (decl_inc.find(include) != std::string::npos)
+				auto const pos = decl_inc.find(include);
+				if (pos != std::string::npos && 
+					pos == (decl_inc.size() - include.size()) &&
+					(pos == 0 || decl_inc[pos - 1] == '/' || decl_inc[pos - 1] == '\\'))
 				{
 					if (include.find(".h") == include.size() - 2)
 						include = include.substr(0, include.size() - 2);
@@ -211,8 +223,8 @@ class VisitorToD
 					break;
 				}
 			}
+			return name;
 		}
-		return type;
 	}
 
 	std::string replace(std::string str, std::string const& in, std::string const& out)
@@ -1985,8 +1997,32 @@ public:
 	std::string modulename;
 
 private:
+
+	const char* getFile(Stmt const* d)
+	{
+		/*Module* module = d->getLocalOwningModule();
+		if (clang::FileEntry const* f = module->getASTFile())
+		return f->getName();
+		else
+		return nullptr;*/
+		clang::SourceLocation sl = d->getLocStart();
+		if (sl.isValid() == false)
+			return "";
+		clang::FullSourceLoc fsl = Context->getFullLoc(sl).getExpansionLoc();
+		auto& mgr = fsl.getManager();
+		if (clang::FileEntry const* f = mgr.getFileEntryForID(fsl.getFileID()))
+			return f->getName();
+		else
+			return nullptr;
+	}
+
 	const char* getFile(Decl const* d)
 	{
+		/*Module* module = d->getLocalOwningModule();
+		if (clang::FileEntry const* f = module->getASTFile())
+			return f->getName();
+		else
+			return nullptr;*/
 		clang::SourceLocation sl = d->getLocation();
 		if (sl.isValid() == false)
 			return "";
