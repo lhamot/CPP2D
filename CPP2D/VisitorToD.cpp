@@ -18,6 +18,9 @@
 //#include "llvm/Support/ConvertUTF.h"
 #pragma warning(pop)
 
+#include "MatchContainer.h"
+#include "Matcher.h"
+
 //using namespace clang::tooling;
 using namespace llvm;
 using namespace clang;
@@ -341,8 +344,11 @@ class VisitorToD
 	}
 
 public:
-	explicit VisitorToD(ASTContext *Context)
-		: Context(Context) 
+	explicit VisitorToD(
+			ASTContext *Context, 
+			MatchContainer const& receiver)
+		: Context(Context)
+		, receiver(receiver)
 	{
 	}
 
@@ -845,9 +851,7 @@ public:
 		Decl* singleDecl = varDecl->getSingleDecl();
 		if(singleDecl->getKind() != Decl::Kind::Var)
 			abort();
-		in_foreach_decl = true;
 		TraverseVarDeclImpl(static_cast<VarDecl*>(singleDecl));
-		in_foreach_decl = false;
 		out() << "; ";
 		TraverseStmt(Stmt->getRangeInit());
 		out() << ")" << std::endl;
@@ -961,8 +965,7 @@ public:
 		{
 			if (type.isConstQualified())
 				out() << "const ";
-			if (in_foreach_decl == false)
-				TraverseType(type);
+			TraverseType(type);
 		}
 		else
 		{
@@ -1263,9 +1266,10 @@ public:
 		return true;
 	}
 
-	bool TraverseAutoType(AutoType*)
+	bool TraverseAutoType(AutoType* type)
 	{
-		out() << "auto";
+		if(receiver.forrange_loopvar_auto.count(type) == 0)
+			out() << "auto";
 		return true;
 	}
 
@@ -1955,6 +1959,7 @@ public:
 				TraverseNestedNameSpecifier(qualifier);
 		}
 		out() << mangleName(Decl->getNameAsString());
+		bool const in_foreach_decl = receiver.forrange_loopvar.count(Decl) != 0;
 		auto init = Decl->getInit();
 		if (init && !in_foreach_decl)
 		{
@@ -2080,9 +2085,9 @@ private:
 		}
 	}
 
+	MatchContainer const& receiver;
 	size_t indent = 0;
 	ASTContext *Context;
-	bool in_foreach_decl = false;
 	bool isCatchParameter = false;
 
 	std::vector<std::vector<NamedDecl*> > template_args_stack;
@@ -2091,17 +2096,21 @@ private:
 
 class VisitorToDConsumer : public clang::ASTConsumer
 {
-	std::string InFile;
-
 public:
-	explicit VisitorToDConsumer(ASTContext *Context, llvm::StringRef InFile)
-		: Visitor(Context)
+	explicit VisitorToDConsumer(
+			ASTContext *Context, 
+			llvm::StringRef InFile
+		)
+		: finder(getMatcher(receiver))
+		, finderConsumer(finder.newASTConsumer())
 		, InFile(InFile.data(), InFile.size())
+		, Visitor(Context, receiver)
 	{
 	}
 
 	virtual void HandleTranslationUnit(clang::ASTContext &Context)
 	{
+		finderConsumer->HandleTranslationUnit(Context);
 		int lastSep = (int)InFile.find_last_of('/');
 		if (lastSep == std::string::npos)
 			lastSep = (int)InFile.find_last_of('\\');
@@ -2127,6 +2136,10 @@ public:
 	}
 
 private:
+	MatchContainer receiver;
+	ast_matchers::MatchFinder finder;
+	std::unique_ptr<clang::ASTConsumer> finderConsumer;
+	std::string InFile;
 	VisitorToD Visitor;
 };
 
@@ -2155,9 +2168,7 @@ std::unique_ptr<clang::ASTConsumer> VisitorToDAction::CreateASTConsumer(
 	llvm::StringRef InFile
 	)
 {
-	return std::make_unique<VisitorToDConsumer>(
-		&Compiler.getASTContext(), 
-		InFile);
+	return std::make_unique<VisitorToDConsumer>(&Compiler.getASTContext(), InFile);
 }
 
 bool VisitorToDAction::BeginSourceFileAction(CompilerInstance &ci, StringRef)

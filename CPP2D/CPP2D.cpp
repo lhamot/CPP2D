@@ -3,8 +3,6 @@
 #include "clang/Tooling/Tooling.h"
 #pragma warning(pop)
 
-#pragma warning(disable: 4714)
-
 #include <iostream>
 #include <fstream>
 

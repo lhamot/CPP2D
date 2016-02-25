@@ -6,23 +6,30 @@
 #include "clang/Frontend/FrontendActions.h"
 #pragma warning(pop)
 
-class VisitorToD;
+#include "MatchContainer.h"
 
 namespace clang
 {
 	class CompilerInstance;
+
+	namespace ast_matchers
+	{
+		class MatchFinder;
+	}
 }
 
+class VisitorToD;
+class MatchContainer;
 
 class VisitorToDAction : public clang::ASTFrontendAction
 {
 public:
-	virtual std::unique_ptr<clang::ASTConsumer> CreateASTConsumer(
+	std::unique_ptr<clang::ASTConsumer> CreateASTConsumer(
 		clang::CompilerInstance &Compiler,
 		llvm::StringRef //InFile
-		);
+		) override;
 
-	bool BeginSourceFileAction(clang::CompilerInstance &ci, llvm::StringRef);
+	bool BeginSourceFileAction(clang::CompilerInstance &ci, llvm::StringRef) override;
 
-	void EndSourceFileAction();
+	void EndSourceFileAction() override;
 };
