@@ -15,8 +15,22 @@ MatchFinder getMatcher(MatchContainer& receiver)
 				hasType(autoType().bind("forrange_loopvar_auto"))
 				))));
 
+	TypeMatcher refToClass =
+		lValueReferenceType(
+			pointee(
+				elaboratedType(
+					namesType(
+						recordType(
+							hasDeclaration(cxxRecordDecl(isClass()))
+							)
+						)
+					)
+				)
+			).bind("ref_to_class");
+
 	MatchFinder finder;
 	finder.addMatcher(foreachDeclInitMatcher, &receiver);
 	finder.addMatcher(foreachDeclAutoMatcher, &receiver);
+	finder.addMatcher(refToClass, &receiver);
 	return finder;
 }

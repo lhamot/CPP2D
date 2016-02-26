@@ -9,4 +9,7 @@ void MatchContainer::run(const ast_matchers::MatchFinder::MatchResult &Result)
 
 	if (AutoType const* type = Result.Nodes.getNodeAs<clang::AutoType>("forrange_loopvar_auto"))
 		forrange_loopvar_auto.insert(type);
+
+	if (LValueReferenceType const* type = Result.Nodes.getNodeAs<clang::LValueReferenceType>("ref_to_class"))
+		ref_to_class.insert(type);
 }

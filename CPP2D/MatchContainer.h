@@ -15,4 +15,5 @@ public:
 
 	std::set<clang::VarDecl const*> forrange_loopvar;
 	std::set<clang::AutoType const*> forrange_loopvar_auto;
+	std::set<clang::LValueReferenceType const*> ref_to_class;
 };

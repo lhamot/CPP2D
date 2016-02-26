@@ -611,9 +611,7 @@ public:
 		if (Stmt->getExceptionDecl())
 		{
 			out() << '(';
-			isCatchParameter = true;
 			TraverseVarDeclImpl(Stmt->getExceptionDecl());
-			isCatchParameter = false;
 			out() << ')';
 		}
 		out() << std::endl;
@@ -846,12 +844,12 @@ public:
 	{
 		out() << "foreach(";
 		DeclStmt* varDecl = Stmt->getLoopVarStmt();
-		if(varDecl->isSingleDecl() == false)
-			abort();
+		assert(varDecl->isSingleDecl());
 		Decl* singleDecl = varDecl->getSingleDecl();
-		if(singleDecl->getKind() != Decl::Kind::Var)
-			abort();
+		assert(singleDecl && singleDecl->getKind() == Decl::Kind::Var);
+		refAccepted = true;
 		TraverseVarDeclImpl(static_cast<VarDecl*>(singleDecl));
+		refAccepted = false;
 		out() << "; ";
 		TraverseStmt(Stmt->getRangeInit());
 		out() << ")" << std::endl;
@@ -1050,8 +1048,12 @@ public:
 	template<typename D, typename TemplPrinter>
 	bool TraverseFunctionDeclImpl(D *Decl, TemplPrinter templPrinter = [] {})
 	{
+		refAccepted = true;
 		if (printFuncBegin(Decl) == false)
+		{
+			refAccepted = false;
 			return true;
+		}
 		templPrinter();
 		out() << "(";
 		TypeSourceInfo* declSourceInfo = Decl->getTypeSourceInfo();
@@ -1073,6 +1075,7 @@ public:
 		--indent;
 		out() << indent_str();
 		out() << ")";
+		refAccepted = false;
 		Stmt* body = Decl->getBody();
 		if(body)
 		{
@@ -1096,8 +1099,8 @@ public:
 		}
 		else
 			out() << ";";
-		return true;
 
+		return true;
 	}
 
 	bool TraverseFunctionDecl(FunctionDecl *Decl)
@@ -1305,9 +1308,21 @@ public:
 
 	bool TraverseLValueReferenceType(LValueReferenceType *Type)
 	{
-		if(not isCatchParameter)
-			out() << "ref ";
-		PrintType(Type->getPointeeType());
+		if(receiver.ref_to_class.count(Type))
+			PrintType(Type->getPointeeType());
+		else
+		{
+			if (refAccepted)
+			{
+				out() << "ref ";
+				PrintType(Type->getPointeeType());
+			}
+			else
+			{
+				PrintType(Type->getPointeeType());
+				out() << "* ";
+			}
+		}
 		return true;
 	}
 
@@ -1666,12 +1681,14 @@ public:
 			if (S->hasExplicitParameters()) {
 				Spliter spliter2(", ");
 				out() << '(';
+				refAccepted = true;
 				// Visit parameters.
 				for (unsigned I = 0, N = Proto.getNumParams(); I != N; ++I) 
 				{
 					spliter2.split();
 					TraverseDecl(Proto.getParam(I));
 				}
+				refAccepted = false;
 				out() << ')' << std::endl;
 			}
 			else if (S->hasExplicitResultType()) {
@@ -2088,9 +2105,9 @@ private:
 	MatchContainer const& receiver;
 	size_t indent = 0;
 	ASTContext *Context;
-	bool isCatchParameter = false;
 
 	std::vector<std::vector<NamedDecl*> > template_args_stack;
+	bool refAccepted = false;
 };
 
 
