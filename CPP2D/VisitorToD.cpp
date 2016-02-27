@@ -75,6 +75,7 @@ static std::map<std::string, std::string> type2type =
 	{ "RedBlackTree", "std.container.rbtree" },
 	{ "std::map", "cpp_std.map" },
 	{ "std::string", "string" },
+	{ "std::ostream", "std.stdio.File" },
 };
 
 
@@ -359,6 +360,7 @@ public:
 
 	bool TraverseTranslationUnitDecl(TranslationUnitDecl *Decl)
 	{
+		if (receiver.dont_print_this_decl.count(Decl)) return true;
 		//SourceManager& sm = Context->getSourceManager();
 		//SourceLocation prevDeclEnd;
 		//for(auto c: Context->Comments.getComments())
@@ -402,6 +404,7 @@ public:
 
 	bool TraverseTypedefDecl(TypedefDecl *Decl)
 	{
+		if (receiver.dont_print_this_decl.count(Decl)) return true;
 		out() << "alias " << mangleName(Decl->getNameAsString()) << " = ";
 		PrintType(Decl->getUnderlyingType());
 		return true;
@@ -409,6 +412,7 @@ public:
 
 	bool TraverseFieldDecl(FieldDecl *Decl)
 	{
+		if (receiver.dont_print_this_decl.count(Decl)) return true;
 		//out() << indent_str();
 		//TraverseNestedNameSpecifierLoc(Decl->getQualifierLoc());
 		PrintType(Decl->getType());
@@ -585,6 +589,7 @@ public:
 
 	bool TraverseNamespaceDecl(NamespaceDecl *Decl)
 	{
+		if (receiver.dont_print_this_decl.count(Decl)) return true;
 		out() << "// -> module " << mangleName(Decl->getNameAsString()) << ';' << std::endl;
 		for (auto decl : Decl->decls())
 		{
@@ -620,8 +625,9 @@ public:
 		return true;
 	}
 
-	bool TraverseAccessSpecDecl(AccessSpecDecl*)
+	bool TraverseAccessSpecDecl(AccessSpecDecl* Decl)
 	{
+		if (receiver.dont_print_this_decl.count(Decl)) return true;
 		return true;
 	}
 
@@ -639,15 +645,15 @@ public:
 
 	template<typename TmpSpecFunc>
 	bool TraverseCXXRecordDeclImpl(
-		RecordDecl *Decl, 
+		RecordDecl *decl, 
 		TmpSpecFunc traverseTmpSpecs)
 	{
-		if (Decl->isCompleteDefinition() == false)
+		if (decl->isCompleteDefinition() == false)
 			return true;
 
-		const bool isClass = Decl->isClass();// || Decl->isPolymorphic();
-		char const* struct_class = Decl->isClass() ? "class" : "struct";
-		out() << struct_class << " " << mangleName(Decl->getNameAsString());
+		const bool isClass = decl->isClass();// || decl->isPolymorphic();
+		char const* struct_class = decl->isClass() ? "class" : "struct";
+		out() << struct_class << " " << mangleName(decl->getNameAsString());
 		traverseTmpSpecs();
 
 		out() << std::endl << indent_str() << "{";
@@ -660,18 +666,18 @@ public:
 			"private"
 		};
 
-		//Base::TraverseCXXRecordDecl(Decl);
+		//Base::TraverseCXXRecordDecl(decl);
 		AccessSpecifier access = isClass ?
 			AccessSpecifier::AS_private :
 			AccessSpecifier::AS_public;
-		for (auto decl : Decl->decls())
+		for (auto decl2 : decl->decls())
 		{
 			pushStream();
-			TraverseDecl(decl);
+			TraverseDecl(decl2);
 			std::string const declstr = popStream();
 			if (not declstr.empty())
 			{
-				AccessSpecifier newAccess = decl->getAccess();
+				AccessSpecifier newAccess = decl2->getAccess();
 				if (newAccess == AccessSpecifier::AS_none)
 					newAccess = AccessSpecifier::AS_public;
 				if (newAccess != access)
@@ -681,15 +687,33 @@ public:
 					++indent;
 					access = newAccess;
 				}
-				printCommentBefore(decl);
+				printCommentBefore(decl2);
 				out() << indent_str() << declstr;
-				if (needSemiComma(decl))
+				if (needSemiComma(decl2))
 					out() << ";";
-				printCommentAfter(decl);
+				printCommentAfter(decl2);
 				out() << std::endl;
 			}
 		}
 
+		//Print all free operator inside the class scope
+		auto record_name = decl->getTypeForDecl()->getCanonicalTypeInternal().getAsString();
+		for (auto rng = receiver.free_operator.equal_range(record_name); 
+		     rng.first != rng.second;
+		     ++rng.first)
+		{
+			out() << indent_str();
+			TraverseFunctionDeclImpl(const_cast<FunctionDecl*>(rng.first->second), [] {}, 0);
+			out() << std::endl;
+		}
+		for (auto rng = receiver.free_operator_right.equal_range(record_name); 
+		     rng.first != rng.second; 
+			 ++rng.first)
+		{
+			out() << indent_str();
+			TraverseFunctionDeclImpl(const_cast<FunctionDecl*>(rng.first->second), [] {}, 1);
+			out() << std::endl;
+		}
 		// Print the toHash method.
 		/*auto record_name = Decl->getTypeForDecl()->getCanonicalTypeInternal().getAsString();
 		auto iter = receiver.hash_traits.find(record_name);
@@ -762,6 +786,7 @@ public:
 	template<typename D>
 	bool TraverseClassTemplateSpecializationDeclImpl(D* Decl)
 	{
+		if (receiver.dont_print_this_decl.count(Decl)) return true;
 		if (Decl->isCompleteDefinition() == false)
 			return true;
 
@@ -804,16 +829,19 @@ public:
 
 	bool TraverseCXXConstructorDecl(CXXConstructorDecl *Decl)
 	{
+		if (receiver.dont_print_this_decl.count(Decl)) return true;
 		return TraverseFunctionDeclImpl(Decl, [] {});
 	}
 
 	bool TraverseCXXDestructorDecl(CXXDestructorDecl *Decl)
 	{
+		if (receiver.dont_print_this_decl.count(Decl)) return true;
 		return TraverseFunctionDeclImpl(Decl, [] {});
 	}
 
 	bool TraverseCXXMethodDecl(CXXMethodDecl *Decl)
 	{
+		if (receiver.dont_print_this_decl.count(Decl)) return true;
 		if (Decl->getLexicalParent() == Decl->getParent())
 			return TraverseFunctionDeclImpl(Decl, [] {});
 		else
@@ -925,6 +953,7 @@ public:
 
 	bool TraverseStaticAssertDecl(StaticAssertDecl *Decl)
 	{
+		if (receiver.dont_print_this_decl.count(Decl)) return true;
 		out() << "static assert(";
 		TraverseStmt(Decl->getAssertExpr());
 		out() << ", ";
@@ -1039,7 +1068,7 @@ public:
 		}
 	}
 
-	bool printFuncBegin(FunctionDecl* Decl)
+	bool printFuncBegin(FunctionDecl* Decl, int arg_become_this = -1)
 	{
 		if (Decl->isOverloadedOperator() && Decl->getOverloadedOperator() == OverloadedOperatorKind::OO_ExclaimEqual)
 			return false;
@@ -1047,18 +1076,19 @@ public:
 		out() << " ";
 		if (Decl->isOverloadedOperator())
 		{
+			std::string right = (arg_become_this == 1)? "Right": "";
 			auto const opKind = Decl->getOverloadedOperator();
 			if (opKind == OverloadedOperatorKind::OO_EqualEqual)
-				out() << "opEqual";
+				out() << "opEqual" + right;
 			else
-				out() << "opBinary(string op: \"" << opStrTab[opKind] << "\")";
+				out() << "opBinary" + right + "(string op: \"" << opStrTab[opKind] << "\")";
 		}
 		else
 			out() << mangleName(Decl->getNameAsString());
 		return true;
 	}
 
-	bool printFuncBegin(CXXConstructorDecl *Decl)
+	bool printFuncBegin(CXXConstructorDecl *Decl, int arg_become_this = -1)
 	{
 		auto record = Decl->getParent();
 		if (record->isStruct() && Decl->getNumParams() == 0)
@@ -1067,7 +1097,7 @@ public:
 		return true;
 	}
 
-	bool printFuncBegin(CXXDestructorDecl*)
+	bool printFuncBegin(CXXDestructorDecl*, int arg_become_this = -1)
 	{
 		out() << "~this";
 		return true;
@@ -1075,10 +1105,13 @@ public:
 
 
 	template<typename D, typename TemplPrinter>
-	bool TraverseFunctionDeclImpl(D *Decl, TemplPrinter templPrinter = [] {})
+	bool TraverseFunctionDeclImpl(
+		D *Decl, 
+		TemplPrinter templPrinter = [] {},
+		int arg_become_this = -1)
 	{
 		refAccepted = true;
-		if (printFuncBegin(Decl) == false)
+		if (printFuncBegin(Decl, arg_become_this) == false)
 		{
 			refAccepted = false;
 			return true;
@@ -1093,11 +1126,14 @@ public:
 		size_t index = 0;
 		for (auto decl : Decl->params())
 		{
-			printStmtComment(locStart, decl->getLocStart().getLocWithOffset(-1), decl->getLocEnd().getLocWithOffset(1));
-			out() << indent_str();
-			TraverseDecl(decl);
-			if(index != Decl->getNumParams() - 1)
-				out() << ',';
+			if (arg_become_this != index)
+			{
+				printStmtComment(locStart, decl->getLocStart().getLocWithOffset(-1), decl->getLocEnd().getLocWithOffset(1));
+				out() << indent_str();
+				TraverseDecl(decl);
+				if (index != Decl->getNumParams() - 1)
+					out() << ',';
+			}
 			++index;
 		}
 		printStmtComment(locStart, funcTypeLoc.getRParenLoc());
@@ -1109,12 +1145,20 @@ public:
 		if(body)
 		{
 			out() << std::endl << std::flush;
+			auto alias_this = [&]
+			{
+				if (arg_become_this >= 0)
+				{
+					ParmVarDecl* param = *(Decl->param_begin() + arg_become_this);
+					out() << std::endl << indent_str() << "alias " << param->getNameAsString() << " = this;";
+				}
+			};
 			if (body->getStmtClass() == Stmt::CXXTryStmtClass)
 			{
 				out() << indent_str() << '{' << std::endl;
 				++indent;
 				out() << indent_str();
-				TraverseCXXTryStmtImpl(static_cast<CXXTryStmt*>(body), [&] {startCtorBody(Decl); });
+				TraverseCXXTryStmtImpl(static_cast<CXXTryStmt*>(body), [&] {startCtorBody(Decl); alias_this(); });
 				out() << std::endl;
 				--indent;
 				out() << indent_str() << '}';
@@ -1123,7 +1167,7 @@ public:
 			{
 				out() << indent_str();
 				assert(body->getStmtClass() == Stmt::CompoundStmt);
-				TraverseCompoundStmtImpl(static_cast<CompoundStmt*>(body), [&] {startCtorBody(Decl); });
+				TraverseCompoundStmtImpl(static_cast<CompoundStmt*>(body), [&] {startCtorBody(Decl); alias_this(); });
 			}
 		}
 		else
@@ -1134,17 +1178,20 @@ public:
 
 	bool TraverseFunctionDecl(FunctionDecl *Decl)
 	{
+		if (receiver.dont_print_this_decl.count(Decl)) return true;
 		return TraverseFunctionDeclImpl(Decl, [] {});
 	}
 
-	bool TraverseUsingDirectiveDecl(UsingDirectiveDecl*)
+	bool TraverseUsingDirectiveDecl(UsingDirectiveDecl* Decl)
 	{
+		if (receiver.dont_print_this_decl.count(Decl)) return true;
 		return true;
 	}
 
 
 	bool TraverseFunctionTemplateDecl(FunctionTemplateDecl *Decl)
 	{
+		if (receiver.dont_print_this_decl.count(Decl)) return true;
 		auto FDecl = Decl->getTemplatedDecl();
 		return TraverseFunctionDeclImpl(FDecl, [FDecl, Decl, this] {
 			out() << "(";
@@ -1248,6 +1295,7 @@ public:
 
 	bool TraverseEnumConstantDecl(EnumConstantDecl *Decl)
 	{
+		if (receiver.dont_print_this_decl.count(Decl)) return true;
 		out() << mangleName(Decl->getNameAsString());
 		if (Decl->getInitExpr())
 		{
@@ -1259,6 +1307,7 @@ public:
 
 	bool TraverseEnumDecl(EnumDecl *Decl)
 	{
+		if (receiver.dont_print_this_decl.count(Decl)) return true;
 		out() << "enum " << mangleName(Decl->getNameAsString());
 		if (Decl->isFixed())
 		{
@@ -1311,18 +1360,21 @@ public:
 	return true;
 	}*/
 	
-	bool TraverseLinkageSpecDecl(LinkageSpecDecl*)
+	bool TraverseLinkageSpecDecl(LinkageSpecDecl* Decl)
 	{
+		if (receiver.dont_print_this_decl.count(Decl)) return true;
 		return true;
 	}
 
-	bool TraverseFriendDecl(FriendDecl*)
+	bool TraverseFriendDecl(FriendDecl* Decl)
 	{
+		if (receiver.dont_print_this_decl.count(Decl)) return true;
 		return true;
 	}
 
 	bool TraverseParmVarDecl(ParmVarDecl *Decl)
 	{
+		if (receiver.dont_print_this_decl.count(Decl)) return true;
 		PrintType(Decl->getType());
 		out() <<  " " << mangleName(Decl->getNameAsString());
 		return true;
@@ -1374,6 +1426,7 @@ public:
 
 	bool TraverseTemplateTypeParmDecl(TemplateTypeParmDecl *Decl)
 	{
+		if (receiver.dont_print_this_decl.count(Decl)) return true;
 		IdentifierInfo* identifier = Decl->getIdentifier();
 		if (identifier)
 			out() << identifier->getName().str();
@@ -1382,6 +1435,7 @@ public:
 
 	bool TraverseNonTypeTemplateParmDecl(NonTypeTemplateParmDecl *Decl)
 	{
+		if (receiver.dont_print_this_decl.count(Decl)) return true;
 		IdentifierInfo* identifier = Decl->getIdentifier();
 		if (identifier)
 			out() << mangleName(identifier->getName());
@@ -1412,8 +1466,9 @@ public:
 		return true;
 	}
 
-	bool TraverseNamespaceAliasDecl(NamespaceAliasDecl*)
+	bool TraverseNamespaceAliasDecl(NamespaceAliasDecl* Decl)
 	{
+		if (receiver.dont_print_this_decl.count(Decl)) return true;
 		return true;
 	}
 
@@ -1687,8 +1742,9 @@ public:
 		return true;
 	}
 
-	bool TraverseEmptyDecl(EmptyDecl*)
+	bool TraverseEmptyDecl(EmptyDecl* Decl)
 	{
+		if (receiver.dont_print_this_decl.count(Decl)) return true;
 		return true;
 	}
 
@@ -2033,6 +2089,7 @@ public:
 
 	bool TraverseVarDecl(VarDecl* Decl)
 	{
+		if (receiver.dont_print_this_decl.count(Decl)) return true;
 		//out() << indent_str();
 		TraverseVarDeclImpl(Decl);
 		//out() << ";" << std::endl << std::flush;

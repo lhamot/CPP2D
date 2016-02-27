@@ -20,4 +20,6 @@ public:
 	std::unordered_set<clang::LValueReferenceType const*> ref_to_class;
 	std::unordered_map<std::string, clang::CXXMethodDecl const*> hash_traits;
 	std::unordered_set<clang::Decl const*> dont_print_this_decl;
+	std::unordered_multimap<std::string, clang::FunctionDecl const*> free_operator;  //left operand will become this
+	std::unordered_multimap<std::string, clang::FunctionDecl const*> free_operator_right; //right operand will become this
 };

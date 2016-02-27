@@ -36,10 +36,18 @@ MatchFinder getMatcher(MatchContainer& receiver)
 				)
 			);
 
+	DeclarationMatcher out_stream_op =
+		functionDecl(
+			unless(hasDeclContext(recordDecl())),
+			matchesName("operator.+"),
+			parameterCountIs(2)
+			).bind("free_operator");
+
 	MatchFinder finder;
 	finder.addMatcher(foreachDeclInitMatcher, &receiver);
 	finder.addMatcher(foreachDeclAutoMatcher, &receiver);
 	finder.addMatcher(refToClass, &receiver);
 	finder.addMatcher(hash_trait, &receiver);
+	finder.addMatcher(out_stream_op, &receiver);
 	return finder;
 }
