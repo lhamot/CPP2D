@@ -16,7 +16,7 @@
     <LocalDebuggerWorkingDirectory>I:\C\Bit_them_all\src_d</LocalDebuggerWorkingDirectory>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <LocalDebuggerCommandArguments>I:\C\Bit_them_all\src\Model.cpp  -- -x c++ -fparse-all-comments -DBOOST_USE_WINDOWS_H -fms-compatibility-version=19 -fcxx-exceptions -pthread -cxx-isystem I:\C_libs\poco-1.4.6p2-all\Foundation\include -cxx-isystem I:\C_libs\poco-1.4.6p1-all\Data\include -cxx-isystem I:\C_libs\poco-1.4.6p2-all\Data\MySQL\include -cxx-isystem I:\C_libs\poco-1.4.6p1-all\Crypto\include -cxx-isystem I:\C_libs\boost_1_59_0</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>I:\C\Bit_them_all\src\Player.h  -- -x c++ -fparse-all-comments -DBOOST_USE_WINDOWS_H -fms-compatibility-version=19 -fcxx-exceptions -pthread -cxx-isystem I:\C_libs\poco-1.4.6p2-all\Foundation\include -cxx-isystem I:\C_libs\poco-1.4.6p1-all\Data\include -cxx-isystem I:\C_libs\poco-1.4.6p2-all\Data\MySQL\include -cxx-isystem I:\C_libs\poco-1.4.6p1-all\Crypto\include -cxx-isystem I:\C_libs\boost_1_59_0</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerWorkingDirectory>I:\C\Bit_them_all\src_d\DroneWars\source</LocalDebuggerWorkingDirectory>
   </PropertyGroup>

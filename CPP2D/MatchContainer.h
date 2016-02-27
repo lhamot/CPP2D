@@ -7,13 +7,17 @@
 #include <clang/AST/Stmt.h>
 #pragma warning(pop)
 
+#include <unordered_map>
+#include <unordered_set>
 
 class MatchContainer : public clang::ast_matchers::MatchFinder::MatchCallback 
 {
 public:
 	void run(clang::ast_matchers::MatchFinder::MatchResult const& Result) override;
 
-	std::set<clang::VarDecl const*> forrange_loopvar;
-	std::set<clang::AutoType const*> forrange_loopvar_auto;
-	std::set<clang::LValueReferenceType const*> ref_to_class;
+	std::unordered_set<clang::VarDecl const*> forrange_loopvar;
+	std::unordered_set<clang::AutoType const*> forrange_loopvar_auto;
+	std::unordered_set<clang::LValueReferenceType const*> ref_to_class;
+	std::unordered_map<std::string, clang::CXXMethodDecl const*> hash_traits;
+	std::unordered_set<clang::Decl const*> dont_print_this_decl;
 };

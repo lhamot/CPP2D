@@ -627,11 +627,13 @@ public:
 
 	bool TraverseCXXRecordDecl(CXXRecordDecl *Decl)
 	{
+		if (receiver.dont_print_this_decl.count(Decl)) return true;
 		return TraverseCXXRecordDeclImpl(Decl, [] {});
 	}
 
 	bool TraverseRecordDecl(RecordDecl *Decl)
 	{
+		if (receiver.dont_print_this_decl.count(Decl)) return true;
 		return TraverseCXXRecordDeclImpl(Decl, [] {});
 	}
 
@@ -687,6 +689,30 @@ public:
 				out() << std::endl;
 			}
 		}
+
+		// Print the toHash method.
+		/*auto record_name = Decl->getTypeForDecl()->getCanonicalTypeInternal().getAsString();
+		auto iter = receiver.hash_traits.find(record_name);
+		if (iter != receiver.hash_traits.end())
+		{
+			auto* meth = const_cast<CXXMethodDecl*>(iter->second);
+			if (meth->getNumParams() == 1)
+			{
+				ParmVarDecl* attr = *meth->param_begin();
+				std::string const name = attr->getNameAsString();
+				out() << indent_str() << "size_t toHash() const @safe pure nothrow" << std::endl;
+				//out() << indent_str();
+				out() << indent_str() << '{' << std::endl;
+				++indent;
+				out() << indent_str() << "auto " << name << " = this;" << std::endl;
+				out() << indent_str();
+				TraverseStmt(meth->getBody());
+				out() << std::endl;
+				--indent;
+				out() << indent_str() << '}' << std::endl;
+			}
+		}*/
+
 		--indent;
 		out() << indent_str() << "}";
 
@@ -695,6 +721,7 @@ public:
 
 	bool TraverseClassTemplateDecl(ClassTemplateDecl* Decl)
 	{
+		if (receiver.dont_print_this_decl.count(Decl)) return true;
 		TraverseCXXRecordDeclImpl(Decl->getTemplatedDecl(), [Decl, this]
 		{
 			auto& tmpParams = *Decl->getTemplateParameters();
@@ -722,11 +749,13 @@ public:
 
 	bool TraverseClassTemplatePartialSpecializationDecl(ClassTemplatePartialSpecializationDecl* Decl)
 	{
+		if (receiver.dont_print_this_decl.count(Decl)) return true;
 		return TraverseClassTemplateSpecializationDeclImpl(Decl);
 	}
 
 	bool TraverseClassTemplateSpecializationDecl(ClassTemplateSpecializationDecl* Decl)
 	{
+		if (receiver.dont_print_this_decl.count(Decl)) return true;
 		return TraverseClassTemplateSpecializationDeclImpl(Decl);
 	}
 

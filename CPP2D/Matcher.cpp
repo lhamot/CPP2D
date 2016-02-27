@@ -16,21 +16,30 @@ MatchFinder getMatcher(MatchContainer& receiver)
 				))));
 
 	TypeMatcher refToClass =
-		lValueReferenceType(
-			pointee(
-				elaboratedType(
-					namesType(
-						recordType(
-							hasDeclaration(cxxRecordDecl(isClass()))
+		lValueReferenceType(pointee(elaboratedType(namesType(recordType(
+			hasDeclaration(cxxRecordDecl(isClass()))))))
+			).bind("ref_to_class");
+
+	DeclarationMatcher hash_trait =
+		namespaceDecl(
+			allOf(
+				hasName("std"),
+				hasDescendant(
+					classTemplateSpecializationDecl(
+						allOf(
+							templateArgumentCountIs(1),
+							hasName("hash"),
+							hasMethod(cxxMethodDecl(hasName("operator()")).bind("hash_method"))
 							)
-						)
+						).bind("dont_print_this_decl")
 					)
 				)
-			).bind("ref_to_class");
+			);
 
 	MatchFinder finder;
 	finder.addMatcher(foreachDeclInitMatcher, &receiver);
 	finder.addMatcher(foreachDeclAutoMatcher, &receiver);
 	finder.addMatcher(refToClass, &receiver);
+	finder.addMatcher(hash_trait, &receiver);
 	return finder;
 }
