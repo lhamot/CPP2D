@@ -267,6 +267,8 @@ class VisitorToD
 			string const comment = rc->getRawText(sm).str();
 			out() << replace(comment, "\r\n", line_return.str()) << std::endl;
 		}
+		else
+			out() << std::endl;
 	}
 
 	void printCommentAfter(Decl* t)
@@ -1076,10 +1078,14 @@ public:
 		out() << " ";
 		if (Decl->isOverloadedOperator())
 		{
-			std::string right = (arg_become_this == 1)? "Right": "";
+			std::string const right = (arg_become_this == 1)? "Right": "";
 			auto const opKind = Decl->getOverloadedOperator();
 			if (opKind == OverloadedOperatorKind::OO_EqualEqual)
 				out() << "opEqual" + right;
+			else if (opKind == OverloadedOperatorKind::OO_Call)
+				out() << "opCall" + right;
+			else if (opKind == OverloadedOperatorKind::OO_Subscript)
+				out() << "opIndex" + right;
 			else
 				out() << "opBinary" + right + "(string op: \"" << opStrTab[opKind] << "\")";
 		}
@@ -1088,7 +1094,9 @@ public:
 		return true;
 	}
 
-	bool printFuncBegin(CXXConstructorDecl *Decl, int arg_become_this = -1)
+	bool printFuncBegin(CXXConstructorDecl *Decl, 
+		                int = -1 //arg_become_this = -1
+		                )
 	{
 		auto record = Decl->getParent();
 		if (record->isStruct() && Decl->getNumParams() == 0)
@@ -1097,7 +1105,9 @@ public:
 		return true;
 	}
 
-	bool printFuncBegin(CXXDestructorDecl*, int arg_become_this = -1)
+	bool printFuncBegin(CXXDestructorDecl*, 
+		                int = -1 //arg_become_this = -1
+		                )
 	{
 		out() << "~this";
 		return true;
@@ -2023,7 +2033,9 @@ public:
 
 	bool TraverseInitListExpr(InitListExpr* Expr)
 	{
-		out() << "{ " << std::endl;
+		bool const isArray = 
+			(Expr->ClassifyLValue(*Context) == clang::Expr::LV_ArrayTemporary);
+		out() << (isArray?'[':'{') << " " << std::endl;
 		++indent;
 		for (auto c : Expr->inits())
 		{
@@ -2032,7 +2044,7 @@ public:
 			out() << ',' << std::endl;
 		}
 		--indent;
-		out() << indent_str() << "}";
+		out() << indent_str() << (isArray ? ']' : '}');
 		return true;
 	}
 

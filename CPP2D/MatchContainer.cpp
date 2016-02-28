@@ -42,7 +42,6 @@ void MatchContainer::run(const ast_matchers::MatchFinder::MatchResult &Result)
 		dont_print_this_decl.insert(decl);
 		std::string const left_name = getParamTypeName(*(decl->param_begin()));
 		std::string const right_name = getParamTypeName(*(decl->param_begin() + 1));
-		std::cout << decl->getNameAsString() << " " << left_name << " " << right_name << std::endl;
 		free_operator.emplace(left_name, decl);
 		if(right_name != left_name)
 			free_operator_right.emplace(right_name, decl);
