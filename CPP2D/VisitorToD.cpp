@@ -8,6 +8,7 @@
 #include <ciso646>
 
 #pragma warning(push, 0)
+#pragma warning(disable, 4702)
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Frontend/CompilerInstance.h"
@@ -54,12 +55,13 @@ std::string popStream()
 static std::map<std::string, std::string> type2type =
 {
 	{ "boost::optional", "std.typecons.Nullable" },
-	{ "std::vector", "std.container.array.Array" },
+	{ "std::vector", "cpp_std.vector" },
 	{ "std::set", "std.container.rbtree.RedBlackTree" },
 	{ "std::logic_error", "object.error" },
 	{ "std::runtime_error", "object.Exception" },
 	{ "boost::shared_mutex", "core.sync.rwmutex.ReadWriteMutex" },
 	{ "boost::mutex", "core.sync.mutex.Mutex" },
+	{ "std::allocator", "cpp_std.allocator" },
 	{ "time_t", "core.stdc.time.time_t" },
 	{ "intptr_t", "core.stdc.stdint.intptr_t" },
 	{ "int8_t", "core.stdc.stdint.int8_t" },
@@ -70,7 +72,6 @@ static std::map<std::string, std::string> type2type =
 	{ "uint32_t", "core.stdc.stdint.uint32_t" },
 	{ "int64_t", "core.stdc.stdint.int64_t" },
 	{ "uint64_t", "core.stdc.stdint.uint64_t" },
-	{ "Array", "std.container.array" },
 	{ "SafeInt", "std.experimental.safeint.SafeInt" },
 	{ "RedBlackTree", "std.container.rbtree" },
 	{ "std::map", "cpp_std.map" },
@@ -297,7 +298,8 @@ class VisitorToD
 		{
 			iter = std::find(prevIter, std::end(instr), '\n');
 			result.push_back(trim(std::string(prevIter, iter)));
-			prevIter = iter + 1;
+			if (iter != std::end(instr))
+				prevIter = iter + 1;
 		} while (iter != std::end(instr));
 		return result;
 	}
@@ -750,13 +752,39 @@ public:
 		if (receiver.dont_print_this_decl.count(Decl)) return true;
 		TraverseCXXRecordDeclImpl(Decl->getTemplatedDecl(), [Decl, this]
 		{
-			auto& tmpParams = *Decl->getTemplateParameters();
+			TemplateParameterList* tmpParams = Decl->getTemplateParameters();
 			out() << "(";
 			Spliter spliter1(", ");
-			for (decltype(tmpParams.size()) i = 0, size = tmpParams.size(); i != size; ++i)
+			for (unsigned int i = 0, size = tmpParams->size(); i != size; ++i)
 			{
 				spliter1.split();
-				TraverseDecl(tmpParams.getParam(i));
+				NamedDecl* param = tmpParams->getParam(i);
+				TraverseDecl(param);
+				// Print default template arguments
+				if (auto *FTTP = dyn_cast<TemplateTypeParmDecl>(param))
+				{
+					if (FTTP->hasDefaultArgument())
+					{
+						out() << " = ";
+						PrintType(FTTP->getDefaultArgument());
+					}
+				}
+				else if (auto *FNTTP = dyn_cast<NonTypeTemplateParmDecl>(param)) 
+				{
+					if (FNTTP->hasDefaultArgument())
+					{
+						out() << " = ";
+						TraverseStmt(FNTTP->getDefaultArgument());
+					}
+				}
+				else if(auto *FTTTP = dyn_cast<TemplateTemplateParmDecl>(param))
+				{
+					if (FTTTP->hasDefaultArgument())
+					{
+						out() << " = ";
+						TraverseTemplateArgumentLoc(FTTTP->getDefaultArgument());
+					}
+				}
 			}
 			out() << ')';
 		});
@@ -1005,12 +1033,16 @@ public:
 			//out() << "/*el*/";
 			assert(Init->getNumArgs() == 0);
 			TraverseStmt(*Init->arg_begin());
-			return true;
 		}
 		else if (Init->getConstructor()->isExplicit() == false && Init->getNumArgs() == 1)
-		{
+		{   //If implicit copy constructor
+			QualType const argType = (*Init->arg_begin())->getType().getCanonicalType().getLocalUnqualifiedType();
+			QualType const ctorType = Init->getType().getCanonicalType().getLocalUnqualifiedType();
 			//out() << "/*im*/";
-			TraverseStmt(*Init->arg_begin());  // Implicite convertion is enough
+			if(argType == ctorType)
+				TraverseStmt(*Init->arg_begin());  // Implicite convertion is enough
+			else
+				PrintCXXConstructExprParams(Init);
 		}
 		else
 			PrintCXXConstructExprParams(Init);
@@ -1176,7 +1208,7 @@ public:
 			else
 			{
 				out() << indent_str();
-				assert(body->getStmtClass() == Stmt::CompoundStmt);
+				assert(body->getStmtClass() == Stmt::CompoundStmtClass);
 				TraverseCompoundStmtImpl(static_cast<CompoundStmt*>(body), [&] {startCtorBody(Decl); alias_this(); });
 			}
 		}
@@ -2006,13 +2038,22 @@ public:
 
 	bool TraverseDeclRefExpr(DeclRefExpr* Expr)
 	{
+		QualType nnsQualType;
 		if (Expr->hasQualifier())
-			TraverseNestedNameSpecifier(Expr->getQualifier());
+		{
+			NestedNameSpecifier* nns = Expr->getQualifier();
+			if (nns->getKind() == NestedNameSpecifier::SpecifierKind::TypeSpec)
+				nnsQualType = nns->getAsType()->getCanonicalTypeUnqualified();
+			TraverseNestedNameSpecifier(nns);
+		}
 		auto decl = Expr->getDecl();
 		if (decl->getKind() == Decl::Kind::EnumConstant)
 		{
-			PrintType(decl->getType());
-			out() << '.';
+			if (nnsQualType != decl->getType().getUnqualifiedType())
+			{
+				PrintType(decl->getType());
+				out() << '.';
+			}
 		}
 		out() << mangleName(Expr->getNameInfo().getAsString());
 		return true;
@@ -2021,6 +2062,30 @@ public:
 	bool TraverseRecordType(RecordType* Type)
 	{
 		out() << mangleType(Type->getDecl());
+		RecordDecl* decl = Type->getDecl();
+		switch (decl->getKind())
+		{
+		case Decl::Kind::Record:	break;
+		case Decl::Kind::CXXRecord:	break;
+		case Decl::Kind::ClassTemplateSpecialization: 
+		{  
+			// Print template arguments in template type of template specialization
+			auto* tmpSpec = llvm::dyn_cast<ClassTemplateSpecializationDecl>(decl);
+			TemplateArgumentList const& tmpArgsSpec = tmpSpec->getTemplateInstantiationArgs();
+			bool const paren = tmpArgsSpec.size() != 1 || tempArgHasTempArg(tmpArgsSpec.get(0));
+			out() << '!' << (paren? "(": "");
+			Spliter spliter2(", ");
+			for (unsigned int i = 0, size = tmpArgsSpec.size(); i != size; ++i)
+			{
+				spliter2.split();
+				TemplateArgument const& tmpArg = tmpArgsSpec.get(i);
+				TraverseTemplateArgument(tmpArg);
+			}
+			out() << (paren ? ")" : "");
+			break;
+		}
+		default: assert(false && "Unconsustent RecordDecl kind");
+		}
 		return true;
 	}
 
