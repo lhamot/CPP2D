@@ -237,6 +237,17 @@ class VisitorToD
 		}
 	}
 
+	std::string mangleVar(std::string const& name)
+	{
+		if (name == "printf")
+		{
+			extern_includes.insert("std.stdio");
+			return "writef";
+		}
+		else
+			return mangleName(name);
+	}
+
 	std::string replace(std::string str, std::string const& in, std::string const& out)
 	{
 		size_t pos = 0;
@@ -266,10 +277,10 @@ class VisitorToD
 			using namespace std;
 			out() << std::endl << indent_str();
 			string const comment = rc->getRawText(sm).str();
-			out() << replace(comment, "\r\n", line_return.str()) << std::endl;
+			out() << replace(comment, "\r\n", line_return.str()) << std::endl << indent_str();
 		}
 		else
-			out() << std::endl;
+			out() << std::endl << indent_str();
 	}
 
 	void printCommentAfter(Decl* t)
@@ -692,13 +703,13 @@ public:
 					access = newAccess;
 				}
 				printCommentBefore(decl2);
-				out() << indent_str() << declstr;
+				out() << declstr;
 				if (needSemiComma(decl2))
 					out() << ";";
 				printCommentAfter(decl2);
-				out() << std::endl;
 			}
 		}
+		out() << std::endl;
 
 		//Print all free operator inside the class scope
 		auto record_name = decl->getTypeForDecl()->getCanonicalTypeInternal().getAsString();
@@ -747,46 +758,50 @@ public:
 		return true;
 	}
 
+	void PrintTemplateParameterList(TemplateParameterList* tmpParams)
+	{
+		out() << "(";
+		Spliter spliter1(", ");
+		for (unsigned int i = 0, size = tmpParams->size(); i != size; ++i)
+		{
+			spliter1.split();
+			NamedDecl* param = tmpParams->getParam(i);
+			TraverseDecl(param);
+			// Print default template arguments
+			if (auto *FTTP = dyn_cast<TemplateTypeParmDecl>(param))
+			{
+				if (FTTP->hasDefaultArgument())
+				{
+					out() << " = ";
+					PrintType(FTTP->getDefaultArgument());
+				}
+			}
+			else if (auto *FNTTP = dyn_cast<NonTypeTemplateParmDecl>(param))
+			{
+				if (FNTTP->hasDefaultArgument())
+				{
+					out() << " = ";
+					TraverseStmt(FNTTP->getDefaultArgument());
+				}
+			}
+			else if (auto *FTTTP = dyn_cast<TemplateTemplateParmDecl>(param))
+			{
+				if (FTTTP->hasDefaultArgument())
+				{
+					out() << " = ";
+					TraverseTemplateArgumentLoc(FTTTP->getDefaultArgument());
+				}
+			}
+		}
+		out() << ')';
+	}
+
 	bool TraverseClassTemplateDecl(ClassTemplateDecl* Decl)
 	{
 		if (receiver.dont_print_this_decl.count(Decl)) return true;
 		TraverseCXXRecordDeclImpl(Decl->getTemplatedDecl(), [Decl, this]
 		{
-			TemplateParameterList* tmpParams = Decl->getTemplateParameters();
-			out() << "(";
-			Spliter spliter1(", ");
-			for (unsigned int i = 0, size = tmpParams->size(); i != size; ++i)
-			{
-				spliter1.split();
-				NamedDecl* param = tmpParams->getParam(i);
-				TraverseDecl(param);
-				// Print default template arguments
-				if (auto *FTTP = dyn_cast<TemplateTypeParmDecl>(param))
-				{
-					if (FTTP->hasDefaultArgument())
-					{
-						out() << " = ";
-						PrintType(FTTP->getDefaultArgument());
-					}
-				}
-				else if (auto *FNTTP = dyn_cast<NonTypeTemplateParmDecl>(param)) 
-				{
-					if (FNTTP->hasDefaultArgument())
-					{
-						out() << " = ";
-						TraverseStmt(FNTTP->getDefaultArgument());
-					}
-				}
-				else if(auto *FTTTP = dyn_cast<TemplateTemplateParmDecl>(param))
-				{
-					if (FTTTP->hasDefaultArgument())
-					{
-						out() << " = ";
-						TraverseTemplateArgumentLoc(FTTTP->getDefaultArgument());
-					}
-				}
-			}
-			out() << ')';
+			PrintTemplateParameterList(Decl->getTemplateParameters());
 		});
 		return true;
 	}
@@ -1002,10 +1017,38 @@ public:
 		return true;
 	}
 
+	bool TraverseCXXDeleteExpr(CXXDeleteExpr *Expr)
+	{
+		TraverseStmt(Expr->getArgument());
+		out() << " = null";
+		return true;
+	}
+
 	bool TraverseCXXNewExpr(CXXNewExpr *Expr)
 	{
 		out() << "new ";
-		TraverseStmt(Expr->getInitializer());
+		if (Expr->isArray())
+		{
+			PrintType(Expr->getAllocatedType());
+			out() << '[';
+			TraverseStmt(Expr->getArraySize());
+			out() << ']';
+		}
+		else
+		{
+			switch (Expr->getInitializationStyle())
+			{
+			case CXXNewExpr::NoInit:
+				PrintType(Expr->getAllocatedType());
+				break;
+			case CXXNewExpr::CallInit:
+				TraverseStmt(const_cast<CXXConstructExpr*>(Expr->getConstructExpr()));
+				break;
+			case CXXNewExpr::ListInit:
+				TraverseStmt(Expr->getInitializer());
+				break;
+			}
+		}
 		return true;
 	}
 
@@ -1100,6 +1143,28 @@ public:
 				}
 			}
 		}
+	}
+
+	bool printFuncBegin(CXXMethodDecl* Decl, int arg_become_this = -1)
+	{
+		if (Decl->isOverloadedOperator() && Decl->getOverloadedOperator() == OverloadedOperatorKind::OO_ExclaimEqual)
+			return false;
+		if (Decl->isStatic())
+			out() << "static ";
+		CXXRecordDecl* record = Decl->getParent();
+		if (Decl->isVirtual())
+		{
+			if (record->isStruct())
+			{
+				llvm::errs() << "struct " << record->getName() << " has virtual function, which is forbiden.\n";
+				out() << "virtual ";
+			}
+		}
+		else if (record->isClass())
+			out() << "final ";
+
+		printFuncBegin((FunctionDecl*)Decl, arg_become_this);
+		return true;
 	}
 
 	bool printFuncBegin(FunctionDecl* Decl, int arg_become_this = -1)
@@ -1235,15 +1300,9 @@ public:
 	{
 		if (receiver.dont_print_this_decl.count(Decl)) return true;
 		auto FDecl = Decl->getTemplatedDecl();
-		return TraverseFunctionDeclImpl(FDecl, [FDecl, Decl, this] {
-			out() << "(";
-			Spliter spliter(", ");
-			for (TemplateArgument const& tmpArg : Decl->getInjectedTemplateArgs())
-			{
-				spliter.split();
-				PrintType(tmpArg.getAsType());
-			}
-			out() << ")";
+		return TraverseFunctionDeclImpl(FDecl, [FDecl, Decl, this] 
+		{
+			PrintTemplateParameterList(Decl->getTemplateParameters());
 		});
 	}
 
@@ -1325,7 +1384,7 @@ public:
 				return TraverseType(innerType);
 		}
 		PrintType(pointee);
-		out() << '*';
+		out() << "[]"; //'*';
 		return true;
 	}
 
@@ -1419,6 +1478,11 @@ public:
 		if (receiver.dont_print_this_decl.count(Decl)) return true;
 		PrintType(Decl->getType());
 		out() <<  " " << mangleName(Decl->getNameAsString());
+		if (Decl->hasDefaultArg())
+		{
+			out() << " = ";
+			TraverseStmt(Decl->getDefaultArg());
+		}
 		return true;
 	}
 
@@ -1478,6 +1542,8 @@ public:
 	bool TraverseNonTypeTemplateParmDecl(NonTypeTemplateParmDecl *Decl)
 	{
 		if (receiver.dont_print_this_decl.count(Decl)) return true;
+		PrintType(Decl->getType());
+		out() << " ";
 		IdentifierInfo* identifier = Decl->getIdentifier();
 		if (identifier)
 			out() << mangleName(identifier->getName());
@@ -1494,14 +1560,12 @@ public:
 			bool first = true;
 			for (auto d : Stmt->decls())
 			{
-				printCommentBefore(d);
 				if (first)
 					first = false;
 				else
 					out() << indent_str();
 				TraverseDecl(d);
 				out() << ";";
-				printCommentAfter(d);
 				out() << std::endl;
 			}
 		}
@@ -1838,7 +1902,6 @@ public:
 
 	bool TraverseCallExpr(CallExpr* Stmt)
 	{
-		//out() << indent_str();
 		TraverseStmt(Stmt->getCallee());
 		out() << "(";
 		Spliter spliter(", ");
@@ -1978,6 +2041,16 @@ public:
 		return true;
 	}
 
+	bool TraverseConditionalOperator(ConditionalOperator* op)
+	{
+		TraverseStmt(op->getCond());
+		out() << "? ";
+		TraverseStmt(op->getTrueExpr());
+		out() << ": ";
+		TraverseStmt(op->getFalseExpr());
+		return true;
+	}
+
 	bool TraverseCompoundAssignOperator(CompoundAssignOperator* op)
 	{
 		VisitorToD::TraverseBinaryOperator(op);
@@ -2055,7 +2128,24 @@ public:
 				out() << '.';
 			}
 		}
-		out() << mangleName(Expr->getNameInfo().getAsString());
+		
+		out() << mangleVar(Expr->getNameInfo().getName().getAsString());
+		unsigned const argNum = Expr->getNumTemplateArgs();
+		if (argNum != 0)
+		{
+			TemplateArgumentLoc const* tmpArgs = Expr->getTemplateArgs();
+			bool const needParen = (argNum > 1) 
+				|| (argNum == 1 && tempArgHasTempArg(tmpArgs[0].getArgument()));
+			out() << '!' << (needParen? "(": "");
+			Spliter split(", ");
+			for (unsigned i = 0; i < argNum; ++i)
+			{
+				split.split();
+				TraverseTemplateArgument(tmpArgs[i].getArgument());
+			}
+			out() << (needParen ? ")" : "");
+		}
+
 		return true;
 	}
 
@@ -2104,9 +2194,11 @@ public:
 		++indent;
 		for (auto c : Expr->inits())
 		{
-			out() << indent_str();
+			pushStream();
 			TraverseStmt(c);
-			out() << ',' << std::endl;
+			std::string const valInit = popStream();
+			if (valInit.empty() == false)
+				out() << indent_str() << valInit << ',' << std::endl;
 		}
 		--indent;
 		out() << indent_str() << (isArray ? ']' : '}');
@@ -2118,6 +2210,11 @@ public:
 		out() << '(';
 		TraverseStmt(Expr->getSubExpr());
 		out() << ')';
+		return true;
+	}
+
+	bool TraverseImplicitValueInitExpr(ImplicitValueInitExpr*)
+	{
 		return true;
 	}
 
