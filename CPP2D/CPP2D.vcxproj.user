@@ -1,23 +1,23 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <LocalDebuggerCommandArguments>I:\C\Bit_them_all\src\UnivManip.cpp  -- -DBOOST_USE_WINDOWS_H -fms-compatibility-version=19 -fcxx-exceptions -pthread -cxx-isystem I:\C_libs\poco-1.4.6p2-all\Foundation\include -cxx-isystem I:\C_libs\poco-1.4.6p1-all\Data\include -cxx-isystem I:\C_libs\poco-1.4.6p2-all\Data\MySQL\include -cxx-isystem I:\C_libs\poco-1.4.6p1-all\Crypto\include -cxx-isystem I:\C_libs\boost_1_59_0</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>I:\C\CPP2D\CPP2D_UT_CPP\source_file.cpp  -- -x c++ -fms-compatibility-version=19 -fcxx-exceptions</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
-    <LocalDebuggerWorkingDirectory>I:\C\clangAST_test</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerWorkingDirectory>I:\C\CPP2D_UT_D\CPP2D_UT_D</LocalDebuggerWorkingDirectory>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <LocalDebuggerCommandArguments>I:\C\Bit_them_all\src\UnivManip.cpp  -- -DBOOST_USE_WINDOWS_H -fms-compatibility-version=19 -fcxx-exceptions -pthread -cxx-isystem I:\C_libs\poco-1.4.6p2-all\Foundation\include -cxx-isystem I:\C_libs\poco-1.4.6p1-all\Data\include -cxx-isystem I:\C_libs\poco-1.4.6p2-all\Data\MySQL\include -cxx-isystem I:\C_libs\poco-1.4.6p1-all\Crypto\include -cxx-isystem I:\C_libs\boost_1_59_0</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>I:\C\CPP2D\CPP2D_UT_CPP\source_file.cpp  -- -x c++ -fms-compatibility-version=19 -fcxx-exceptions</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
-    <LocalDebuggerWorkingDirectory>I:\C\clangAST_test</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerWorkingDirectory>I:\C\CPP2D_UT_D\CPP2D_UT_D</LocalDebuggerWorkingDirectory>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LocalDebuggerCommandArguments>I:\C\Bit_them_all\src\Player.h  -- -x c++ -fparse-all-comments -DBOOST_USE_WINDOWS_H -fms-compatibility-version=19 -fcxx-exceptions -pthread -cxx-isystem I:\C_libs\poco-1.4.6p2-all\Foundation\include -cxx-isystem I:\C_libs\poco-1.4.6p1-all\Data\include -cxx-isystem I:\C_libs\poco-1.4.6p2-all\Data\MySQL\include -cxx-isystem I:\C_libs\poco-1.4.6p1-all\Crypto\include -cxx-isystem I:\C_libs\boost_1_59_0 2&gt; out.txt</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>I:\C\CPP2D\CPP2D_UT_CPP\source_file.cpp  -- -x c++ -fms-compatibility-version=19 -fcxx-exceptions</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
-    <LocalDebuggerWorkingDirectory>I:\C\Bit_them_all\src_d</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerWorkingDirectory>I:\C\CPP2D_UT_D\CPP2D_UT_D</LocalDebuggerWorkingDirectory>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <LocalDebuggerCommandArguments>I:\C\Bit_them_all\src\Player.h  -- -x c++ -fparse-all-comments -DBOOST_USE_WINDOWS_H -fms-compatibility-version=19 -fcxx-exceptions -pthread -cxx-isystem I:\C_libs\poco-1.4.6p2-all\Foundation\include -cxx-isystem I:\C_libs\poco-1.4.6p1-all\Data\include -cxx-isystem I:\C_libs\poco-1.4.6p2-all\Data\MySQL\include -cxx-isystem I:\C_libs\poco-1.4.6p1-all\Crypto\include -cxx-isystem I:\C_libs\boost_1_59_0</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>I:\C\CPP2D\CPP2D_UT_CPP\source_file.cpp  -- -x c++ -fms-compatibility-version=19 -fcxx-exceptions</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
-    <LocalDebuggerWorkingDirectory>I:\C\Bit_them_all\src_d\DroneWars\source</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerWorkingDirectory>I:\C\CPP2D_UT_D\CPP2D_UT_D</LocalDebuggerWorkingDirectory>
   </PropertyGroup>
 </Project>

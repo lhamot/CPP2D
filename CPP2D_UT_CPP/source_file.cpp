@@ -3,8 +3,62 @@
 #include <cmath>
 #include <ciso646>
 
+class Tata
+{
+public:
+	virtual int funcV()
+	{
+		return 1;
+	}
+
+	int funcF()
+	{
+		return 1;
+	}
+};
+
+class Tata2 : public Tata
+{
+public:
+	int funcV() override
+	{
+		return 2;
+	}
+
+	int funcF(int i = 0)
+	{
+		return 2;
+	}
+
+	Tata2* getThis()
+	{
+		return this;
+	}
+
+	Tata2& getThisRef()
+	{
+		return *this;
+	}
+};
+
+template<int I>
+class TmplClass1
+{
+public:
+	static int const value = I;
+};
+
+template<int I>
+class TmplClass2 : public TmplClass1<I>{};
+
+template<>
+class TmplClass2<0> : public TmplClass1<42>{};
+
+unsigned int testCount = 0;
+
 void check(bool ok, char const* message, int line)
 {
+	++testCount;
 	if (not ok)
 	{
 		//printf(message);
@@ -84,7 +138,7 @@ void check_function()
 
 void check_array()
 {
-	int tab[3] = {1, 2, 3};
+	int tab[3] = { 1, 2, 3 };
 	tab[1] = 42;
 	CHECK(tab[1] == 42);
 	CHECK(tab[2] == 3);
@@ -97,7 +151,48 @@ void check_array()
 	CHECK(tab2[6] == 42);
 	delete[] tab2;
 	tab2 = nullptr;
+
+	int tabA[3] = { 1, 2, 3 };
+	int tabB[3] = { 1, 2, 3 };
+	CHECK(tabA != tabB);
+
+	int *tabC = new int[3];
+	int *tabD = new int[3];
+	for (int i = 0; i < 3; ++i)
+	{
+		tabC[i] = i - 1;
+		tabD[i] = i - 1;
+	}
+	CHECK(tabD != tabC);
 }
+
+struct Toto3
+{
+	int a;
+	float b;
+	bool c;
+	static short u;
+
+	int getA() const
+	{
+		return a;
+	}
+
+	void setA(int a_)
+	{
+		a = a_;
+	}
+
+	static int getStatic()
+	{
+		return 12;
+	}
+
+	//virtual void impossible(){}
+};
+
+short Toto3::u = 36;
+
 
 void check_struct()
 {
@@ -113,7 +208,7 @@ void check_struct()
 	// test commment
 	CHECK(toto.a == 6);
 
-	Toto toto2 = { 7, 8.99, true };
+	Toto toto2 = { 7, 8.99f, true };
 	CHECK(toto2.a == 7 && fl_equal(toto2.b, 8.99) && toto2.c == true);
 
 	//! comment Toto2
@@ -123,48 +218,42 @@ void check_struct()
 		int a;
 		float b; //!< comment b
 		bool c;
-		Toto2(int a_, 
-			  float b_, 
-			  bool c_ //!< comment c
+		Toto2(int a_,
+			float b_,
+			bool c_ //!< comment c
 			)
 			: a(a_)
 			, b(b_)
 			, c(c_)
 		{
 		}
+
+		Toto2* getThis()
+		{
+			return this;
+		}
+
+		Toto2& getThisRef()
+		{
+			return *this;
+		}
 	};
 
-	Toto2 toto3(18, 12.57, true);
+	Toto2 toto3(18, 12.57f, true);
 	CHECK(toto3.a == 18 && fl_equal(toto3.b, 12.57) && toto3.c == true);
-
-	struct Toto3
-	{
-		int a;
-		float b;
-		bool c;
-
-		int getA() const
-		{
-			return a;
-		}
-
-		void setA(int a_)
-		{
-			a = a_;
-		}
-
-		static int getStatic()
-		{
-			return 12;
-		}
-
-		//virtual void impossible(){}
-	};
+	CHECK(toto3.getThis() == &toto3);
+	CHECK(&toto3.getThisRef() == &toto3);
 
 	Toto3 t3;
 	t3.setA(16);
 	CHECK(t3.getA() == 16);
 	CHECK(Toto3::getStatic() == 12);
+
+	Toto3 const t4 = { 16 };
+	CHECK(t4.getA() == 16);
+
+	Toto3::u = 17;
+	CHECK(Toto3::u == 17);
 };
 
 // Template type
@@ -211,10 +300,27 @@ void check_template_function()
 	CHECK(res2 == 6);
 }
 
+
+void check_class()
+{
+	Tata2* t2 = new Tata2();
+	CHECK(t2->funcV() == 2);
+	CHECK(t2->funcF() == 2);
+	Tata* t = t2;
+	CHECK(t2->funcV() == 2);
+	CHECK(t2->funcF() == 1);
+	CHECK(t2->getThis() == t2);
+	CHECK(&t2->getThisRef() == t2);
+	delete t;
+
+	CHECK(TmplClass2<3>::value == 3);
+	CHECK(TmplClass2<0>::value == 42);
+}
+
 int main()
 {
 	check_operators();
-	
+
 	check_function();
 
 	check_struct();
@@ -224,6 +330,8 @@ int main()
 	check_template_struct_specialization();
 
 	check_template_function();
+
+	printf("%u tests\n", testCount);
 
 	return EXIT_SUCCESS;
 }
