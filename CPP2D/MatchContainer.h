@@ -10,7 +10,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
-class MatchContainer : public clang::ast_matchers::MatchFinder::MatchCallback 
+class MatchContainer : public clang::ast_matchers::MatchFinder::MatchCallback
 {
 public:
 	void run(clang::ast_matchers::MatchFinder::MatchResult const& Result) override;

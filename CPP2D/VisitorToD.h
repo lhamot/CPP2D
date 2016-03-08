@@ -10,12 +10,12 @@
 
 namespace clang
 {
-	class CompilerInstance;
+class CompilerInstance;
 
-	namespace ast_matchers
-	{
-		class MatchFinder;
-	}
+namespace ast_matchers
+{
+class MatchFinder;
+}
 }
 
 class VisitorToD;
@@ -25,11 +25,11 @@ class VisitorToDAction : public clang::ASTFrontendAction
 {
 public:
 	std::unique_ptr<clang::ASTConsumer> CreateASTConsumer(
-		clang::CompilerInstance &Compiler,
-		llvm::StringRef //InFile
-		) override;
+	  clang::CompilerInstance& Compiler,
+	  llvm::StringRef //InFile
+	) override;
 
-	bool BeginSourceFileAction(clang::CompilerInstance &ci, llvm::StringRef) override;
+	bool BeginSourceFileAction(clang::CompilerInstance& ci, llvm::StringRef) override;
 
 	void EndSourceFileAction() override;
 };
