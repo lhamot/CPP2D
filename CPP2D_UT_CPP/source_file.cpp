@@ -307,9 +307,10 @@ void check_class()
 	CHECK(t2->funcV() == 2);
 	CHECK(t2->funcF() == 2);
 	Tata* t = t2;
-	CHECK(t2->funcV() == 2);
-	CHECK(t2->funcF() == 1);
+	CHECK(t->funcV() == 2);
+	CHECK(t->funcF() == 1);
 	CHECK(t2->getThis() == t2);
+	CHECK(t2 == t);
 	CHECK(&t2->getThisRef() == t2);
 	delete t;
 
@@ -330,6 +331,8 @@ int main()
 	check_template_struct_specialization();
 
 	check_template_function();
+
+	check_class();
 
 	printf("%u tests\n", testCount);
 
