@@ -1,7 +1,4 @@
 #include <cstdio>
-#include <cstdlib>
-#include <cmath>
-#include <ciso646>
 
 class Tata
 {
@@ -20,6 +17,13 @@ public:
 class Tata2 : public Tata
 {
 public:
+	int value;
+
+	Tata2(int arg = 13) 
+	{
+		value = arg;
+	}
+
 	int funcV() override
 	{
 		return 2;
@@ -59,7 +63,7 @@ unsigned int testCount = 0;
 void check(bool ok, char const* message, int line)
 {
 	++testCount;
-	if (not ok)
+	if (!ok)
 	{
 		//printf(message);
 		printf("%s    ->Failed at line %u\n", message, line);
@@ -136,7 +140,7 @@ void check_function()
 	CHECK(&func15() == &z);
 }
 
-void check_array()
+void check_static_array()
 {
 	int tab[3] = { 1, 2, 3 };
 	tab[1] = 42;
@@ -146,15 +150,18 @@ void check_array()
 	int tab3[] = { 4, 5, 6, 7 };
 	CHECK(sizeof(tab3) == 4 * sizeof(int));
 
+	int tabA[3] = { 1, 2, 3 };
+	int tabB[3] = { 1, 2, 3 };
+	CHECK(tabA != tabB);  // Pointer comparison
+}
+
+void check_dynamic_array()
+{
 	int *tab2 = new int[46];
 	tab2[6] = 42;
 	CHECK(tab2[6] == 42);
 	delete[] tab2;
 	tab2 = nullptr;
-
-	int tabA[3] = { 1, 2, 3 };
-	int tabB[3] = { 1, 2, 3 };
-	CHECK(tabA != tabB);
 
 	int *tabC = new int[3];
 	int *tabD = new int[3];
@@ -163,7 +170,11 @@ void check_array()
 		tabC[i] = i - 1;
 		tabD[i] = i - 1;
 	}
-	CHECK(tabD != tabC);
+	CHECK(tabD != tabC); // Pointer comparison
+
+	tabD = tabC;   // Copy pointer
+	tabC[1] = 78;
+	CHECK(tabD == tabC); // Pointer comparison
 }
 
 struct Toto3
@@ -186,6 +197,11 @@ struct Toto3
 	static int getStatic()
 	{
 		return 12;
+	}
+
+	bool operator==(Toto3 const& other) const
+	{
+		return a == other.a && b == other.b && c == other.c;
 	}
 
 	//virtual void impossible(){}
@@ -254,6 +270,11 @@ void check_struct()
 
 	Toto3::u = 17;
 	CHECK(Toto3::u == 17);
+
+	t3.b = 0.00795f;
+	Toto3 t5 = t3;
+	CHECK(&t5 != &t3);  // Pointer compatison
+	CHECK(t5 == t3);   //Content comparison
 };
 
 // Template type
@@ -316,6 +337,14 @@ void check_class()
 
 	CHECK(TmplClass2<3>::value == 3);
 	CHECK(TmplClass2<0>::value == 42);
+
+	Tata2 t3;
+	CHECK(&t3 != nullptr);
+	CHECK(t3.value == 13);
+
+	Tata2 t4(54);
+	CHECK(&t4 != nullptr);
+	CHECK(t4.value == 54);
 }
 
 int main()
@@ -326,7 +355,9 @@ int main()
 
 	check_struct();
 
-	check_array();
+	check_static_array();
+
+	check_dynamic_array();
 
 	check_template_struct_specialization();
 
@@ -336,5 +367,5 @@ int main()
 
 	printf("%u tests\n", testCount);
 
-	return EXIT_SUCCESS;
+	return 0;
 }

@@ -1407,6 +1407,7 @@ public:
 			case BuiltinType::OMPArraySection: return "<OpenMP array section type>";
 			default: assert(false && "invalid Type->getKind()");
 			}
+			return "";
 		}();
 		return true;
 	}
@@ -2340,7 +2341,8 @@ public:
 
 		if(Decl->isStaticDataMember() || Decl->isStaticLocal())
 			out() << "static ";
-		PrintType(Decl->getType());
+		QualType varType = Decl->getType();
+		PrintType(varType);
 		out() << " ";
 		if(!Decl->isOutOfLine())
 		{
@@ -2359,9 +2361,17 @@ public:
 				else
 				{
 					auto const constr = static_cast<CXXConstructExpr*>(init);
-					if(constr->getNumArgs() != 0)
+					if (getSemantic(varType) == Value)
 					{
-						out() << " = ";
+						if (constr->getNumArgs() != 0)
+						{
+							out() << " = ";
+							PrintCXXConstructExprParams(constr);
+						}
+					}
+					else
+					{
+						out() << " = new ";
 						PrintCXXConstructExprParams(constr);
 					}
 				}
