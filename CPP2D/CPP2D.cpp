@@ -25,9 +25,13 @@ static cl::extrahelp CommonHelp(CommonOptionsParser::HelpMessage);
 static cl::extrahelp MoreHelp("\nMore help text...");
 
 
-int main(int argc, const char** argv)
+int main(int argc, char const** argv)
 {
-	CommonOptionsParser OptionsParser(argc, argv, MyToolCategory);
+	std::vector<char const*> argv_vect;
+	std::copy(argv, argv + argc, std::back_inserter(argv_vect));
+	argv_vect.push_back("-fno-delayed-template-parsing");
+	argc = static_cast<int>(argv_vect.size());
+	CommonOptionsParser OptionsParser(argc, argv_vect.data(), MyToolCategory);
 	ClangTool Tool(
 	  OptionsParser.getCompilations(),
 	  OptionsParser.getSourcePathList());

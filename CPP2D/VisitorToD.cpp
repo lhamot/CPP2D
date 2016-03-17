@@ -528,14 +528,24 @@ public:
 
 	bool TraverseNestedNameSpecifier(NestedNameSpecifier* NNS)
 	{
-		auto kind = NNS->getKind();
-		if(kind == NestedNameSpecifier::TypeSpec ||
-		   kind == NestedNameSpecifier::TypeSpecWithTemplate ||
-		   kind == NestedNameSpecifier::Identifier
-		  )
+		if(NNS->getPrefix())
+			TraverseNestedNameSpecifier(NNS->getPrefix());
+
+		NestedNameSpecifier::SpecifierKind const kind = NNS->getKind();
+		switch(kind)
 		{
+		//case NestedNameSpecifier::Namespace:
+		//case NestedNameSpecifier::NamespaceAlias:
+		//case NestedNameSpecifier::Global:
+		//case NestedNameSpecifier::Super:
+		case NestedNameSpecifier::TypeSpec:
+		case NestedNameSpecifier::TypeSpecWithTemplate:
 			PrintType(QualType(NNS->getAsType(), 0));
 			out() << ".";
+			break;
+		case NestedNameSpecifier::Identifier:
+			out() << NNS->getAsIdentifier()->getName().str() << ".";
+			break;
 		}
 		return true;
 	}
@@ -2412,16 +2422,18 @@ public:
 	template<typename ME>
 	bool TraverseMemberExprImpl(ME* Stmt)
 	{
+		if(Stmt->getQualifier())
+			TraverseNestedNameSpecifier(Stmt->getQualifier());
 		DeclarationName const declName = Stmt->getMemberNameInfo().getName();
 		std::string const memberName = Stmt->getMemberNameInfo().getAsString();
-		Expr* base = Stmt->getBase();
-		if(isStdArray(base->getType()) && memberName == "assign")
+		Expr* base = Stmt->isImplicitAccess() ? nullptr : Stmt->getBase();
+		if(base && isStdArray(base->getType()) && memberName == "assign")
 		{
 			TraverseStmt(base);
 			out() << "[] = ";
 			return true;
 		}
-		if(base->getStmtClass() != Stmt::StmtClass::CXXThisExprClass)
+		if(base && base->getStmtClass() != Stmt::StmtClass::CXXThisExprClass)
 		{
 			TraverseStmt(base);
 			out() << '.';

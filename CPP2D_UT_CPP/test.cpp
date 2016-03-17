@@ -770,6 +770,8 @@ void check_class_instantiation()
 
 	StackClass *d = new StackClass;
 	StackClass *e = new StackClass(1);
+	CHECK(d->a != e->a);
+	CHECK(d != e);
 	delete d;
 
 	d = e;
@@ -788,3 +790,16 @@ void check_incomplete_array_type()
 	int toto[] = { 0, 1, 2, 3 };
 	CHECK(func_incomp_arr(toto) == 3);
 }
+
+
+template<typename T>
+struct UninstantiatedStruct
+{
+	template<typename I>
+	typename T::A func(typename I::B a)
+	{
+		typename I::C c;
+		typename I::D d;
+		return c + d.z - I::C::y;
+	}
+};
