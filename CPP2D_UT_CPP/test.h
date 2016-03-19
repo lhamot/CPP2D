@@ -49,3 +49,7 @@ void check_uninstantiated_default_arg();
 void check_class_instantiation();
 
 void check_incomplete_array_type();
+
+void check_builtin_macro();
+
+void check_incr_pointer();

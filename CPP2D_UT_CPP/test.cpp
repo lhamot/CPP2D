@@ -5,6 +5,38 @@
 
 #define CHECK(COND) check(COND, #COND, __LINE__) //if(!(COND)) error(#COND)
 
+size_t equal_len(char const* a, char const* b)
+{
+	size_t pos = 0;
+	while (*a == *b && *a != 0 && *b != 0)
+	{
+		++a;
+		++b;
+		++pos;
+	}
+	return pos;
+}
+
+int find_string(char const* str, char const* sub)
+{
+	int pos = 0;
+	while (str[pos] != 0)
+	{
+		size_t len = equal_len(str + pos, sub);
+		if (sub[len] == 0)
+			return pos;
+		++pos;
+	}
+	return -1;
+}
+
+bool cmp_string(char const* a, char const* b)
+{
+	size_t pos = equal_len(a, b);
+	return a[pos] == b[pos];
+}
+
+
 class Tata
 {
 public:
@@ -581,13 +613,6 @@ void var_func(char* buffer, const char* fmt, ...)
 	return;
 }
 
-bool cmp_string(char const* a, char const* b)
-{
-	size_t pos = 0;
-	while (a[pos] == b[pos] && a[pos] != 0)
-		++pos;
-	return a[pos] == b[pos];
-}
 
 void check_variadic()
 {
@@ -803,3 +828,26 @@ struct UninstantiatedStruct
 		return c + d.z - I::C::y;
 	}
 };
+
+void check_builtin_macro()
+{
+	auto l = __LINE__;
+	CHECK(find_string(__FILE__, "test") != -1);
+	CHECK(find_string(__FUNCTION__, "check_builtin_macro") != -1);
+	CHECK(find_string(__func__, "check_builtin_macro") != -1);
+	CHECK(__LINE__ == l + 4);
+}
+
+void check_incr_pointer()
+{
+	size_t const SIZE = 10;
+	int tab[SIZE];
+	int val = 0;
+	for (int* ptr = tab; ptr != tab + 10; ++ptr, ++val) // preincr
+		*ptr = val;
+	int* ptr = tab;
+	ptr++;					//postincr
+	ptr += 2;				// +=
+	int* ptr2 = ptr + 2;	//+
+	CHECK(*ptr2 == 5);
+}

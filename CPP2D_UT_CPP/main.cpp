@@ -51,6 +51,10 @@ int main()
 
 	check_incomplete_array_type();
 
+	check_builtin_macro();
+
+	check_incr_pointer();
+
 	print_results();
 
 	return 0;

@@ -9,12 +9,14 @@
 
 #pragma warning(push, 0)
 #pragma warning(disable, 4702)
-#include "clang/AST/RecursiveASTVisitor.h"
-#include "clang/Frontend/CompilerInstance.h"
-#include "clang/Frontend/CompilerInstance.h"
-#include "clang/Lex/Preprocessor.h"
-#include "llvm/ADT/SmallString.h"
-#include "llvm/ADT/APFloat.h"
+#include <clang/AST/RecursiveASTVisitor.h>
+#include <clang/Frontend/CompilerInstance.h>
+#include <clang/Frontend/CompilerInstance.h>
+#include <clang/Lex/Preprocessor.h>
+#include <clang/Lex/MacroArgs.h>
+#include <llvm/ADT/SmallString.h>
+#include <llvm/ADT/APFloat.h>
+#include <llvm/Support/Path.h>
 #include <clang/AST/Comment.h>
 //#include "llvm/Support/ConvertUTF.h"
 #pragma warning(pop)
@@ -394,9 +396,11 @@ class VisitorToD
 public:
 	explicit VisitorToD(
 	  ASTContext* Context,
-	  MatchContainer const& receiver)
+	  MatchContainer const& receiver,
+	  StringRef file)
 		: Context(Context)
 		, receiver(receiver)
+		, modulename(llvm::sys::path::stem(file))
 	{
 	}
 
@@ -1998,7 +2002,7 @@ public:
 
 			bool const dup = //both operands will be transformed to pointer
 			  (ro_ptr == false && ro_sem == Reference) &&
-			  (ro_ptr == false && ro_sem == Reference);
+			  (lo_ptr == false && lo_sem == Reference);
 
 			if(dup)
 			{
@@ -2252,7 +2256,7 @@ public:
 			}
 		}
 		out() << literal;
-		out() << "\"";
+		out() << "\\0\"";
 		return true;
 	}
 
@@ -2515,10 +2519,26 @@ public:
 		return true;
 	}
 
+	bool TraverseBinAddAssign(CompoundAssignOperator *expr)
+	{
+		if(expr->getLHS()->getType()->isPointerType())
+		{
+			TraverseStmt(expr->getLHS());
+			out() << ".popFrontN(";
+			TraverseStmt(expr->getRHS());
+			out() << ')';
+			extern_includes.insert("std.range.primitives");
+			return true;
+		}
+		else
+			return TraverseCompoundAssignOperator(expr);
+	}
+
+
 #define OPERATOR(NAME)                                        \
 	bool TraverseBin##NAME##Assign(CompoundAssignOperator *S) \
 	{return TraverseCompoundAssignOperator(S);}
-	OPERATOR(Mul) OPERATOR(Div) OPERATOR(Rem) OPERATOR(Add) OPERATOR(Sub)
+	OPERATOR(Mul) OPERATOR(Div) OPERATOR(Rem) OPERATOR(Sub)
 	OPERATOR(Shl) OPERATOR(Shr) OPERATOR(And) OPERATOR(Or) OPERATOR(Xor)
 #undef OPERATOR
 
@@ -2531,8 +2551,10 @@ public:
 
 	bool TraverseBinaryOperator(BinaryOperator* Stmt)
 	{
-		Type const* typeL = Stmt->getLHS()->getType().getTypePtr();
-		Type const* typeR = Stmt->getRHS()->getType().getTypePtr();
+		Expr* lhs = Stmt->getLHS();
+		Expr* rhs = Stmt->getRHS();
+		Type const* typeL = lhs->getType().getTypePtr();
+		Type const* typeR = rhs->getType().getTypePtr();
 		if(typeL->isPointerType() and typeR->isPointerType())
 		{
 			TraverseStmt(Stmt->getLHS());
@@ -2546,16 +2568,64 @@ public:
 		}
 		else
 		{
-			TraverseStmt(Stmt->getLHS());
+			if (Stmt->getOpcode() == BinaryOperatorKind::BO_Comma)
+			{
+				if (StringLiteral const* strLit = dyn_cast<StringLiteral>(lhs))
+				{
+					StringRef const str = strLit->getString();
+					if (str == "__CPP2D__LINE__")
+					{
+						out() << "__LINE__";
+						return true;
+					}
+					else if(str == "__CPP2D__FILE__")
+					{
+						out() << "__FILE__ ~ '\\0'";
+						return true;
+					}
+					else if (str == "__CPP2D__FUNC__")
+					{
+						out() << "__FUNCTION__ ~ '\\0'";
+						return true;
+					}
+					else if (str == "__CPP2D__PFUNC__")
+					{
+						out() << "__PRETTY_FUNCTION__ ~ '\\0'";
+						return true;
+					}
+					else if (str == "__CPP2D__func__")
+					{
+						out() << "__PRETTY_FUNCTION__ ~ '\\0'";
+						return true;
+					}
+				}
+			}
+
+			TraverseStmt(lhs);
 			out() << " " << Stmt->getOpcodeStr().str() << " ";
-			TraverseStmt(Stmt->getRHS());
+			TraverseStmt(rhs);
 		}
 		return true;
 	}
+
+	bool TraverseBinAdd(BinaryOperator* expr)
+	{
+		if (expr->getLHS()->getType()->isPointerType())
+		{
+			TraverseStmt(expr->getLHS());
+			out() << '[';
+			TraverseStmt(expr->getRHS());
+			out() << "..$]";
+			return true;
+		}
+		else
+			return TraverseBinaryOperator(expr);
+	}
+
 #define OPERATOR(NAME) \
 	bool TraverseBin##NAME(BinaryOperator* Stmt) {return TraverseBinaryOperator(Stmt);}
 	OPERATOR(PtrMemD) OPERATOR(PtrMemI) OPERATOR(Mul) OPERATOR(Div)
-	OPERATOR(Rem) OPERATOR(Add) OPERATOR(Sub) OPERATOR(Shl) OPERATOR(Shr)
+	OPERATOR(Rem) OPERATOR(Sub) OPERATOR(Shl) OPERATOR(Shr)
 	OPERATOR(LT) OPERATOR(GT) OPERATOR(LE) OPERATOR(GE) OPERATOR(EQ)
 	OPERATOR(NE) OPERATOR(And) OPERATOR(Xor) OPERATOR(Or) OPERATOR(LAnd)
 	OPERATOR(LOr) OPERATOR(Assign) OPERATOR(Comma)
@@ -2563,11 +2633,20 @@ public:
 
 	bool TraverseUnaryOperator(UnaryOperator* Stmt)
 	{
+		if (Stmt->isIncrementOp())
+		{
+			if (Stmt->getSubExpr()->getType()->isPointerType())
+			{
+				TraverseStmt(Stmt->getSubExpr());
+				out() << ".popFront";
+				extern_includes.insert("std.range.primitives");
+				return true;
+			}
+		}
+
 		if(Stmt->isPostfix())
 		{
-			//TraverseStmt(Stmt->getSubExpr());
-			for(auto c : Stmt->children())
-				TraverseStmt(c);
+			TraverseStmt(Stmt->getSubExpr());
 			out() << Stmt->getOpcodeStr(Stmt->getOpcode()).str();
 		}
 		else
@@ -2931,8 +3010,8 @@ public:
 	)
 		: finder(getMatcher(receiver))
 		, finderConsumer(finder.newASTConsumer())
-		, InFile(InFile.data(), InFile.size())
-		, Visitor(Context, receiver)
+		, InFile(InFile.str())
+		, Visitor(Context, receiver, InFile)
 	{
 	}
 
@@ -2942,23 +3021,14 @@ public:
 		outStack.emplace_back(std::make_unique<std::stringstream>());
 
 		finderConsumer->HandleTranslationUnit(Context);
-		int lastSep = (int)InFile.find_last_of('/');
-		if(lastSep == std::string::npos)
-			lastSep = (int)InFile.find_last_of('\\');
-		if(lastSep == std::string::npos)
-			lastSep = -1;
-		auto lastDot = InFile.find_last_of('.');
-		if(lastDot == std::string::npos)
-			lastDot = InFile.size();
-		lastSep += 1;
-		auto modulename = InFile.substr(lastSep, lastDot - lastSep);
-		Visitor.modulename = modulename;
 		Visitor.TraverseTranslationUnitDecl(Context.getTranslationUnitDecl());
 
+		std::string modulename = llvm::sys::path::stem(InFile).str();
 		std::ofstream file(modulename + ".d");
-		std::replace(std::begin(modulename), std::end(modulename), '-', '_'); //Replace illegal characters
-		if(modulename != Visitor.modulename) // When filename has some illegal characters
-			file << "module " << modulename << ';';
+		std::string new_modulename;
+		std::replace_copy(std::begin(modulename), std::end(modulename), std::back_inserter(new_modulename), '-', '_'); //Replace illegal characters
+		if(new_modulename != modulename) // When filename has some illegal characters
+			file << "module " << new_modulename << ';';
 		for(auto const& import : Visitor.extern_includes)
 			file << "import " << import << ";" << std::endl;
 		file << std::endl;

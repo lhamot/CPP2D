@@ -32,4 +32,7 @@ public:
 	bool BeginSourceFileAction(clang::CompilerInstance& ci, llvm::StringRef) override;
 
 	void EndSourceFileAction() override;
+
+private:
+	llvm::StringRef modulename;
 };

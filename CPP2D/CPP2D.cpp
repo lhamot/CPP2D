@@ -30,6 +30,14 @@ int main(int argc, char const** argv)
 	std::vector<char const*> argv_vect;
 	std::copy(argv, argv + argc, std::back_inserter(argv_vect));
 	argv_vect.push_back("-fno-delayed-template-parsing");
+	argv_vect.push_back("-ferror-limit=999999");
+	argv_vect.push_back("-Wno-builtin-macro-redefined");
+	argv_vect.push_back("-Wno-unused-value");
+	argv_vect.push_back("-D__LINE__=(\"__CPP2D__LINE__\", 0)");
+	argv_vect.push_back("-D__FILE__=(\"__CPP2D__FILE__\", \"\")");
+	argv_vect.push_back("-D__FUNCTION__=(\"__CPP2D__FUNC__\", __FUNCTION__)");
+	argv_vect.push_back("-D__PRETTY_FUNCTION__=(\"__CPP2D__PFUNC__\", __PRETTY_FUNCTION__)");
+	argv_vect.push_back("-D__func__=(\"__CPP2D__func__\", __func__)");
 	argc = static_cast<int>(argv_vect.size());
 	CommonOptionsParser OptionsParser(argc, argv_vect.data(), MyToolCategory);
 	ClangTool Tool(
