@@ -24,6 +24,11 @@ static cl::extrahelp CommonHelp(CommonOptionsParser::HelpMessage);
 // A help message for this specific tool can be added afterwards.
 static cl::extrahelp MoreHelp("\nMore help text...");
 
+cl::list<std::string>
+MacroAsFunction("macro-function",
+                cl::desc("This macro will not be expanded and will be migrated expecting it has a function-like behavior"),
+                cl::cat(MyToolCategory),
+                cl::ZeroOrMore);
 
 int main(int argc, char const** argv)
 {
@@ -33,6 +38,7 @@ int main(int argc, char const** argv)
 	argv_vect.push_back("-ferror-limit=999999");
 	argv_vect.push_back("-Wno-builtin-macro-redefined");
 	argv_vect.push_back("-Wno-unused-value");
+	argv_vect.push_back("-DCPP2D");
 	argv_vect.push_back("-D__LINE__=(\"__CPP2D__LINE__\", 0)");
 	argv_vect.push_back("-D__FILE__=(\"__CPP2D__FILE__\", \"\")");
 	argv_vect.push_back("-D__FUNCTION__=(\"__CPP2D__FUNC__\", __FUNCTION__)");

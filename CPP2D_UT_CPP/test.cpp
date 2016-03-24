@@ -851,3 +851,19 @@ void check_incr_pointer()
 	int* ptr2 = ptr + 2;	//+
 	CHECK(*ptr2 == 5);
 }
+
+#define UT_MACRO(expr1, expr2, expr3)  \
+	(var##expr1 = 42, var2 = #expr2, var3 = expr3, expr1 + expr3)
+
+void check_function_macro()
+{
+	int var1(0);
+	char const* var2 = nullptr;
+	int var3 = 0;
+	int var4(UT_MACRO(1, 2, 3));
+
+	CHECK(var1 == 42);
+	CHECK(var2[0] == '2');
+	CHECK(var3 == 3);
+	CHECK(var4 == 4);
+}

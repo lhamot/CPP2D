@@ -55,6 +55,8 @@ int main()
 
 	check_incr_pointer();
 
+	check_function_macro();
+
 	print_results();
 
 	return 0;

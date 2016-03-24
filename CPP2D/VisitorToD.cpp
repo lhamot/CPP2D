@@ -23,10 +23,13 @@
 
 #include "MatchContainer.h"
 #include "Matcher.h"
+#include "Find_Includes.h"
 
 //using namespace clang::tooling;
 using namespace llvm;
 using namespace clang;
+
+static std::string const cpp2d_macro_sufix = "_CPP2D_MACRO";
 
 std::vector<std::unique_ptr<std::stringstream> > outStack;
 
@@ -263,7 +266,8 @@ class VisitorToD
 		}
 		else
 		{
-			include_file(getFile(expr->getDecl()));
+			if(char const* filename = getFile(expr->getDecl()))
+				include_file(filename);
 			return mangleName(name);
 		}
 	}
@@ -1368,6 +1372,9 @@ public:
 		if(Decl->isOverloadedOperator()
 		   && Decl->getOverloadedOperator() == OverloadedOperatorKind::OO_ExclaimEqual)
 			return false;
+		std::string const name = Decl->getNameAsString();
+		if(name == "cpp2d_dummy_variadic")
+			return false;
 		PrintType(Decl->getReturnType());
 		out() << " ";
 		if(Decl->isOverloadedOperator())
@@ -1391,7 +1398,7 @@ public:
 			}
 		}
 		else
-			out() << mangleName(Decl->getNameAsString());
+			out() << mangleName(name);
 		return true;
 	}
 
@@ -2519,7 +2526,7 @@ public:
 		return true;
 	}
 
-	bool TraverseBinAddAssign(CompoundAssignOperator *expr)
+	bool TraverseBinAddAssign(CompoundAssignOperator* expr)
 	{
 		if(expr->getLHS()->getType()->isPointerType())
 		{
@@ -2568,39 +2575,6 @@ public:
 		}
 		else
 		{
-			if (Stmt->getOpcode() == BinaryOperatorKind::BO_Comma)
-			{
-				if (StringLiteral const* strLit = dyn_cast<StringLiteral>(lhs))
-				{
-					StringRef const str = strLit->getString();
-					if (str == "__CPP2D__LINE__")
-					{
-						out() << "__LINE__";
-						return true;
-					}
-					else if(str == "__CPP2D__FILE__")
-					{
-						out() << "__FILE__ ~ '\\0'";
-						return true;
-					}
-					else if (str == "__CPP2D__FUNC__")
-					{
-						out() << "__FUNCTION__ ~ '\\0'";
-						return true;
-					}
-					else if (str == "__CPP2D__PFUNC__")
-					{
-						out() << "__PRETTY_FUNCTION__ ~ '\\0'";
-						return true;
-					}
-					else if (str == "__CPP2D__func__")
-					{
-						out() << "__PRETTY_FUNCTION__ ~ '\\0'";
-						return true;
-					}
-				}
-			}
-
 			TraverseStmt(lhs);
 			out() << " " << Stmt->getOpcodeStr().str() << " ";
 			TraverseStmt(rhs);
@@ -2610,7 +2584,7 @@ public:
 
 	bool TraverseBinAdd(BinaryOperator* expr)
 	{
-		if (expr->getLHS()->getType()->isPointerType())
+		if(expr->getLHS()->getType()->isPointerType())
 		{
 			TraverseStmt(expr->getLHS());
 			out() << '[';
@@ -2633,9 +2607,9 @@ public:
 
 	bool TraverseUnaryOperator(UnaryOperator* Stmt)
 	{
-		if (Stmt->isIncrementOp())
+		if(Stmt->isIncrementOp())
 		{
-			if (Stmt->getSubExpr()->getType()->isPointerType())
+			if(Stmt->getSubExpr()->getType()->isPointerType())
 			{
 				TraverseStmt(Stmt->getSubExpr());
 				out() << ".popFront";
@@ -2811,10 +2785,70 @@ public:
 		return true;
 	}
 
-	bool TraverseParenExpr(ParenExpr* Expr)
+	bool TraverseParenExpr(ParenExpr* expr)
 	{
+		if(auto* binOp = dyn_cast<BinaryOperator>(expr->getSubExpr()))
+		{
+			Expr* lhs = binOp->getLHS();
+			Expr* rhs = binOp->getRHS();
+			StringLiteral const* strLit = dyn_cast<StringLiteral>(lhs);
+			if(strLit && (binOp->getOpcode() == BinaryOperatorKind::BO_Comma))
+			{
+				StringRef const str = strLit->getString();
+				if(str == "__CPP2D__LINE__")
+				{
+					out() << "__LINE__";
+					return true;
+				}
+				else if(str == "__CPP2D__FILE__")
+				{
+					out() << "__FILE__ ~ '\\0'";
+					return true;
+				}
+				else if(str == "__CPP2D__FUNC__")
+				{
+					out() << "__FUNCTION__ ~ '\\0'";
+					return true;
+				}
+				else if(str == "__CPP2D__PFUNC__")
+				{
+					out() << "__PRETTY_FUNCTION__ ~ '\\0'";
+					return true;
+				}
+				else if(str == "__CPP2D__func__")
+				{
+					out() << "__PRETTY_FUNCTION__ ~ '\\0'";
+					return true;
+				}
+				else if(str == "CPP2D_MACRO_EXPAND")
+				{
+					auto get_binop = [](Expr * paren)
+					{
+						return dyn_cast<BinaryOperator>(dyn_cast<ParenExpr>(paren)->getSubExpr());
+					};
+					BinaryOperator* macro_and_cpp = get_binop(rhs);
+					BinaryOperator* macro_name_and_args = get_binop(macro_and_cpp->getLHS());
+					auto* macro_name = dyn_cast<StringLiteral>(macro_name_and_args->getLHS());
+					auto* macro_args = dyn_cast<CallExpr>(macro_name_and_args->getRHS());
+					out() << "(mixin(" << macro_name->getString().str() << "!(";
+					Spliter split(", ");
+					for(Expr* arg : macro_args->arguments())
+					{
+						split.split();
+						out() << "q{";
+						TraverseStmt(arg);
+						out() << "}";
+					}
+					out() << ")))";
+					pushStream();
+					TraverseStmt(macro_and_cpp->getRHS());
+					popStream();
+					return true;
+				}
+			}
+		}
 		out() << '(';
-		TraverseStmt(Expr->getSubExpr());
+		TraverseStmt(expr->getSubExpr());
 		out() << ')';
 		return true;
 	}
@@ -2826,6 +2860,14 @@ public:
 
 	void TraverseVarDeclImpl(VarDecl* Decl)
 	{
+		std::string const varName = Decl->getNameAsString();
+		if(varName.find(cpp2d_macro_sufix) != std::string::npos)
+		{
+			auto* d_macro = dyn_cast<StringLiteral>(Decl->getInit());
+			out() << d_macro->getString().str();
+			return;
+		}
+
 		if(Decl->isOutOfLine())
 			return;
 		else if(Decl->getOutOfLineDefinition())
@@ -2849,7 +2891,10 @@ public:
 			if(Decl->isDirectInit())
 			{
 				if(init->getStmtClass() != Stmt::StmtClass::CXXConstructExprClass)
+				{
+					out() << " = ";
 					TraverseStmt(init);
+				}
 				else
 				{
 					auto const constr = static_cast<CXXConstructExpr*>(init);
@@ -2887,21 +2932,9 @@ public:
 	bool TraverseVarDecl(VarDecl* Decl)
 	{
 		if(receiver.dont_print_this_decl.count(Decl)) return true;
-		//out() << indent_str();
 		TraverseVarDeclImpl(Decl);
-		//out() << ";" << std::endl << std::flush;
 		return true;
 	}
-
-	/*bool TraverseType(QualType const& Type)
-	{
-		//out() << Type.getAsString();
-		//if(Type.hasQualifiers())
-		//Qualifiers quals = Type.getQualifiers();
-		Base::TraverseType(Type);
-		return true;
-	}*/
-
 
 	bool VisitDecl(Decl* Decl)
 	{
@@ -2923,6 +2956,7 @@ public:
 
 	std::set<std::string> extern_includes;
 	std::string modulename;
+	std::string insert_after_import;
 
 private:
 
@@ -2964,7 +2998,10 @@ private:
 
 	bool checkFilename(Decl const* d)
 	{
-		std::string filepath = getFile(d);
+		char const* filepath_str = getFile(d);
+		if(filepath_str == nullptr)
+			return false;
+		std::string filepath = filepath_str;
 		if(filepath.size() < 12)
 			return false;
 		else
@@ -3005,18 +3042,24 @@ class VisitorToDConsumer : public clang::ASTConsumer
 {
 public:
 	explicit VisitorToDConsumer(
-	  ASTContext* Context,
+	  clang::CompilerInstance& Compiler,
 	  llvm::StringRef InFile
 	)
-		: finder(getMatcher(receiver))
+		: Compiler(Compiler)
+		, finder(getMatcher(receiver))
 		, finderConsumer(finder.newASTConsumer())
 		, InFile(InFile.str())
-		, Visitor(Context, receiver, InFile)
+		, Visitor(&Compiler.getASTContext(), receiver, InFile)
 	{
 	}
 
 	virtual void HandleTranslationUnit(clang::ASTContext& Context)
 	{
+		//Find_Includes
+		auto& ppcallback = dynamic_cast<Find_Includes&>(*Compiler.getPreprocessor().getPPCallbacks());
+		auto& incs = ppcallback.includes_in_file;
+		includes_in_file.insert(incs.begin(), incs.end());
+
 		outStack.clear();
 		outStack.emplace_back(std::make_unique<std::stringstream>());
 
@@ -3031,11 +3074,14 @@ public:
 			file << "module " << new_modulename << ';';
 		for(auto const& import : Visitor.extern_includes)
 			file << "import " << import << ";" << std::endl;
-		file << std::endl;
+		file << "\n\n";
+		for(auto const& code : ppcallback.add_before_decl)
+			file << code << '\n';
 		file << out().str();
 	}
 
 private:
+	clang::CompilerInstance& Compiler;
 	MatchContainer receiver;
 	ast_matchers::MatchFinder finder;
 	std::unique_ptr<clang::ASTConsumer> finderConsumer;
@@ -3044,40 +3090,20 @@ private:
 };
 
 
-class Find_Includes : public PPCallbacks
-{
-public:
-	void InclusionDirective(
-	  SourceLocation,		//hash_loc,
-	  const Token&,		//include_token,
-	  StringRef file_name,
-	  bool,				//is_angled,
-	  CharSourceRange,	//filename_range,
-	  const FileEntry*,	//file,
-	  StringRef,			//search_path,
-	  StringRef,			//relative_path,
-	  const Module*		//imported
-	)
-	{
-		includes_in_file.insert(file_name);
-	}
-};
-
 std::unique_ptr<clang::ASTConsumer> VisitorToDAction::CreateASTConsumer(
   clang::CompilerInstance& Compiler,
   llvm::StringRef InFile
 )
 {
-	return std::make_unique<VisitorToDConsumer>(&Compiler.getASTContext(), InFile);
+	auto visitor = std::make_unique<VisitorToDConsumer>(Compiler, InFile);
+	return std::move(visitor);
 }
 
-bool VisitorToDAction::BeginSourceFileAction(CompilerInstance& ci, StringRef)
+bool VisitorToDAction::BeginSourceFileAction(CompilerInstance& ci, StringRef file)
 {
-	std::unique_ptr<Find_Includes> find_includes_callback(new Find_Includes());
-
 	Preprocessor& pp = ci.getPreprocessor();
+	std::unique_ptr<Find_Includes> find_includes_callback(new Find_Includes(pp, file));
 	pp.addPPCallbacks(std::move(find_includes_callback));
-
 	return true;
 }
 

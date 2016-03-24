@@ -53,3 +53,5 @@ void check_incomplete_array_type();
 void check_builtin_macro();
 
 void check_incr_pointer();
+
+void check_function_macro();
