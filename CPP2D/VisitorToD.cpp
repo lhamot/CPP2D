@@ -29,13 +29,18 @@
 using namespace llvm;
 using namespace clang;
 
-static std::string const cpp2d_macro_sufix = "_CPP2D_MACRO";
-
 std::vector<std::unique_ptr<std::stringstream> > outStack;
+
+bool output_enabled = true;
 
 std::stringstream& out()
 {
-	return *outStack.back();
+	static std::stringstream empty_ss;
+	empty_ss.str("");
+	if(output_enabled)
+		return *outStack.back();
+	else
+		return empty_ss;
 }
 
 void pushStream()
@@ -45,7 +50,7 @@ void pushStream()
 
 std::string popStream()
 {
-	std::string const str = out().str();
+	std::string const str = outStack.back()->str();
 	outStack.pop_back();
 	return str;
 }
@@ -397,6 +402,65 @@ class VisitorToD
 		locStart = nextStart;
 	}
 
+	void PrintMacroArgs(CallExpr* macro_args)
+	{
+		Spliter split(", ");
+		for(Expr* arg : macro_args->arguments())
+		{
+			split.split();
+			out() << "q{";
+			if(auto* callExpr = dyn_cast<CallExpr>(arg))
+			{
+				if(auto* impCast = dyn_cast<ImplicitCastExpr>(callExpr->getCallee()))
+				{
+					if(auto* func = dyn_cast<DeclRefExpr>(impCast->getSubExpr()))
+					{
+						std::string const func_name = func->getNameInfo().getAsString();
+						if(func_name == "cpp2d_type")
+						{
+							TraverseTemplateArgument(func->getTemplateArgs()->getArgument());
+						}
+						else if(func_name == "cpp2d_name")
+						{
+							auto* impCast2 = dyn_cast<ImplicitCastExpr>(callExpr->getArg(0));
+							auto* str = dyn_cast<StringLiteral>(impCast2->getSubExpr());
+							out() << str->getString().str();
+						}
+						else
+							TraverseStmt(arg);
+					}
+					else
+						TraverseStmt(arg);
+				}
+				else
+					TraverseStmt(arg);
+			}
+			else
+				TraverseStmt(arg);
+			out() << "}";
+		}
+	}
+
+	void PrintStmtMacro(std::string const& varName, Expr* init)
+	{
+		if(varName.find("CPP2D_MACRO_STMT_END") == 0)
+			--isInMacro;
+		else if(varName.find("CPP2D_MACRO_STMT") == 0)
+		{
+			auto get_binop = [](Expr * paren)
+			{
+				return dyn_cast<BinaryOperator>(dyn_cast<ParenExpr>(paren)->getSubExpr());
+			};
+			BinaryOperator* name_and_args = get_binop(init); // Decl->getInClassInitializer());
+			auto* macro_name = dyn_cast<StringLiteral>(name_and_args->getLHS());
+			auto* macro_args = dyn_cast<CallExpr>(name_and_args->getRHS());
+			out() << "mixin(" << macro_name->getString().str() << "!(";
+			PrintMacroArgs(macro_args);
+			out() << "))";
+			++isInMacro;
+		}
+	}
+
 public:
 	explicit VisitorToD(
 	  ASTContext* Context,
@@ -415,7 +479,7 @@ public:
 
 	bool TraverseTranslationUnitDecl(TranslationUnitDecl* Decl)
 	{
-		if(receiver.dont_print_this_decl.count(Decl)) return true;
+		if(pass_decl(Decl)) return true;
 		//SourceManager& sm = Context->getSourceManager();
 		//SourceLocation prevDeclEnd;
 		//for(auto c: Context->Comments.getComments())
@@ -437,6 +501,7 @@ public:
 					printCommentAfter(c);
 					out() << std::endl << std::endl;
 				}
+				output_enabled = (isInMacro == 0);
 			}
 		}
 
@@ -445,7 +510,7 @@ public:
 
 	bool TraverseTypedefDecl(TypedefDecl* Decl)
 	{
-		if(receiver.dont_print_this_decl.count(Decl)) return true;
+		if(pass_decl(Decl)) return true;
 		out() << "alias " << mangleName(Decl->getNameAsString()) << " = ";
 		PrintType(Decl->getUnderlyingType());
 		return true;
@@ -453,7 +518,7 @@ public:
 
 	bool TraverseTypeAliasDecl(TypeAliasDecl* Decl)
 	{
-		if(receiver.dont_print_this_decl.count(Decl)) return true;
+		if(pass_decl(Decl)) return true;
 		out() << "alias " << mangleName(Decl->getNameAsString()) << " = ";
 		PrintType(Decl->getUnderlyingType());
 		return true;
@@ -461,7 +526,7 @@ public:
 
 	bool TraverseTypeAliasTemplateDecl(TypeAliasTemplateDecl* Decl)
 	{
-		if(receiver.dont_print_this_decl.count(Decl)) return true;
+		if(pass_decl(Decl)) return true;
 		out() << "alias " << mangleName(Decl->getNameAsString());
 		PrintTemplateParameterList(Decl->getTemplateParameters(), "");
 		out() << " = ";
@@ -471,14 +536,21 @@ public:
 
 	bool TraverseFieldDecl(FieldDecl* Decl)
 	{
-		if(receiver.dont_print_this_decl.count(Decl)) return true;
+		std::string const varName = Decl->getNameAsString();
+		if(varName.find("CPP2D_MACRO_STMT") == 0)
+		{
+			PrintStmtMacro(varName, Decl->getInClassInitializer());
+			return true;
+		}
+
+		if(pass_decl(Decl)) return true;
 		if(Decl->isMutable())
 			out() << "/*mutable*/";
 		if(Decl->isBitField())
 		{
 			out() << "\t";
 			PrintType(Decl->getType());
-			out() << ", \"" << mangleName(Decl->getNameAsString()) << "\", ";
+			out() << ", \"" << mangleName(varName) << "\", ";
 			TraverseStmt(Decl->getBitWidth());
 			out() << ',';
 			extern_includes.insert("std.bitmanip");
@@ -620,6 +692,7 @@ public:
 			TraverseStmt(child);
 			if(needSemiComma(child))
 				out() << ";";
+			output_enabled = (isInMacro == 0);
 		}
 		printStmtComment(locStart, Stmt->getRBracLoc().getLocWithOffset(-1));
 		--indent;
@@ -653,9 +726,17 @@ public:
 		return TraverseCXXTryStmtImpl(Stmt, [] {});
 	}
 
+	bool pass_decl(Decl* decl)
+	{
+		if(receiver.dont_print_this_decl.count(decl))
+			return true;
+		else
+			return false;
+	}
+
 	bool TraverseNamespaceDecl(NamespaceDecl* Decl)
 	{
-		if(receiver.dont_print_this_decl.count(Decl)) return true;
+		if(pass_decl(Decl)) return true;
 		out() << "// -> module " << mangleName(Decl->getNameAsString()) << ';' << std::endl;
 		for(auto decl : Decl->decls())
 		{
@@ -671,6 +752,7 @@ public:
 				printCommentAfter(decl);
 				out() << std::endl << std::endl;
 			}
+			output_enabled = (isInMacro == 0);
 		}
 		out() << "// <- module " << mangleName(Decl->getNameAsString()) << " end" << std::endl;
 		return true;
@@ -693,7 +775,7 @@ public:
 
 	bool TraverseAccessSpecDecl(AccessSpecDecl* Decl)
 	{
-		if(receiver.dont_print_this_decl.count(Decl)) return true;
+		if(pass_decl(Decl)) return true;
 		return true;
 	}
 
@@ -724,13 +806,13 @@ public:
 
 	bool TraverseCXXRecordDecl(CXXRecordDecl* decl)
 	{
-		if(receiver.dont_print_this_decl.count(decl)) return true;
+		if(pass_decl(decl)) return true;
 		return TraverseCXXRecordDeclImpl(decl, [] {}, [this, decl] {printBasesClass(decl); });
 	}
 
 	bool TraverseRecordDecl(RecordDecl* Decl)
 	{
-		if(receiver.dont_print_this_decl.count(Decl)) return true;
+		if(pass_decl(Decl)) return true;
 		return TraverseCXXRecordDeclImpl(Decl, [] {}, [] {});
 	}
 
@@ -822,7 +904,7 @@ public:
 				AccessSpecifier newAccess = decl2->getAccess();
 				if(newAccess == AccessSpecifier::AS_none)
 					newAccess = AccessSpecifier::AS_public;
-				if(newAccess != access)
+				if(newAccess != access && (isInMacro == 0))
 				{
 					--indent;
 					out() << std::endl << indent_str() << AccessSpecifierStr[newAccess] << ":";
@@ -830,10 +912,8 @@ public:
 					access = newAccess;
 				}
 				printCommentBefore(decl2);
-				if(inBitField == false && nextIsBitField)
+				if(inBitField == false && nextIsBitField && (isInMacro == 0))
 					out() << "mixin(bitfields!(\n" << indent_str();
-				//if(inBitField && nextIsBitField == false)
-				//	out() << "\tuint, \"\", " << (roundPow2(bit_count) - bit_count) << "));\n" << indent_str();
 				out() << declstr;
 				if(needSemiComma(decl2) && nextIsBitField == false)
 					out() << ";";
@@ -842,6 +922,7 @@ public:
 			inBitField = nextIsBitField;
 			if(nextIsBitField == false)
 				bit_count = 0;
+			output_enabled = (isInMacro == 0);
 		}
 		if(inBitField)
 			out() << "\n" << indent_str() << "\tuint, \"\", " << (roundPow2(bit_count) - bit_count) << "));";
@@ -917,7 +998,7 @@ public:
 
 	bool TraverseClassTemplateDecl(ClassTemplateDecl* Decl)
 	{
-		if(receiver.dont_print_this_decl.count(Decl)) return true;
+		if(pass_decl(Decl)) return true;
 		TraverseCXXRecordDeclImpl(Decl->getTemplatedDecl(), [Decl, this]
 		{
 			PrintTemplateParameterList(Decl->getTemplateParameters(), "");
@@ -939,13 +1020,13 @@ public:
 	bool TraverseClassTemplatePartialSpecializationDecl(
 	  ClassTemplatePartialSpecializationDecl* Decl)
 	{
-		if(receiver.dont_print_this_decl.count(Decl)) return true;
+		if(pass_decl(Decl)) return true;
 		return TraverseClassTemplateSpecializationDeclImpl(Decl);
 	}
 
 	bool TraverseClassTemplateSpecializationDecl(ClassTemplateSpecializationDecl* Decl)
 	{
-		if(receiver.dont_print_this_decl.count(Decl)) return true;
+		if(pass_decl(Decl)) return true;
 		return TraverseClassTemplateSpecializationDeclImpl(Decl);
 	}
 
@@ -1011,7 +1092,7 @@ public:
 	template<typename D>
 	bool TraverseClassTemplateSpecializationDeclImpl(D* Decl)
 	{
-		if(receiver.dont_print_this_decl.count(Decl)) return true;
+		if(pass_decl(Decl)) return true;
 		if(Decl->getSpecializationKind() == TSK_ExplicitInstantiationDeclaration
 		   || Decl->getSpecializationKind() == TSK_ExplicitInstantiationDefinition
 		   || Decl->getSpecializationKind() == TSK_ImplicitInstantiation)
@@ -1038,25 +1119,25 @@ public:
 
 	bool TraverseCXXConversionDecl(CXXConversionDecl* Decl)
 	{
-		if(receiver.dont_print_this_decl.count(Decl)) return true;
+		if(pass_decl(Decl)) return true;
 		return TraverseFunctionDeclImpl(Decl);
 	}
 
 	bool TraverseCXXConstructorDecl(CXXConstructorDecl* Decl)
 	{
-		if(receiver.dont_print_this_decl.count(Decl)) return true;
+		if(pass_decl(Decl)) return true;
 		return TraverseFunctionDeclImpl(Decl);
 	}
 
 	bool TraverseCXXDestructorDecl(CXXDestructorDecl* Decl)
 	{
-		if(receiver.dont_print_this_decl.count(Decl)) return true;
+		if(pass_decl(Decl)) return true;
 		return TraverseFunctionDeclImpl(Decl);
 	}
 
 	bool TraverseCXXMethodDecl(CXXMethodDecl* Decl)
 	{
-		if(receiver.dont_print_this_decl.count(Decl)) return true;
+		if(pass_decl(Decl)) return true;
 		if(Decl->getLexicalParent() == Decl->getParent())
 			return TraverseFunctionDeclImpl(Decl);
 		else
@@ -1167,7 +1248,7 @@ public:
 
 	bool TraverseStaticAssertDecl(StaticAssertDecl* Decl)
 	{
-		if(receiver.dont_print_this_decl.count(Decl)) return true;
+		if(pass_decl(Decl)) return true;
 		out() << "static assert(";
 		TraverseStmt(Decl->getAssertExpr());
 		out() << ", ";
@@ -1575,27 +1656,27 @@ public:
 
 	bool TraverseUsingDecl(UsingDecl* Decl)
 	{
-		if(receiver.dont_print_this_decl.count(Decl)) return true;
+		if(pass_decl(Decl)) return true;
 		out() << "//using " << Decl->getNameAsString();
 		return true;
 	}
 
 	bool TraverseFunctionDecl(FunctionDecl* Decl)
 	{
-		if(receiver.dont_print_this_decl.count(Decl)) return true;
+		if(pass_decl(Decl)) return true;
 		return TraverseFunctionDeclImpl(Decl);
 	}
 
 	bool TraverseUsingDirectiveDecl(UsingDirectiveDecl* Decl)
 	{
-		if(receiver.dont_print_this_decl.count(Decl)) return true;
+		if(pass_decl(Decl)) return true;
 		return true;
 	}
 
 
 	bool TraverseFunctionTemplateDecl(FunctionTemplateDecl* Decl)
 	{
-		if(receiver.dont_print_this_decl.count(Decl)) return true;
+		if(pass_decl(Decl)) return true;
 		FunctionDecl* FDecl = Decl->getTemplatedDecl();
 		switch(FDecl->getKind())
 		{
@@ -1729,7 +1810,7 @@ public:
 
 	bool TraverseEnumConstantDecl(EnumConstantDecl* Decl)
 	{
-		if(receiver.dont_print_this_decl.count(Decl)) return true;
+		if(pass_decl(Decl)) return true;
 		out() << mangleName(Decl->getNameAsString());
 		if(Decl->getInitExpr())
 		{
@@ -1741,7 +1822,7 @@ public:
 
 	bool TraverseEnumDecl(EnumDecl* Decl)
 	{
-		if(receiver.dont_print_this_decl.count(Decl)) return true;
+		if(pass_decl(Decl)) return true;
 		out() << "enum " << mangleName(Decl->getNameAsString());
 		if(Decl->isFixed())
 		{
@@ -1800,7 +1881,7 @@ public:
 
 	bool TraverseLinkageSpecDecl(LinkageSpecDecl* Decl)
 	{
-		if(receiver.dont_print_this_decl.count(Decl)) return true;
+		if(pass_decl(Decl)) return true;
 		switch(Decl->getLanguage())
 		{
 		case LinkageSpecDecl::LanguageIDs::lang_c: out() << "extern (C) "; break;
@@ -1830,7 +1911,7 @@ public:
 
 	bool TraverseFriendDecl(FriendDecl* Decl)
 	{
-		if(receiver.dont_print_this_decl.count(Decl)) return true;
+		if(pass_decl(Decl)) return true;
 		out() << "//friend ";
 		if(Decl->getFriendType())
 			TraverseType(Decl->getFriendType()->getType());
@@ -1841,7 +1922,7 @@ public:
 
 	bool TraverseParmVarDecl(ParmVarDecl* Decl)
 	{
-		if(receiver.dont_print_this_decl.count(Decl)) return true;
+		if(pass_decl(Decl)) return true;
 		PrintType(Decl->getType());
 		std::string const name = Decl->getNameAsString();
 		if(name.empty() == false)
@@ -1911,7 +1992,7 @@ public:
 
 	bool TraverseTemplateTypeParmDecl(TemplateTypeParmDecl* Decl)
 	{
-		if(receiver.dont_print_this_decl.count(Decl)) return true;
+		if(pass_decl(Decl)) return true;
 		IdentifierInfo* identifier = Decl->getIdentifier();
 		if(identifier)
 		{
@@ -1926,7 +2007,7 @@ public:
 
 	bool TraverseNonTypeTemplateParmDecl(NonTypeTemplateParmDecl* Decl)
 	{
-		if(receiver.dont_print_this_decl.count(Decl)) return true;
+		if(pass_decl(Decl)) return true;
 		PrintType(Decl->getType());
 		out() << " ";
 		IdentifierInfo* identifier = Decl->getIdentifier();
@@ -1959,7 +2040,7 @@ public:
 
 	bool TraverseNamespaceAliasDecl(NamespaceAliasDecl* Decl)
 	{
-		if(receiver.dont_print_this_decl.count(Decl)) return true;
+		if(pass_decl(Decl)) return true;
 		return true;
 	}
 
@@ -2301,7 +2382,7 @@ public:
 
 	bool TraverseEmptyDecl(EmptyDecl* Decl)
 	{
-		if(receiver.dont_print_this_decl.count(Decl)) return true;
+		if(pass_decl(Decl)) return true;
 		return true;
 	}
 
@@ -2779,6 +2860,7 @@ public:
 			std::string const valInit = popStream();
 			if(valInit.empty() == false)
 				out() << indent_str() << valInit << ',' << std::endl;
+			output_enabled = (isInMacro == 0);
 		}
 		--indent;
 		out() << indent_str() << (isArray ? ']' : '}');
@@ -2820,7 +2902,7 @@ public:
 					out() << "__PRETTY_FUNCTION__ ~ '\\0'";
 					return true;
 				}
-				else if(str == "CPP2D_MACRO_EXPAND")
+				else if(str == "CPP2D_MACRO_EXPR")
 				{
 					auto get_binop = [](Expr * paren)
 					{
@@ -2831,17 +2913,10 @@ public:
 					auto* macro_name = dyn_cast<StringLiteral>(macro_name_and_args->getLHS());
 					auto* macro_args = dyn_cast<CallExpr>(macro_name_and_args->getRHS());
 					out() << "(mixin(" << macro_name->getString().str() << "!(";
-					Spliter split(", ");
-					for(Expr* arg : macro_args->arguments())
-					{
-						split.split();
-						out() << "q{";
-						TraverseStmt(arg);
-						out() << "}";
-					}
+					PrintMacroArgs(macro_args);
 					out() << ")))";
 					pushStream();
-					TraverseStmt(macro_and_cpp->getRHS());
+					TraverseStmt(macro_and_cpp->getRHS()); //Add the required import
 					popStream();
 					return true;
 				}
@@ -2861,12 +2936,13 @@ public:
 	void TraverseVarDeclImpl(VarDecl* Decl)
 	{
 		std::string const varName = Decl->getNameAsString();
-		if(varName.find(cpp2d_macro_sufix) != std::string::npos)
+		if(varName.find("CPP2D_MACRO_STMT") == 0)
 		{
-			auto* d_macro = dyn_cast<StringLiteral>(Decl->getInit());
-			out() << d_macro->getString().str();
+			PrintStmtMacro(varName, Decl->getInit());
 			return;
 		}
+
+		if(pass_decl(Decl)) return;
 
 		if(Decl->isOutOfLine())
 			return;
@@ -2931,7 +3007,6 @@ public:
 
 	bool TraverseVarDecl(VarDecl* Decl)
 	{
-		if(receiver.dont_print_this_decl.count(Decl)) return true;
 		TraverseVarDeclImpl(Decl);
 		return true;
 	}
@@ -3030,6 +3105,7 @@ private:
 	MatchContainer const& receiver;
 	size_t indent = 0;
 	ASTContext* Context;
+	size_t isInMacro = 0;
 
 	std::vector<std::vector<NamedDecl*> > template_args_stack;
 	std::unordered_map<IdentifierInfo*, std::string> renamedIdentifiers;

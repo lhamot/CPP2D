@@ -42,8 +42,22 @@ public:
 	std::set<std::string> includes_in_file;
 	std::set<std::string> add_before_decl;
 private:
+	void Find_Includes::inject_macro(
+	  clang::MacroDirective const* MD,
+	  std::string const& name,
+	  std::string const& new_macro);
+	void TransformMacroExpr(clang::Token const& MacroNameTok,
+	                        clang::MacroDirective const* MD,
+	                        std::string const& name,
+	                        std::string const& args);
+	void TransformMacroStmt(clang::Token const& MacroNameTok,
+	                        clang::MacroDirective const* MD,
+	                        std::string const& name,
+	                        std::string const& args);
+
 	clang::Preprocessor& pp_;
 	llvm::StringRef inFile_;
 	llvm::StringRef modulename_;
-	std::set<std::string> macro_to_transform;
+	std::map<std::string, std::string> macro_expr;
+	std::map<std::string, std::string> macro_stmt;
 };

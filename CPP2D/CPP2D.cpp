@@ -24,11 +24,15 @@ static cl::extrahelp CommonHelp(CommonOptionsParser::HelpMessage);
 // A help message for this specific tool can be added afterwards.
 static cl::extrahelp MoreHelp("\nMore help text...");
 
-cl::list<std::string>
-MacroAsFunction("macro-function",
-                cl::desc("This macro will not be expanded and will be migrated expecting it has a function-like behavior"),
-                cl::cat(MyToolCategory),
-                cl::ZeroOrMore);
+cl::list<std::string> MacroAsExpr("macro-expr",
+                                  cl::desc("This macro will not be expanded and will be migrated expecting an expression"),
+                                  cl::cat(MyToolCategory),
+                                  cl::ZeroOrMore);
+
+cl::list<std::string> MacroAsStmt("macro-stmt",
+                                  cl::desc("This macro will not be expanded and will be migrated expecting statments"),
+                                  cl::cat(MyToolCategory),
+                                  cl::ZeroOrMore);
 
 int main(int argc, char const** argv)
 {

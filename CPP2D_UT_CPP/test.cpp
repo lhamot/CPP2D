@@ -855,15 +855,47 @@ void check_incr_pointer()
 #define UT_MACRO(expr1, expr2, expr3)  \
 	(var##expr1 = 42, var2 = #expr2, var3 = expr3, expr1 + expr3)
 
+#define UT_MACRO_STMT  \
+int a = 1; \
+int b = 2;
+
+#define UT_MACRO_STMT_CLASS(P, T, N, V) P: T N = V;
+
+class MacroClass
+{
+	UT_MACRO_STMT_CLASS(public, int, a, 1);
+	UT_MACRO_STMT_CLASS(public, int, b, 2);
+};
+
+template<int I>
+struct MPInt {};
+
+int forward(int i)
+{
+	return i;
+}
+
+#define UT_MACRO_EXPR(A, B) A + B
+
 void check_function_macro()
 {
 	int var1(0);
 	char const* var2 = nullptr;
 	int var3 = 0;
-	int var4(UT_MACRO(1, 2, 3));
+	int var4(UT_MACRO(1, 2, 3)); 
 
 	CHECK(var1 == 42);
 	CHECK(var2[0] == '2');
 	CHECK(var3 == 3);
 	CHECK(var4 == 4);
+
+	UT_MACRO_STMT
+
+	CHECK(a == 1 && b == 2);
+
+	MacroClass* m = new MacroClass();
+	CHECK(m->a == 1 && m->b == 2);
+	delete m;
+
+	CHECK(forward(UT_MACRO_EXPR(4, 3)) == 7);
 }
