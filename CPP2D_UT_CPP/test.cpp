@@ -899,3 +899,32 @@ void check_function_macro()
 
 	CHECK(forward(UT_MACRO_EXPR(4, 3)) == 7);
 }
+
+void check_range_based_for_loop()
+{
+	int tab[] = { 1, 2, 3 };
+	int sum = 0;
+	for (int i : tab)
+		sum += i;
+	CHECK(sum == 6);
+	
+	sum = 0;
+	for (auto i : tab)
+		sum += i;
+	CHECK(sum == 6);
+
+	for (int& i : tab)
+		i = i + 1;
+	CHECK(tab[0] == 2 && tab[1] == 3 && tab[2] == 4);
+
+	for (auto& i : tab)
+		i = i + 1;
+	CHECK(tab[0] == 3 && tab[1] == 4 && tab[2] == 5);
+
+	int ctab[] = { 1, 2, 3 };
+	sum = 0;
+	for (auto const& i : ctab)
+		sum += i;
+	CHECK(sum == 6);
+
+}

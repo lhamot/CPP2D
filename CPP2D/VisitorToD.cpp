@@ -1195,12 +1195,10 @@ public:
 	bool TraverseCXXForRangeStmt(CXXForRangeStmt*  Stmt)
 	{
 		out() << "foreach(";
-		DeclStmt* varDecl = Stmt->getLoopVarStmt();
-		assert(varDecl->isSingleDecl());
-		Decl* singleDecl = varDecl->getSingleDecl();
-		assert(singleDecl && singleDecl->getKind() == Decl::Kind::Var);
 		refAccepted = true;
-		TraverseVarDeclImpl(static_cast<VarDecl*>(singleDecl));
+		inForRangeInit = true;
+		TraverseVarDeclImpl(dyn_cast<VarDecl>(Stmt->getLoopVarStmt()->getSingleDecl()));
+		inForRangeInit = false;
 		refAccepted = false;
 		out() << "; ";
 		TraverseStmt(Stmt->getRangeInit());
@@ -1866,9 +1864,9 @@ public:
 		return true;
 	}
 
-	bool TraverseAutoType(AutoType* type)
+	bool TraverseAutoType(AutoType*)
 	{
-		if(receiver.forrange_loopvar_auto.count(type) == 0)
+		if(not inForRangeInit)
 			out() << "auto";
 		return true;
 	}
@@ -3111,6 +3109,7 @@ private:
 	std::unordered_map<IdentifierInfo*, std::string> renamedIdentifiers;
 	bool renameIdentifiers = true;
 	bool refAccepted = false;
+	bool inForRangeInit = false;
 };
 
 

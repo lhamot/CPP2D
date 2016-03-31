@@ -55,3 +55,5 @@ void check_builtin_macro();
 void check_incr_pointer();
 
 void check_function_macro();
+
+void check_range_based_for_loop();
