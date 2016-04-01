@@ -159,14 +159,6 @@ struct Spliter
 	}
 };
 
-static char const* opStrTab[] =
-{
-	"@",                ///< Not an overloaded operator
-#define OVERLOADED_OPERATOR(Name,Spelling,Token,Unary,Binary,MemberOnly) \
-	Spelling,
-#include "clang/Basic/OperatorKinds.def"
-};
-
 std::string mangleName(std::string const& name)
 {
 	if(name == "version")
@@ -1302,6 +1294,16 @@ public:
 
 	void PrintCXXConstructExprParams(CXXConstructExpr* Init)
 	{
+		if (Init->getNumArgs() == 1)  //Handle Copy ctor
+		{
+			QualType recordType = Init->getType();
+			recordType.addConst();
+			if (recordType == Init->getArg(0)->getType())
+			{
+				TraverseStmt(Init->getArg(0));
+				return;
+			}
+		}
 		PrintType(Init->getType());
 		out() << '(';
 		Spliter spliter(", ");
@@ -1459,7 +1461,7 @@ public:
 		if(Decl->isOverloadedOperator())
 		{
 			std::string const right = (arg_become_this == 1) ? "Right" : "";
-			auto const opKind = Decl->getOverloadedOperator();
+			OverloadedOperatorKind const opKind = Decl->getOverloadedOperator();
 			if(opKind == OverloadedOperatorKind::OO_EqualEqual)
 				out() << "opEquals" + right;
 			else if(opKind == OverloadedOperatorKind::OO_Call)
@@ -1469,11 +1471,24 @@ public:
 			else if(opKind == OverloadedOperatorKind::OO_Equal)
 				out() << "opAssign" + right;
 			else if(opKind == OverloadedOperatorKind::OO_Less)
-				out() << "_opless" + right;
+				out() << "_opLess" + right;
+			else if (opKind == OverloadedOperatorKind::OO_LessEqual)
+				out() << "_opLessEqual" + right;
+			else if (opKind == OverloadedOperatorKind::OO_Greater)
+				out() << "_opGreater" + right;
+			else if (opKind == OverloadedOperatorKind::OO_GreaterEqual)
+				out() << "_opGreaterEqual" + right;
 			else
 			{
-				out() << "opBinary" + right;
-				tmpParams = "string op: \"" + std::string(opStrTab[opKind]) + "\"";
+				std::string spelling = getOperatorSpelling(opKind);
+				if (spelling.back() == '=') //Handle self assign operators
+				{
+					out() << "opOpAssign";
+					spelling.resize(spelling.size() - 1);
+				}
+				else
+					out() << "opBinary" + right;
+				tmpParams = "string op: \"" + spelling + "\"";
 			}
 		}
 		else
@@ -2058,7 +2073,7 @@ public:
 		const OverloadedOperatorKind kind = Stmt->getOperator();
 		if(kind == OverloadedOperatorKind::OO_Call || kind == OverloadedOperatorKind::OO_Subscript)
 		{
-			auto opStr = opStrTab[kind];
+			char const* opStr = getOperatorSpelling(kind);
 			auto iter = Stmt->arg_begin(), end = Stmt->arg_end();
 			TraverseStmt(*iter);
 			Spliter spliter(", ");
@@ -2112,8 +2127,7 @@ public:
 				TraverseStmt(*Stmt->arg_begin());
 				out() << " ";
 			}
-			assert(kind > 0 && kind < (sizeof(opStrTab) / sizeof(char const*)));
-			out() << opStrTab[kind];
+			out() << getOperatorSpelling(kind);
 			if(numArgs == 2)
 				out() << " ";
 			TraverseStmt(*(Stmt->arg_end() - 1));
@@ -2713,6 +2727,12 @@ public:
 			}
 			else if(Stmt->getOpcode() == UnaryOperatorKind::UO_Deref)
 			{
+				if (auto* t = dyn_cast<CXXThisExpr>(Stmt->getSubExpr()))
+				{   // (*this) in C++ mean (this) in D
+					out() << "this";
+					return true;
+				}
+
 				preOp = "";
 				postOp = "[0]";
 			}
@@ -2964,14 +2984,8 @@ public:
 			Expr* init = Decl->getInit();
 			if(Decl->isDirectInit())
 			{
-				if(init->getStmtClass() != Stmt::StmtClass::CXXConstructExprClass)
+				if(auto* constr = dyn_cast<CXXConstructExpr>(init))
 				{
-					out() << " = ";
-					TraverseStmt(init);
-				}
-				else
-				{
-					auto const constr = static_cast<CXXConstructExpr*>(init);
 					if(getSemantic(varType) == Value)
 					{
 						if(constr->getNumArgs() != 0)
@@ -2985,6 +2999,11 @@ public:
 						out() << " = new ";
 						PrintCXXConstructExprParams(constr);
 					}
+				}
+				else
+				{
+					out() << " = ";
+					TraverseStmt(init);
 				}
 			}
 			else

@@ -928,3 +928,88 @@ void check_range_based_for_loop()
 	CHECK(sum == 6);
 
 }
+
+struct OverloadOpStuct
+{
+	int value = 0;
+
+	explicit OverloadOpStuct(int v) : value(v) {};
+
+	OverloadOpStuct& operator += (OverloadOpStuct const& other)
+	{
+		value += other.value;
+		return *this;
+	}
+
+	OverloadOpStuct& operator -= (OverloadOpStuct const& other)
+	{
+		value -= other.value;
+		return *this;
+	}
+
+	OverloadOpStuct& operator *= (OverloadOpStuct const& other)
+	{
+		value *= other.value;
+		return *this;
+	}
+
+	OverloadOpStuct& operator /= (OverloadOpStuct const& other)
+	{
+		value /= other.value;
+		return *this;
+	}
+
+	OverloadOpStuct operator + (OverloadOpStuct const& other) const
+	{
+		OverloadOpStuct tmp(*this);
+		return tmp += other;
+	}
+
+	OverloadOpStuct operator - (OverloadOpStuct const& other) const
+	{
+		OverloadOpStuct tmp(*this);
+		return tmp -= other;
+	}
+
+	OverloadOpStuct operator * (OverloadOpStuct const& other) const
+	{
+		OverloadOpStuct tmp(*this);
+		return tmp *= other;
+	}
+
+	OverloadOpStuct operator / (OverloadOpStuct const& other) const
+	{
+		OverloadOpStuct tmp(*this);
+		return tmp /= other;
+	}
+};
+
+void check_overloaded_operator()
+{
+	OverloadOpStuct a(6);
+	OverloadOpStuct b(3);
+	
+	OverloadOpStuct mu = a * b;
+	CHECK(mu.value == 18);
+
+	OverloadOpStuct d = a / b;
+	CHECK(d.value == 2);
+
+	OverloadOpStuct p = a + b;
+	CHECK(p.value == 9);
+
+	OverloadOpStuct mi = a - b;
+	CHECK(mi.value == 3);
+
+	mu /= b;
+	CHECK(mu.value == a.value);
+
+	d *= b;
+	CHECK(d.value == a.value);
+
+	p -= b;
+	CHECK(p.value == a.value);
+
+	mi += b;
+	CHECK(mi.value == a.value);
+}
