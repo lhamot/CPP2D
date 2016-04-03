@@ -453,6 +453,13 @@ class VisitorToD
 		}
 	}
 
+	struct RelationInfo
+	{
+		bool hasOpEqual = false;
+		bool hasOpLess = false;
+	};
+	using ClassInfo = std::unordered_map<Type const*, RelationInfo>;
+
 public:
 	explicit VisitorToD(
 	  ASTContext* Context,
@@ -939,6 +946,28 @@ public:
 			out() << std::endl;
 		}
 
+		// print the opCmd operator
+		if (auto* cxxRecordDecl = dyn_cast<CXXRecordDecl>(decl))
+		{
+			errs() << cxxRecordDecl->getNameAsString() << " TOTO \n";
+			for (auto&& type_info : classInfoMap[cxxRecordDecl])
+			{
+				Type const* type = type_info.first;
+				RelationInfo& info = type_info.second;
+				if (info.hasOpLess and info.hasOpEqual)
+				{
+					out() << indent_str() << "int opCmp(ref in ";
+					PrintType(type->getPointeeType());
+					out() << " other) const\n";
+					out() << indent_str() << "{\n";
+					++indent;
+					out() << indent_str() << "return _opLess(other) ? -1: ((this == other)? 0: 1);\n";
+					--indent;
+					out() << indent_str() << "}\n";
+				}
+			}
+		}
+
 		--indent;
 		out() << indent_str() << "}";
 
@@ -1282,7 +1311,10 @@ public:
 				PrintType(Expr->getAllocatedType());
 				break;
 			case CXXNewExpr::CallInit:
+				PrintType(Expr->getAllocatedType());
+				out() << '(';
 				TraverseStmt(const_cast<CXXConstructExpr*>(Expr->getConstructExpr()));
+				out() << ')';
 				break;
 			case CXXNewExpr::ListInit:
 				TraverseStmt(Expr->getInitializer());
@@ -1320,27 +1352,16 @@ public:
 
 	bool TraverseCXXConstructExpr(CXXConstructExpr* Init)
 	{
-		//Can't put the " = " here can called by ReturnStmt
-		if(Init->isElidable())   // Elidable ?
+		Spliter spliter(", ");
+		for (unsigned i = 0, e = Init->getNumArgs(); i != e; ++i) 
 		{
-			//out() << "/*el*/";
-			assert(Init->getNumArgs() < 2);
-			TraverseStmt(*Init->arg_begin());
+			if (isa<CXXDefaultArgExpr>(Init->getArg(i)))
+				break; // Don't print any defaulted arguments
+
+			spliter.split();
+			TraverseStmt(Init->getArg(i));
 		}
-		else if(Init->getConstructor()->isExplicit() == false && Init->getNumArgs() == 1)
-		{
-			//If implicit copy constructor
-			QualType const argType =
-			  (*Init->arg_begin())->getType().getCanonicalType().getLocalUnqualifiedType();
-			QualType const ctorType = Init->getType().getCanonicalType().getLocalUnqualifiedType();
-			//out() << "/*im*/";
-			if(argType == ctorType)
-				TraverseStmt(*Init->arg_begin());  // Implicite convertion is enough
-			else
-				PrintCXXConstructExprParams(Init);
-		}
-		else
-			PrintCXXConstructExprParams(Init);
+
 		return true;
 	}
 
@@ -1460,34 +1481,95 @@ public:
 		out() << " ";
 		if(Decl->isOverloadedOperator())
 		{
+			QualType arg1Type;
+			QualType arg2Type;
+			CXXRecordDecl* arg1Record = nullptr;
+			CXXRecordDecl* arg2Record = nullptr;
+			if (auto* methodDecl = dyn_cast<CXXMethodDecl>(Decl))
+			{
+				arg1Type = methodDecl->getThisType(*Context);
+				arg1Record = methodDecl->getParent();
+				if (methodDecl->getNumParams() > 0)
+				{
+					arg2Type = methodDecl->getParamDecl(0)->getType();
+					arg2Record = arg2Type->getAsCXXRecordDecl();
+				}
+			}
+			else
+			{
+				if (methodDecl->getNumParams() > 0)
+				{
+					arg1Type = Decl->getParamDecl(0)->getType();
+					arg1Record = arg1Type->getAsCXXRecordDecl();
+				}
+				if (methodDecl->getNumParams() > 1)
+				{
+					arg2Type = Decl->getParamDecl(1)->getType();
+					arg2Record = arg2Type->getAsCXXRecordDecl();
+				}
+			}
+			size_t const nbArgs = (arg_become_this == -1 ? 1 : 0) + Decl->getNumParams();
 			std::string const right = (arg_become_this == 1) ? "Right" : "";
 			OverloadedOperatorKind const opKind = Decl->getOverloadedOperator();
-			if(opKind == OverloadedOperatorKind::OO_EqualEqual)
+			if (opKind == OverloadedOperatorKind::OO_EqualEqual)
+			{
 				out() << "opEquals" + right;
+				if (arg1Record)
+				{
+					classInfoMap[arg1Record][arg2Type.getTypePtr()].hasOpEqual = true;
+					errs() << arg1Record->getNameAsString() << " has opEquals\n";
+				}
+				if (arg2Record)
+				{
+					classInfoMap[arg2Record][arg1Type.getTypePtr()].hasOpEqual = true;
+					errs() << arg2Record->getNameAsString() << " has opEquals\n";
+				}
+			}
 			else if(opKind == OverloadedOperatorKind::OO_Call)
 				out() << "opCall" + right;
 			else if(opKind == OverloadedOperatorKind::OO_Subscript)
 				out() << "opIndex" + right;
 			else if(opKind == OverloadedOperatorKind::OO_Equal)
 				out() << "opAssign" + right;
-			else if(opKind == OverloadedOperatorKind::OO_Less)
+			else if (opKind == OverloadedOperatorKind::OO_Less)
+			{
 				out() << "_opLess" + right;
+				if (arg1Record)
+				{
+					classInfoMap[arg1Record][arg2Type.getTypePtr()].hasOpLess = true;
+					errs() << arg1Record->getNameAsString() << " has opLess\n";
+				}
+				if (arg2Record)
+				{
+					classInfoMap[arg2Record][arg1Type.getTypePtr()].hasOpLess = true;
+					errs() << arg2Record->getNameAsString() << " has opLess\n";
+				}
+			}
 			else if (opKind == OverloadedOperatorKind::OO_LessEqual)
 				out() << "_opLessEqual" + right;
 			else if (opKind == OverloadedOperatorKind::OO_Greater)
 				out() << "_opGreater" + right;
 			else if (opKind == OverloadedOperatorKind::OO_GreaterEqual)
 				out() << "_opGreaterEqual" + right;
+			else if (opKind == OverloadedOperatorKind::OO_PlusPlus && nbArgs == 2)
+				out() << "_opPostPlusplus" + right;
+			else if (opKind == OverloadedOperatorKind::OO_MinusMinus && nbArgs == 2)
+				out() << "_opPostMinusMinus" + right;
 			else
 			{
 				std::string spelling = getOperatorSpelling(opKind);
-				if (spelling.back() == '=') //Handle self assign operators
+				if (nbArgs == 1)
+					out() << "opUnary" + right;
+				else  // Two args
 				{
-					out() << "opOpAssign";
-					spelling.resize(spelling.size() - 1);
+					if (spelling.back() == '=') //Handle self assign operators
+					{
+						out() << "opOpAssign";
+						spelling.resize(spelling.size() - 1);
+					}
+					else
+						out() << "opBinary" + right;
 				}
-				else
-					out() << "opBinary" + right;
 				tmpParams = "string op: \"" + spelling + "\"";
 			}
 		}
@@ -2060,6 +2142,12 @@ public:
 	bool TraverseReturnStmt(ReturnStmt* Stmt)
 	{
 		out() << "return";
+		if (Stmt->getRetValue()) {
+			out() << " ";
+			TraverseStmt(Stmt->getRetValue());
+		}
+		return true;
+		out() << "return";
 		if(Stmt->getRetValue())
 		{
 			out() << ' ';
@@ -2070,10 +2158,11 @@ public:
 
 	bool TraverseCXXOperatorCallExpr(CXXOperatorCallExpr* Stmt)
 	{
+		auto const numArgs = Stmt->getNumArgs();
 		const OverloadedOperatorKind kind = Stmt->getOperator();
+		char const* opStr = getOperatorSpelling(kind);
 		if(kind == OverloadedOperatorKind::OO_Call || kind == OverloadedOperatorKind::OO_Subscript)
 		{
-			char const* opStr = getOperatorSpelling(kind);
 			auto iter = Stmt->arg_begin(), end = Stmt->arg_end();
 			TraverseStmt(*iter);
 			Spliter spliter(", ");
@@ -2119,15 +2208,28 @@ public:
 				TraverseStmt(ro);
 			}
 		}
+		else if (kind == OverloadedOperatorKind::OO_PlusPlus || kind == OverloadedOperatorKind::OO_MinusMinus)
+		{
+			if (numArgs == 2)
+			{
+				TraverseStmt(*Stmt->arg_begin());
+				out() << opStr;
+			}
+			else
+			{
+				out() << opStr;
+				TraverseStmt(*Stmt->arg_begin());
+			}
+			return true;
+		}
 		else
 		{
-			auto const numArgs = Stmt->getNumArgs();
 			if(numArgs == 2)
 			{
 				TraverseStmt(*Stmt->arg_begin());
 				out() << " ";
 			}
-			out() << getOperatorSpelling(kind);
+			out() << opStr;
 			if(numArgs == 2)
 				out() << " ";
 			TraverseStmt(*(Stmt->arg_end() - 1));
@@ -3016,7 +3118,10 @@ public:
 				else
 				{
 					out() << " = new ";
+					PrintType(varType);
+					out() << '(';
 					TraverseStmt(init);
+					out() << ')';
 				}
 			}
 		}
@@ -3126,6 +3231,7 @@ private:
 
 	std::vector<std::vector<NamedDecl*> > template_args_stack;
 	std::unordered_map<IdentifierInfo*, std::string> renamedIdentifiers;
+	std::unordered_map<CXXRecordDecl*, ClassInfo> classInfoMap;
 	bool renameIdentifiers = true;
 	bool refAccepted = false;
 	bool inForRangeInit = false;

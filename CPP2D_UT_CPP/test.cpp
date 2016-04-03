@@ -929,33 +929,55 @@ void check_range_based_for_loop()
 
 }
 
+struct OverloadOpStuct2
+{
+	int value;
+};
+
 struct OverloadOpStuct
 {
 	int value = 0;
 
 	explicit OverloadOpStuct(int v) : value(v) {};
 
+	// Unary operators
+	OverloadOpStuct operator -() { return OverloadOpStuct(-value); }
+	OverloadOpStuct operator +() { return OverloadOpStuct(+value); }
+	OverloadOpStuct operator ~() { return OverloadOpStuct(~value); }
+	OverloadOpStuct operator *() { return OverloadOpStuct(value * value); }
+	OverloadOpStuct& operator ++()
+	{
+		++value;
+		return *this;
+	}
+	OverloadOpStuct& operator --()
+	{
+		--value;
+		return *this;
+	}
+	OverloadOpStuct operator ++(int)
+	{
+		OverloadOpStuct tmp(*this);
+		++(*this);
+		return tmp;
+	}
+	OverloadOpStuct operator --(int)
+	{
+		OverloadOpStuct tmp(*this);
+		--(*this);
+		return tmp;
+	}
+
+	// Cast operator
+	operator int(){return 42;}
+
+	//*************** Binary operators ************************************************************
+
+	// Arithmetic operators
+
 	OverloadOpStuct& operator += (OverloadOpStuct const& other)
 	{
 		value += other.value;
-		return *this;
-	}
-
-	OverloadOpStuct& operator -= (OverloadOpStuct const& other)
-	{
-		value -= other.value;
-		return *this;
-	}
-
-	OverloadOpStuct& operator *= (OverloadOpStuct const& other)
-	{
-		value *= other.value;
-		return *this;
-	}
-
-	OverloadOpStuct& operator /= (OverloadOpStuct const& other)
-	{
-		value /= other.value;
 		return *this;
 	}
 
@@ -965,10 +987,22 @@ struct OverloadOpStuct
 		return tmp += other;
 	}
 
+	OverloadOpStuct& operator -= (OverloadOpStuct const& other)
+	{
+		value -= other.value;
+		return *this;
+	}
+
 	OverloadOpStuct operator - (OverloadOpStuct const& other) const
 	{
 		OverloadOpStuct tmp(*this);
 		return tmp -= other;
+	}
+
+	OverloadOpStuct& operator *= (OverloadOpStuct const& other)
+	{
+		value *= other.value;
+		return *this;
 	}
 
 	OverloadOpStuct operator * (OverloadOpStuct const& other) const
@@ -977,39 +1011,170 @@ struct OverloadOpStuct
 		return tmp *= other;
 	}
 
+	OverloadOpStuct& operator /= (OverloadOpStuct const& other)
+	{
+		value /= other.value;
+		return *this;
+	}
+
 	OverloadOpStuct operator / (OverloadOpStuct const& other) const
 	{
 		OverloadOpStuct tmp(*this);
 		return tmp /= other;
 	}
+
+	// relational operators
+
+	bool operator == (OverloadOpStuct const& other) const
+	{
+		return value == other.value;
+	}
+
+	bool operator != (OverloadOpStuct const& other) const
+	{
+		return !(*this == other);
+	}
+
+	bool operator < (OverloadOpStuct const& other) const
+	{
+		return (this->value < other.value);
+	}
+
+	bool operator > (OverloadOpStuct const& other) const
+	{
+		return (this->value > other.value);
+	}
+
+	bool operator <= (OverloadOpStuct const& other) const
+	{
+		return (*this < other) || (*this == other);
+	}
+
+	bool operator >= (OverloadOpStuct const& other) const
+	{
+		return (this->value >= other.value);
+	}
+
+	// asymetric relational operators
+	bool operator == (OverloadOpStuct2 const& other) const
+	{
+		return value == other.value;
+	}
+
+	bool operator != (OverloadOpStuct2 const& other) const
+	{
+		return !(*this == other);
+	}
+
+	bool operator < (OverloadOpStuct2 const& other) const
+	{
+		return (this->value < other.value);
+	}
+
+	bool operator > (OverloadOpStuct2 const& other) const
+	{
+		return (this->value > other.value);
+	}
+
+	bool operator <= (OverloadOpStuct2 const& other) const
+	{
+		return (*this < other) || (*this == other);
+	}
+
+	bool operator >= (OverloadOpStuct2 const& other) const
+	{
+		return (this->value >= other.value);
+	}
+
 };
 
 void check_overloaded_operator()
 {
-	OverloadOpStuct a(6);
-	OverloadOpStuct b(3);
-	
-	OverloadOpStuct mu = a * b;
-	CHECK(mu.value == 18);
+	//****************   Unary operators  *********************************************************
+	{
+		OverloadOpStuct i(18);
+		CHECK((-i).value == -18);
+		CHECK((+i).value == +18);
+		CHECK((~i).value == ~18);
+		CHECK((*i).value == 18 * 18);
+		// Pre incr and decr
+		CHECK((++i).value == 19);
+		CHECK(i.value == 19);
+		CHECK((--i).value == 18);
+		CHECK(i.value == 18);
+		// post incr and decr
+		CHECK((i++).value == 18);
+		CHECK(i.value == 19);
+		CHECK((i--).value == 19);
+		CHECK(i.value == 18);
+	}
 
-	OverloadOpStuct d = a / b;
-	CHECK(d.value == 2);
+	//*************************** Cast operator ***************************************************
+	{
+		OverloadOpStuct i(18);
+		CHECK((int)i == 42);
+	}
 
-	OverloadOpStuct p = a + b;
-	CHECK(p.value == 9);
+	//********************* Binary operators ******************************************************
+	// Arithmetic operators
+	{
+		OverloadOpStuct a(6);
+		OverloadOpStuct b(3);
 
-	OverloadOpStuct mi = a - b;
-	CHECK(mi.value == 3);
+		OverloadOpStuct mu = a * b;
+		CHECK(mu.value == 18);
 
-	mu /= b;
-	CHECK(mu.value == a.value);
+		OverloadOpStuct d = a / b;
+		CHECK(d.value == 2);
 
-	d *= b;
-	CHECK(d.value == a.value);
+		OverloadOpStuct p = a + b;
+		CHECK(p.value == 9);
 
-	p -= b;
-	CHECK(p.value == a.value);
+		OverloadOpStuct mi = a - b;
+		CHECK(mi.value == 3);
 
-	mi += b;
-	CHECK(mi.value == a.value);
+		mu /= b;
+		CHECK(mu.value == a.value);
+
+		d *= b;
+		CHECK(d.value == a.value);
+
+		p -= b;
+		CHECK(p.value == a.value);
+
+		mi += b;
+		CHECK(mi.value == a.value);
+	}
+
+	// relational operators
+	{
+		OverloadOpStuct a6(6);
+		OverloadOpStuct b6(6);
+		OverloadOpStuct c3(3);
+		CHECK(b6 == a6);
+		CHECK(b6 <= a6);
+		CHECK(b6 >= a6);
+		CHECK(c3 != a6);
+		CHECK(c3  < a6);
+		CHECK(c3 <= a6);
+		CHECK(a6  > c3);
+		CHECK(a6 >= c3);
+	}
+
+	// Asymetric  relational operators
+	{
+		OverloadOpStuct2 a6 = { 6 };
+		OverloadOpStuct b6(6);
+		OverloadOpStuct c3(3);
+		OverloadOpStuct d9(9);
+		CHECK(b6 == a6);
+		CHECK(b6 <= a6);
+		CHECK(b6 >= a6);
+		CHECK(c3 != a6);
+		CHECK(c3  < a6);
+		CHECK(c3 <= a6);
+		CHECK(d9  > a6);
+		CHECK(d9 >= a6);
+	}
+
 }
