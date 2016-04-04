@@ -449,9 +449,9 @@ template <typename T> struct InjectedClassNameType
 public:
 	InjectedClassNameType():data(2) {  }
 	T data;
-	InjectedClassNameType const& toto(InjectedClassNameType const& a)
+	InjectedClassNameType const& toto(InjectedClassNameType const* a)
 	{
-		return a;
+		return *a;
 	}
 };
 
@@ -459,7 +459,7 @@ void check_injectedclassnametype()
 {
 	InjectedClassNameType<int const> toto;
 	InjectedClassNameType<int const> toto2;
-	CHECK(&toto.toto(toto2) == &toto2);
+	CHECK(&toto.toto(&toto2) == &toto2);
 }
 
 
@@ -1086,7 +1086,7 @@ struct OverloadOpStuct
 		return (this->value >= other.value);
 	}
 
-	// logical operator
+	//************************ logical operators **************************************************
 	bool operator ! () const
 	{
 		return this->value == 0;
@@ -1100,6 +1100,37 @@ struct OverloadOpStuct
 	bool operator || (OverloadOpStuct const& other) const
 	{
 		return (!!*this) || (!!other);
+	}
+
+	//************************ Bitwise operators **************************************************
+	OverloadOpStuct operator ~ () const
+	{
+		return OverloadOpStuct(~this->value);
+	}
+
+	OverloadOpStuct operator & (OverloadOpStuct const& other) const
+	{
+		return OverloadOpStuct(this->value & other.value);
+	}
+
+	OverloadOpStuct operator | (OverloadOpStuct const& other) const
+	{
+		return OverloadOpStuct(this->value | other.value);
+	}
+
+	OverloadOpStuct operator ^ (OverloadOpStuct const& other) const
+	{
+		return OverloadOpStuct(this->value ^ other.value);
+	}
+
+	OverloadOpStuct operator << (int count) const
+	{
+		return OverloadOpStuct(this->value << count);
+	}
+
+	OverloadOpStuct operator >> (int count) const
+	{
+		return OverloadOpStuct(this->value >> count);
 	}
 
 };
@@ -1209,5 +1240,20 @@ void check_overloaded_operator()
 		CHECK(a0 || c1);
 		CHECK(c1 || a0);
 		CHECK(c1 || d1);
+	}
+
+	//************************ Bitwise operators **************************************************
+	{
+		auto inv = ~decltype(OverloadOpStuct::value)(0);
+		OverloadOpStuct a000(0);
+		OverloadOpStuct a110(6);
+		OverloadOpStuct a011(3);
+		CHECK((~a000).value == inv);
+		CHECK((a110 & a011) == OverloadOpStuct(2));
+		CHECK((a110 | a011) == OverloadOpStuct(7));
+		CHECK((a110 ^ a011) == OverloadOpStuct(5));
+		CHECK((a110 >> 1) == OverloadOpStuct(3));
+		CHECK((a110 << 1) == OverloadOpStuct(12));
+
 	}
 }

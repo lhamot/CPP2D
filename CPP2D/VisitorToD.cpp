@@ -1670,6 +1670,7 @@ public:
 		if(not tmplPrinted and not tmplParamsStr.empty())
 			out() << '(' << tmplParamsStr << ')';
 		out() << "(";
+		inFuncArgs = true;
 		if(Decl->getNumParams() != 0)
 		{
 			TypeSourceInfo* declSourceInfo = Decl->getTypeSourceInfo();
@@ -1722,6 +1723,7 @@ public:
 		out() << ")";
 		printFuncEnd(Decl);
 		refAccepted = false;
+		inFuncArgs = false;
 		if(Stmt* body = Decl->getBody())
 		{
 			//Stmt* body = Decl->getBody();
@@ -2059,8 +2061,18 @@ public:
 		{
 			if(refAccepted)
 			{
-				if(getSemantic(Type->getPointeeType()) == Value)
-					out() << "ref ";
+				if (getSemantic(Type->getPointeeType()) == Value)
+				{
+					if (inFuncArgs)
+					{
+						// In D, we can't take a rvalue by const ref. So we need to pass by copy.
+						// (But the copy will be elided when possible)
+						if (Type->getPointeeType().isConstant(*Context) == false)
+							out() << "ref ";
+					}
+					else
+						out() << "ref ";
+				}
 				PrintType(Type->getPointeeType());
 			}
 			else
@@ -2531,6 +2543,7 @@ public:
 				Spliter spliter2(", ");
 				out() << '(';
 				refAccepted = true;
+				inFuncArgs = true;
 				// Visit parameters.
 				for(unsigned I = 0, N = Proto.getNumParams(); I != N; ++I)
 				{
@@ -2538,6 +2551,7 @@ public:
 					TraverseDecl(Proto.getParam(I));
 				}
 				refAccepted = false;
+				inFuncArgs = false;
 				out() << ')' << std::endl;
 			}
 			else if(S->hasExplicitResultType())
@@ -3245,6 +3259,7 @@ private:
 	std::unordered_map<CXXRecordDecl*, ClassInfo> classInfoMap;
 	bool renameIdentifiers = true;
 	bool refAccepted = false;
+	bool inFuncArgs = false;
 	bool inForRangeInit = false;
 };
 
