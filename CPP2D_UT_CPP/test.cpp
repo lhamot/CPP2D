@@ -1086,6 +1086,22 @@ struct OverloadOpStuct
 		return (this->value >= other.value);
 	}
 
+	// logical operator
+	bool operator ! () const
+	{
+		return this->value == 0;
+	}
+
+	bool operator && (OverloadOpStuct const& other) const
+	{
+		return (!!*this) && (!!other);
+	}
+
+	bool operator || (OverloadOpStuct const& other) const
+	{
+		return (!!*this) || (!!other);
+	}
+
 };
 
 void check_overloaded_operator()
@@ -1161,7 +1177,7 @@ void check_overloaded_operator()
 		CHECK(a6 >= c3);
 	}
 
-	// Asymetric  relational operators
+	// Asymetric relational operators
 	{
 		OverloadOpStuct2 a6 = { 6 };
 		OverloadOpStuct b6(6);
@@ -1177,4 +1193,21 @@ void check_overloaded_operator()
 		CHECK(d9 >= a6);
 	}
 
+	// Logical operators
+	{
+		OverloadOpStuct a0(0);
+		OverloadOpStuct b0(0);
+		OverloadOpStuct c1(48);
+		OverloadOpStuct d1(79);
+		CHECK(!a0);
+		CHECK(!!c1);
+		CHECK(!(a0 && b0));
+		CHECK(!(a0 && c1));
+		CHECK(!(c1 && a0));
+		CHECK(c1 && d1);
+		CHECK(!(a0 || b0));
+		CHECK(a0 || c1);
+		CHECK(c1 || a0);
+		CHECK(c1 || d1);
+	}
 }

@@ -458,7 +458,12 @@ class VisitorToD
 		bool hasOpEqual = false;
 		bool hasOpLess = false;
 	};
-	using ClassInfo = std::unordered_map<Type const*, RelationInfo>;
+	struct ClassInfo
+	{
+		std::unordered_map<Type const*, RelationInfo> relations;
+		bool hasOpExclaim = false;
+		bool hasBoolConv = false;
+	};
 
 public:
 	explicit VisitorToD(
@@ -949,8 +954,8 @@ public:
 		// print the opCmd operator
 		if (auto* cxxRecordDecl = dyn_cast<CXXRecordDecl>(decl))
 		{
-			errs() << cxxRecordDecl->getNameAsString() << " TOTO \n";
-			for (auto&& type_info : classInfoMap[cxxRecordDecl])
+			ClassInfo const& classInfo = classInfoMap[cxxRecordDecl];
+			for (auto&& type_info : classInfoMap[cxxRecordDecl].relations)
 			{
 				Type const* type = type_info.first;
 				RelationInfo& info = type_info.second;
@@ -965,6 +970,16 @@ public:
 					--indent;
 					out() << indent_str() << "}\n";
 				}
+			}
+
+			if (classInfo.hasOpExclaim and not classInfo.hasBoolConv)
+			{
+				out() << indent_str() << "bool opCast(T : bool)() const\n";
+				out() << indent_str() << "{\n";
+				++indent;
+				out() << indent_str() << "return !_opExclaim();\n";
+				--indent;
+				out() << indent_str() << "}\n";
 			}
 		}
 
@@ -1515,15 +1530,15 @@ public:
 			{
 				out() << "opEquals" + right;
 				if (arg1Record)
-				{
-					classInfoMap[arg1Record][arg2Type.getTypePtr()].hasOpEqual = true;
-					errs() << arg1Record->getNameAsString() << " has opEquals\n";
-				}
+					classInfoMap[arg1Record].relations[arg2Type.getTypePtr()].hasOpEqual = true;
 				if (arg2Record)
-				{
-					classInfoMap[arg2Record][arg1Type.getTypePtr()].hasOpEqual = true;
-					errs() << arg2Record->getNameAsString() << " has opEquals\n";
-				}
+					classInfoMap[arg2Record].relations[arg1Type.getTypePtr()].hasOpEqual = true;
+			}
+			else if (opKind == OverloadedOperatorKind::OO_Exclaim)
+			{
+				out() << "_opExclaim" + right;
+				if (arg1Record)
+					classInfoMap[arg1Record].hasOpExclaim = true;
 			}
 			else if(opKind == OverloadedOperatorKind::OO_Call)
 				out() << "opCall" + right;
@@ -1535,15 +1550,9 @@ public:
 			{
 				out() << "_opLess" + right;
 				if (arg1Record)
-				{
-					classInfoMap[arg1Record][arg2Type.getTypePtr()].hasOpLess = true;
-					errs() << arg1Record->getNameAsString() << " has opLess\n";
-				}
+					classInfoMap[arg1Record].relations[arg2Type.getTypePtr()].hasOpLess = true;
 				if (arg2Record)
-				{
-					classInfoMap[arg2Record][arg1Type.getTypePtr()].hasOpLess = true;
-					errs() << arg2Record->getNameAsString() << " has opLess\n";
-				}
+					classInfoMap[arg2Record].relations[arg1Type.getTypePtr()].hasOpLess = true;
 			}
 			else if (opKind == OverloadedOperatorKind::OO_LessEqual)
 				out() << "_opLessEqual" + right;
@@ -1585,6 +1594,8 @@ public:
 		out() << " opCast";
 		pushStream();
 		out() << "T : ";
+		if (Decl->getConversionType().getAsString() == "bool")
+			classInfoMap[Decl->getParent()].hasBoolConv = true;
 		PrintType(Decl->getConversionType());
 		tmpParams = popStream();
 		return true;
