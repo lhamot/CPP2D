@@ -57,6 +57,12 @@ int main()
 
 	check_function_macro();
 
+	check_range_based_for_loop();
+
+	check_overloaded_operator();
+
+	check_extern_overloaded_operator();
+
 	print_results();
 
 	return 0;

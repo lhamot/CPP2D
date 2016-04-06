@@ -1500,6 +1500,17 @@ public:
 			QualType arg2Type;
 			CXXRecordDecl* arg1Record = nullptr;
 			CXXRecordDecl* arg2Record = nullptr;
+			auto getRecordType = [](QualType qt) 
+			{
+				if (auto const* lval = dyn_cast<LValueReferenceType>(qt.getTypePtr()))
+				{
+					return lval->getPointeeType()->getAsCXXRecordDecl();
+				}
+				else
+				{
+					return qt->getAsCXXRecordDecl();
+				}
+			};
 			if (auto* methodDecl = dyn_cast<CXXMethodDecl>(Decl))
 			{
 				arg1Type = methodDecl->getThisType(*Context);
@@ -1507,20 +1518,20 @@ public:
 				if (methodDecl->getNumParams() > 0)
 				{
 					arg2Type = methodDecl->getParamDecl(0)->getType();
-					arg2Record = arg2Type->getAsCXXRecordDecl();
+					arg2Record = getRecordType(arg2Type);
 				}
 			}
 			else
 			{
-				if (methodDecl->getNumParams() > 0)
+				if (Decl->getNumParams() > 0)
 				{
 					arg1Type = Decl->getParamDecl(0)->getType();
-					arg1Record = arg1Type->getAsCXXRecordDecl();
+					arg1Record = getRecordType(arg1Type);
 				}
-				if (methodDecl->getNumParams() > 1)
+				if (Decl->getNumParams() > 1)
 				{
 					arg2Type = Decl->getParamDecl(1)->getType();
-					arg2Record = arg2Type->getAsCXXRecordDecl();
+					arg2Record = getRecordType(arg2Type);
 				}
 			}
 			size_t const nbArgs = (arg_become_this == -1 ? 1 : 0) + Decl->getNumParams();
@@ -1551,8 +1562,6 @@ public:
 				out() << "_opLess" + right;
 				if (arg1Record)
 					classInfoMap[arg1Record].relations[arg2Type.getTypePtr()].hasOpLess = true;
-				if (arg2Record)
-					classInfoMap[arg2Record].relations[arg1Type.getTypePtr()].hasOpLess = true;
 			}
 			else if (opKind == OverloadedOperatorKind::OO_LessEqual)
 				out() << "_opLessEqual" + right;
@@ -1671,6 +1680,7 @@ public:
 			out() << '(' << tmplParamsStr << ')';
 		out() << "(";
 		inFuncArgs = true;
+		bool isConstMethod = false;
 		if(Decl->getNumParams() != 0)
 		{
 			TypeSourceInfo* declSourceInfo = Decl->getTypeSourceInfo();
@@ -1683,15 +1693,26 @@ public:
 				funcTypeLoc = declTypeLoc.castAs<FunctionTypeLoc>();
 				locStart = funcTypeLoc.getLParenLoc().getLocWithOffset(1);
 			}
+
+			auto isConst = [](QualType type)
+			{
+				if (auto* ref = dyn_cast<LValueReferenceType>(type.getTypePtr()))
+					return ref->getPointeeType().isConstQualified();
+				else
+					return type.isConstQualified();
+			};
+
 			++indent;
 			size_t index = 0;
 			size_t const numParam =
 			  Decl->getNumParams() +
 			  (Decl->isVariadic() ? 1 : 0) +
 			  ((arg_become_this == -1) ? 0 : -1);
-			for(auto decl : Decl->params())
+			for(ParmVarDecl* decl : Decl->params())
 			{
-				if(arg_become_this != index)
+				if(arg_become_this == index)
+					isConstMethod = isConst(decl->getType());
+				else
 				{
 					if(numParam != 1)
 					{
@@ -1701,7 +1722,7 @@ public:
 						out() << indent_str();
 					}
 					TraverseDecl(decl);
-					if(index != numParam - 1)
+					if(index < numParam - 1)
 						out() << ',';
 				}
 				++index;
@@ -1721,6 +1742,8 @@ public:
 				out() << comment << indent_str();
 		}
 		out() << ")";
+		if(isConstMethod)
+			out() << " const";
 		printFuncEnd(Decl);
 		refAccepted = false;
 		inFuncArgs = false;

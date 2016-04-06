@@ -941,10 +941,9 @@ struct OverloadOpStuct
 	explicit OverloadOpStuct(int v) : value(v) {};
 
 	// Unary operators
-	OverloadOpStuct operator -() { return OverloadOpStuct(-value); }
-	OverloadOpStuct operator +() { return OverloadOpStuct(+value); }
-	OverloadOpStuct operator ~() { return OverloadOpStuct(~value); }
-	OverloadOpStuct operator *() { return OverloadOpStuct(value * value); }
+	OverloadOpStuct operator -() const { return OverloadOpStuct(-value); }
+	OverloadOpStuct operator +() const { return OverloadOpStuct(+value); }
+	OverloadOpStuct operator *() const { return OverloadOpStuct(value * value); }
 	OverloadOpStuct& operator ++()
 	{
 		++value;
@@ -969,7 +968,7 @@ struct OverloadOpStuct
 	}
 
 	// Cast operator
-	operator int(){return 42;}
+	operator int() const {return 42;}
 
 	//*************** Binary operators ************************************************************
 
@@ -1105,7 +1104,7 @@ struct OverloadOpStuct
 	//************************ Bitwise operators **************************************************
 	OverloadOpStuct operator ~ () const
 	{
-		return OverloadOpStuct(~this->value);
+		return OverloadOpStuct(~(this->value));
 	}
 
 	OverloadOpStuct operator & (OverloadOpStuct const& other) const
@@ -1133,6 +1132,36 @@ struct OverloadOpStuct
 		return OverloadOpStuct(this->value >> count);
 	}
 
+	// Member and pointer operators
+	int operator [] (int arg) const
+	{
+		return value + arg;
+	}
+
+	int const* operator & () const
+	{
+		return &value;
+	}
+
+	int* operator & ()
+	{
+		return &value;
+	}
+
+	OverloadOpStuct* operator -> ()
+	{
+		return this;
+	}
+
+	int operator()(int a, int b)
+	{
+		return a + b;
+	}
+
+	int operator,(int a)
+	{
+		return a * 3;
+	}
 };
 
 void check_overloaded_operator()
@@ -1254,6 +1283,346 @@ void check_overloaded_operator()
 		CHECK((a110 ^ a011) == OverloadOpStuct(5));
 		CHECK((a110 >> 1) == OverloadOpStuct(3));
 		CHECK((a110 << 1) == OverloadOpStuct(12));
+	}
 
+	// Member and pointer operators
+	{
+		OverloadOpStuct a13(13);
+		CHECK(a13[7] == 20);
+		//CHECK(&a13 == &a13.value);
+		CHECK(a13->value == a13.value);
+	}
+
+	//********************************* Other operators *******************************************
+	{
+		OverloadOpStuct a13(13);
+		CHECK(a13(1, 2) == 3);
+		//CHECK((a13, 18) == (18 * 3)); //Can't overload , in D
+	}
+}
+
+
+struct ExtOverloadOpStuct
+{
+	int value = 0;
+
+	explicit ExtOverloadOpStuct(int v) : value(v) {};
+};
+
+// Unary operators
+ExtOverloadOpStuct operator -(ExtOverloadOpStuct const& self) { return ExtOverloadOpStuct(-self.value); }
+ExtOverloadOpStuct operator +(ExtOverloadOpStuct const& self) { return ExtOverloadOpStuct(+self.value); }
+ExtOverloadOpStuct operator *(ExtOverloadOpStuct const& self) { return ExtOverloadOpStuct(self.value * self.value); }
+ExtOverloadOpStuct& operator ++(ExtOverloadOpStuct& self)
+{
+	++self.value;
+	return self;
+}
+ExtOverloadOpStuct& operator --(ExtOverloadOpStuct& self)
+{
+	--self.value;
+	return self;
+}
+ExtOverloadOpStuct operator ++(ExtOverloadOpStuct& self, int)
+{
+	ExtOverloadOpStuct tmp(self);
+	++self;
+	return tmp;
+}
+ExtOverloadOpStuct operator --(ExtOverloadOpStuct& self, int)
+{
+	ExtOverloadOpStuct tmp(self);
+	--self;
+	return tmp;
+}
+
+//*************** Binary operators ************************************************************
+
+// Arithmetic operators
+
+ExtOverloadOpStuct& operator += (ExtOverloadOpStuct& self, ExtOverloadOpStuct const& other)
+{
+	self.value += other.value;
+	return self;
+}
+
+ExtOverloadOpStuct operator + (ExtOverloadOpStuct const& self, ExtOverloadOpStuct const& other)
+{
+	ExtOverloadOpStuct tmp(self);
+	return tmp += other;
+}
+
+ExtOverloadOpStuct& operator -= (ExtOverloadOpStuct& self, ExtOverloadOpStuct const& other)
+{
+	self.value -= other.value;
+	return self;
+}
+
+ExtOverloadOpStuct operator - (ExtOverloadOpStuct& self, ExtOverloadOpStuct const& other)
+{
+	ExtOverloadOpStuct tmp(self);
+	return tmp -= other;
+}
+
+ExtOverloadOpStuct& operator *= (ExtOverloadOpStuct& self, ExtOverloadOpStuct const& other)
+{
+	self.value *= other.value;
+	return self;
+}
+
+ExtOverloadOpStuct operator * (ExtOverloadOpStuct& self, ExtOverloadOpStuct const& other)
+{
+	ExtOverloadOpStuct tmp(self);
+	return tmp *= other;
+}
+
+ExtOverloadOpStuct& operator /= (ExtOverloadOpStuct& self, ExtOverloadOpStuct const& other)
+{
+	self.value /= other.value;
+	return self;
+}
+
+ExtOverloadOpStuct operator / (ExtOverloadOpStuct const& self, ExtOverloadOpStuct const& other)
+{
+	ExtOverloadOpStuct tmp(self);
+	return tmp /= other;
+}
+
+// relational operators
+
+bool operator == (ExtOverloadOpStuct const& self, ExtOverloadOpStuct const& other)
+{
+	return self.value == other.value;
+}
+
+bool operator != (ExtOverloadOpStuct const& self, ExtOverloadOpStuct const& other)
+{
+	return !(self == other);
+}
+
+bool operator < (ExtOverloadOpStuct const& self, ExtOverloadOpStuct const& other)
+{
+	return (self.value < other.value);
+}
+
+bool operator > (ExtOverloadOpStuct const& self, ExtOverloadOpStuct const& other)
+{
+	return (self.value > other.value);
+}
+
+bool operator <= (ExtOverloadOpStuct const& self, ExtOverloadOpStuct const& other)
+{
+	return (self < other) || (self == other);
+}
+
+bool operator >= (ExtOverloadOpStuct const& self, ExtOverloadOpStuct const& other)
+{
+	return (self.value >= other.value);
+}
+
+// asymetric relational operators
+bool operator == (ExtOverloadOpStuct const& self, OverloadOpStuct2 const& other)
+{
+	return self.value == other.value;
+}
+
+bool operator != (ExtOverloadOpStuct const& self, OverloadOpStuct2 const& other)
+{
+	return !(self == other);
+}
+
+bool operator < (ExtOverloadOpStuct const& self, OverloadOpStuct2 const& other)
+{
+	return (self.value < other.value);
+}
+
+bool operator > (ExtOverloadOpStuct const& self, OverloadOpStuct2 const& other)
+{
+	return (self.value > other.value);
+}
+
+bool operator <= (ExtOverloadOpStuct const& self, OverloadOpStuct2 const& other)
+{
+	return (self < other) || (self == other);
+}
+
+bool operator >= (ExtOverloadOpStuct const& self, OverloadOpStuct2 const& other)
+{
+	return (self.value >= other.value);
+}
+
+//************************ logical operators **************************************************
+bool operator ! (ExtOverloadOpStuct const& self)
+{
+	return self.value == 0;
+}
+
+bool operator && (ExtOverloadOpStuct const& self, ExtOverloadOpStuct const& other)
+{
+	return (!!self) && (!!other);
+}
+
+bool operator || (ExtOverloadOpStuct const& self, ExtOverloadOpStuct const& other)
+{
+	return (!!self) || (!!other);
+}
+
+//************************ Bitwise operators **************************************************
+ExtOverloadOpStuct operator ~ (ExtOverloadOpStuct const& self)
+{
+	return ExtOverloadOpStuct(~(self.value));
+}
+
+ExtOverloadOpStuct operator & (ExtOverloadOpStuct const& self, ExtOverloadOpStuct const& other)
+{
+	return ExtOverloadOpStuct(self.value & other.value);
+}
+
+ExtOverloadOpStuct operator | (ExtOverloadOpStuct const& self, ExtOverloadOpStuct const& other)
+{
+	return ExtOverloadOpStuct(self.value | other.value);
+}
+
+ExtOverloadOpStuct operator ^ (ExtOverloadOpStuct const& self, ExtOverloadOpStuct const& other)
+{
+	return ExtOverloadOpStuct(self.value ^ other.value);
+}
+
+ExtOverloadOpStuct operator << (ExtOverloadOpStuct const& self, int count)
+{
+	return ExtOverloadOpStuct(self.value << count);
+}
+
+ExtOverloadOpStuct operator >> (ExtOverloadOpStuct const& self, int count)
+{
+	return ExtOverloadOpStuct(self.value >> count);
+}
+
+// Member and pointer operators
+
+int const* operator & (ExtOverloadOpStuct const& self)
+{
+	return &self.value;
+}
+
+int* operator & (ExtOverloadOpStuct& self)
+{
+	return &self.value;
+}
+
+
+void check_extern_overloaded_operator()
+{
+	//****************   Unary operators  *********************************************************
+	{
+		ExtOverloadOpStuct i(18);
+		CHECK((-i).value == -18);
+		CHECK((+i).value == +18);
+		CHECK((~i).value == ~18);
+		CHECK((*i).value == 18 * 18);
+		// Pre incr and decr
+		CHECK((++i).value == 19);
+		CHECK(i.value == 19);
+		CHECK((--i).value == 18);
+		CHECK(i.value == 18);
+		// post incr and decr
+		CHECK((i++).value == 18);
+		CHECK(i.value == 19);
+		CHECK((i--).value == 19);
+		CHECK(i.value == 18);
+	}
+
+	//********************* Binary operators ******************************************************
+	// Arithmetic operators
+	{
+		ExtOverloadOpStuct a(6);
+		ExtOverloadOpStuct b(3);
+
+		ExtOverloadOpStuct mu = a * b;
+		CHECK(mu.value == 18);
+
+		ExtOverloadOpStuct d = a / b;
+		CHECK(d.value == 2);
+
+		ExtOverloadOpStuct p = a + b;
+		CHECK(p.value == 9);
+
+		ExtOverloadOpStuct mi = a - b;
+		CHECK(mi.value == 3);
+
+		mu /= b;
+		CHECK(mu.value == a.value);
+
+		d *= b;
+		CHECK(d.value == a.value);
+
+		p -= b;
+		CHECK(p.value == a.value);
+
+		mi += b;
+		CHECK(mi.value == a.value);
+	}
+
+	// relational operators
+	{
+		ExtOverloadOpStuct a6(6);
+		ExtOverloadOpStuct b6(6);
+		ExtOverloadOpStuct c3(3);
+		CHECK(b6 == a6);
+		CHECK(b6 <= a6);
+		CHECK(b6 >= a6);
+		CHECK(c3 != a6);
+		CHECK(c3  < a6);
+		CHECK(c3 <= a6);
+		CHECK(a6  > c3);
+		CHECK(a6 >= c3);
+	}
+
+	// Asymetric relational operators
+	{
+		OverloadOpStuct2 a6 = { 6 };
+		ExtOverloadOpStuct b6(6);
+		ExtOverloadOpStuct c3(3);
+		ExtOverloadOpStuct d9(9);
+		CHECK(b6 == a6);
+		CHECK(b6 <= a6);
+		CHECK(b6 >= a6);
+		CHECK(c3 != a6);
+		CHECK(c3  < a6);
+		CHECK(c3 <= a6);
+		CHECK(d9  > a6);
+		CHECK(d9 >= a6);
+	}
+
+	// Logical operators
+	{
+		ExtOverloadOpStuct a0(0);
+		ExtOverloadOpStuct b0(0);
+		ExtOverloadOpStuct c1(48);
+		ExtOverloadOpStuct d1(79);
+		CHECK(!a0);
+		CHECK(!!c1);
+		CHECK(!(a0 && b0));
+		CHECK(!(a0 && c1));
+		CHECK(!(c1 && a0));
+		CHECK(c1 && d1);
+		CHECK(!(a0 || b0));
+		CHECK(a0 || c1);
+		CHECK(c1 || a0);
+		CHECK(c1 || d1);
+	}
+
+	//************************ Bitwise operators **************************************************
+	{
+		auto inv = ~decltype(ExtOverloadOpStuct::value)(0);
+		ExtOverloadOpStuct a000(0);
+		ExtOverloadOpStuct a110(6);
+		ExtOverloadOpStuct a011(3);
+		CHECK((~a000).value == inv);
+		CHECK((a110 & a011) == ExtOverloadOpStuct(2));
+		CHECK((a110 | a011) == ExtOverloadOpStuct(7));
+		CHECK((a110 ^ a011) == ExtOverloadOpStuct(5));
+		CHECK((a110 >> 1) == ExtOverloadOpStuct(3));
+		CHECK((a110 << 1) == ExtOverloadOpStuct(12));
 	}
 }
