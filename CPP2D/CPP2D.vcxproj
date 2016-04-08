@@ -170,13 +170,11 @@
     <ClCompile Include="CPP2D.cpp" />
     <ClCompile Include="Find_Includes.cpp" />
     <ClCompile Include="MatchContainer.cpp" />
-    <ClCompile Include="Matcher.cpp" />
     <ClCompile Include="VisitorToD.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Find_Includes.h" />
     <ClInclude Include="MatchContainer.h" />
-    <ClInclude Include="Matcher.h" />
     <ClInclude Include="VisitorToD.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -22,7 +22,6 @@
 #pragma warning(pop)
 
 #include "MatchContainer.h"
-#include "Matcher.h"
 #include "Find_Includes.h"
 
 //using namespace clang::tooling;
@@ -707,6 +706,7 @@ public:
 
 	bool TraverseCompoundStmt(CompoundStmt* Stmt)
 	{
+		if(pass_stmt(Stmt)) return false;
 		return TraverseCompoundStmtImpl(Stmt, [] {});
 	}
 
@@ -727,13 +727,30 @@ public:
 
 	bool TraverseCXXTryStmt(CXXTryStmt* Stmt)
 	{
+		if(pass_stmt(Stmt)) return false;
 		return TraverseCXXTryStmtImpl(Stmt, [] {});
 	}
 
 	bool pass_decl(Decl* decl)
 	{
-		if(receiver.dont_print_this_decl.count(decl))
+		auto printer = receiver.getPrinter(decl);
+		if(printer)
+		{
+			printer(decl);
 			return true;
+		}
+		else
+			return false;
+	}
+
+	bool pass_stmt(Stmt* stmt)
+	{
+		auto printer = receiver.getPrinter(stmt);
+		if(printer)
+		{
+			printer(stmt);
+			return true;
+		}
 		else
 			return false;
 	}
@@ -764,6 +781,7 @@ public:
 
 	bool TraverseCXXCatchStmt(CXXCatchStmt* Stmt)
 	{
+		if(pass_stmt(Stmt)) return false;
 		out() << "catch";
 		if(Stmt->getExceptionDecl())
 		{
@@ -952,14 +970,14 @@ public:
 		}
 
 		// print the opCmd operator
-		if (auto* cxxRecordDecl = dyn_cast<CXXRecordDecl>(decl))
+		if(auto* cxxRecordDecl = dyn_cast<CXXRecordDecl>(decl))
 		{
 			ClassInfo const& classInfo = classInfoMap[cxxRecordDecl];
-			for (auto&& type_info : classInfoMap[cxxRecordDecl].relations)
+			for(auto && type_info : classInfoMap[cxxRecordDecl].relations)
 			{
 				Type const* type = type_info.first;
 				RelationInfo& info = type_info.second;
-				if (info.hasOpLess and info.hasOpEqual)
+				if(info.hasOpLess and info.hasOpEqual)
 				{
 					out() << indent_str() << "int opCmp(ref in ";
 					PrintType(type->getPointeeType());
@@ -972,7 +990,7 @@ public:
 				}
 			}
 
-			if (classInfo.hasOpExclaim and not classInfo.hasBoolConv)
+			if(classInfo.hasOpExclaim and not classInfo.hasBoolConv)
 			{
 				out() << indent_str() << "bool opCast(T : bool)() const\n";
 				out() << indent_str() << "{\n";
@@ -1180,19 +1198,22 @@ public:
 			return true;
 	}
 
-	bool TraversePredefinedExpr(PredefinedExpr*)
+	bool TraversePredefinedExpr(PredefinedExpr* expr)
 	{
+		if(pass_stmt(expr)) return true;
 		out() << "__PRETTY_FUNCTION__";
 		return true;
 	}
 
-	bool TraverseCXXDefaultArgExpr(CXXDefaultArgExpr*)
+	bool TraverseCXXDefaultArgExpr(CXXDefaultArgExpr* expr)
 	{
+		if(pass_stmt(expr)) return true;
 		return true;
 	}
 
 	bool TraverseCXXUnresolvedConstructExpr(CXXUnresolvedConstructExpr*  Expr)
 	{
+		if(pass_stmt(Expr)) return true;
 		PrintType(Expr->getTypeAsWritten());
 		Spliter spliter(", ");
 		out() << "(";
@@ -1211,6 +1232,7 @@ public:
 
 	bool TraverseUnresolvedLookupExpr(UnresolvedLookupExpr*  Expr)
 	{
+		if(pass_stmt(Expr)) return true;
 		out() << mangleName(Expr->getName().getAsString());
 		if(Expr->hasExplicitTemplateArgs())
 		{
@@ -1230,6 +1252,7 @@ public:
 
 	bool TraverseCXXForRangeStmt(CXXForRangeStmt*  Stmt)
 	{
+		if(pass_stmt(Stmt)) return false;
 		out() << "foreach(";
 		refAccepted = true;
 		inForRangeInit = true;
@@ -1245,6 +1268,7 @@ public:
 
 	bool TraverseDoStmt(DoStmt*  Stmt)
 	{
+		if(pass_stmt(Stmt)) return false;
 		out() << "do" << std::endl;
 		TraverseCompoundStmtOrNot(Stmt->getBody());
 		out() << "while(";
@@ -1255,6 +1279,7 @@ public:
 
 	bool TraverseSwitchStmt(SwitchStmt* Stmt)
 	{
+		if(pass_stmt(Stmt)) return false;
 		out() << "switch(";
 		TraverseStmt(Stmt->getCond());
 		out() << ")" << std::endl << indent_str();
@@ -1264,6 +1289,7 @@ public:
 
 	bool TraverseCaseStmt(CaseStmt* Stmt)
 	{
+		if(pass_stmt(Stmt)) return false;
 		out() << "case ";
 		TraverseStmt(Stmt->getLHS());
 		out() << ":" << std::endl;
@@ -1274,8 +1300,9 @@ public:
 		return true;
 	}
 
-	bool TraverseBreakStmt(BreakStmt*)
+	bool TraverseBreakStmt(BreakStmt* Stmt)
 	{
+		if(pass_stmt(Stmt)) return false;
 		out() << "break";
 		return true;
 	}
@@ -1293,6 +1320,7 @@ public:
 
 	bool TraverseDefaultStmt(DefaultStmt* Stmt)
 	{
+		if(pass_stmt(Stmt)) return false;
 		out() << "default:" << std::endl;
 		++indent;
 		out() << indent_str();
@@ -1303,6 +1331,7 @@ public:
 
 	bool TraverseCXXDeleteExpr(CXXDeleteExpr* Expr)
 	{
+		if(pass_stmt(Expr)) return true;
 		TraverseStmt(Expr->getArgument());
 		out() << " = null";
 		return true;
@@ -1310,6 +1339,7 @@ public:
 
 	bool TraverseCXXNewExpr(CXXNewExpr* Expr)
 	{
+		if(pass_stmt(Expr)) return true;
 		out() << "new ";
 		if(Expr->isArray())
 		{
@@ -1341,11 +1371,11 @@ public:
 
 	void PrintCXXConstructExprParams(CXXConstructExpr* Init)
 	{
-		if (Init->getNumArgs() == 1)  //Handle Copy ctor
+		if(Init->getNumArgs() == 1)   //Handle Copy ctor
 		{
 			QualType recordType = Init->getType();
 			recordType.addConst();
-			if (recordType == Init->getArg(0)->getType())
+			if(recordType == Init->getArg(0)->getType())
 			{
 				TraverseStmt(Init->getArg(0));
 				return;
@@ -1367,10 +1397,11 @@ public:
 
 	bool TraverseCXXConstructExpr(CXXConstructExpr* Init)
 	{
+		if(pass_stmt(Init)) return true;
 		Spliter spliter(", ");
-		for (unsigned i = 0, e = Init->getNumArgs(); i != e; ++i) 
+		for(unsigned i = 0, e = Init->getNumArgs(); i != e; ++i)
 		{
-			if (isa<CXXDefaultArgExpr>(Init->getArg(i)))
+			if(isa<CXXDefaultArgExpr>(Init->getArg(i)))
 				break; // Don't print any defaulted arguments
 
 			spliter.split();
@@ -1500,9 +1531,9 @@ public:
 			QualType arg2Type;
 			CXXRecordDecl* arg1Record = nullptr;
 			CXXRecordDecl* arg2Record = nullptr;
-			auto getRecordType = [](QualType qt) 
+			auto getRecordType = [](QualType qt)
 			{
-				if (auto const* lval = dyn_cast<LValueReferenceType>(qt.getTypePtr()))
+				if(auto const* lval = dyn_cast<LValueReferenceType>(qt.getTypePtr()))
 				{
 					return lval->getPointeeType()->getAsCXXRecordDecl();
 				}
@@ -1511,11 +1542,11 @@ public:
 					return qt->getAsCXXRecordDecl();
 				}
 			};
-			if (auto* methodDecl = dyn_cast<CXXMethodDecl>(Decl))
+			if(auto* methodDecl = dyn_cast<CXXMethodDecl>(Decl))
 			{
 				arg1Type = methodDecl->getThisType(*Context);
 				arg1Record = methodDecl->getParent();
-				if (methodDecl->getNumParams() > 0)
+				if(methodDecl->getNumParams() > 0)
 				{
 					arg2Type = methodDecl->getParamDecl(0)->getType();
 					arg2Record = getRecordType(arg2Type);
@@ -1523,12 +1554,12 @@ public:
 			}
 			else
 			{
-				if (Decl->getNumParams() > 0)
+				if(Decl->getNumParams() > 0)
 				{
 					arg1Type = Decl->getParamDecl(0)->getType();
 					arg1Record = getRecordType(arg1Type);
 				}
-				if (Decl->getNumParams() > 1)
+				if(Decl->getNumParams() > 1)
 				{
 					arg2Type = Decl->getParamDecl(1)->getType();
 					arg2Record = getRecordType(arg2Type);
@@ -1537,18 +1568,18 @@ public:
 			size_t const nbArgs = (arg_become_this == -1 ? 1 : 0) + Decl->getNumParams();
 			std::string const right = (arg_become_this == 1) ? "Right" : "";
 			OverloadedOperatorKind const opKind = Decl->getOverloadedOperator();
-			if (opKind == OverloadedOperatorKind::OO_EqualEqual)
+			if(opKind == OverloadedOperatorKind::OO_EqualEqual)
 			{
 				out() << "opEquals" + right;
-				if (arg1Record)
+				if(arg1Record)
 					classInfoMap[arg1Record].relations[arg2Type.getTypePtr()].hasOpEqual = true;
-				if (arg2Record)
+				if(arg2Record)
 					classInfoMap[arg2Record].relations[arg1Type.getTypePtr()].hasOpEqual = true;
 			}
-			else if (opKind == OverloadedOperatorKind::OO_Exclaim)
+			else if(opKind == OverloadedOperatorKind::OO_Exclaim)
 			{
 				out() << "_opExclaim" + right;
-				if (arg1Record)
+				if(arg1Record)
 					classInfoMap[arg1Record].hasOpExclaim = true;
 			}
 			else if(opKind == OverloadedOperatorKind::OO_Call)
@@ -1557,30 +1588,30 @@ public:
 				out() << "opIndex" + right;
 			else if(opKind == OverloadedOperatorKind::OO_Equal)
 				out() << "opAssign" + right;
-			else if (opKind == OverloadedOperatorKind::OO_Less)
+			else if(opKind == OverloadedOperatorKind::OO_Less)
 			{
 				out() << "_opLess" + right;
-				if (arg1Record)
+				if(arg1Record)
 					classInfoMap[arg1Record].relations[arg2Type.getTypePtr()].hasOpLess = true;
 			}
-			else if (opKind == OverloadedOperatorKind::OO_LessEqual)
+			else if(opKind == OverloadedOperatorKind::OO_LessEqual)
 				out() << "_opLessEqual" + right;
-			else if (opKind == OverloadedOperatorKind::OO_Greater)
+			else if(opKind == OverloadedOperatorKind::OO_Greater)
 				out() << "_opGreater" + right;
-			else if (opKind == OverloadedOperatorKind::OO_GreaterEqual)
+			else if(opKind == OverloadedOperatorKind::OO_GreaterEqual)
 				out() << "_opGreaterEqual" + right;
-			else if (opKind == OverloadedOperatorKind::OO_PlusPlus && nbArgs == 2)
+			else if(opKind == OverloadedOperatorKind::OO_PlusPlus && nbArgs == 2)
 				out() << "_opPostPlusplus" + right;
-			else if (opKind == OverloadedOperatorKind::OO_MinusMinus && nbArgs == 2)
+			else if(opKind == OverloadedOperatorKind::OO_MinusMinus && nbArgs == 2)
 				out() << "_opPostMinusMinus" + right;
 			else
 			{
 				std::string spelling = getOperatorSpelling(opKind);
-				if (nbArgs == 1)
+				if(nbArgs == 1)
 					out() << "opUnary" + right;
 				else  // Two args
 				{
-					if (spelling.back() == '=') //Handle self assign operators
+					if(spelling.back() == '=')  //Handle self assign operators
 					{
 						out() << "opOpAssign";
 						spelling.resize(spelling.size() - 1);
@@ -1603,7 +1634,7 @@ public:
 		out() << " opCast";
 		pushStream();
 		out() << "T : ";
-		if (Decl->getConversionType().getAsString() == "bool")
+		if(Decl->getConversionType().getAsString() == "bool")
 			classInfoMap[Decl->getParent()].hasBoolConv = true;
 		PrintType(Decl->getConversionType());
 		tmpParams = popStream();
@@ -1696,7 +1727,7 @@ public:
 
 			auto isConst = [](QualType type)
 			{
-				if (auto* ref = dyn_cast<LValueReferenceType>(type.getTypePtr()))
+				if(auto* ref = dyn_cast<LValueReferenceType>(type.getTypePtr()))
 					return ref->getPointeeType().isConstQualified();
 				else
 					return type.isConstQualified();
@@ -1933,8 +1964,9 @@ public:
 		return TraversePointerTypeImpl(Type);
 	}
 
-	bool TraverseCXXNullPtrLiteralExpr(CXXNullPtrLiteralExpr*)
+	bool TraverseCXXNullPtrLiteralExpr(CXXNullPtrLiteralExpr* Expr)
 	{
+		if(pass_stmt(Expr)) return true;
 		out() << "null";
 		return true;
 	}
@@ -2078,32 +2110,27 @@ public:
 
 	bool TraverseLValueReferenceType(LValueReferenceType* Type)
 	{
-		if(receiver.ref_to_class.count(Type))
-			PrintType(Type->getPointeeType());
-		else
+		if(refAccepted)
 		{
-			if(refAccepted)
+			if(getSemantic(Type->getPointeeType()) == Value)
 			{
-				if (getSemantic(Type->getPointeeType()) == Value)
+				if(inFuncArgs)
 				{
-					if (inFuncArgs)
-					{
-						// In D, we can't take a rvalue by const ref. So we need to pass by copy.
-						// (But the copy will be elided when possible)
-						if (Type->getPointeeType().isConstant(*Context) == false)
-							out() << "ref ";
-					}
-					else
+					// In D, we can't take a rvalue by const ref. So we need to pass by copy.
+					// (But the copy will be elided when possible)
+					if(Type->getPointeeType().isConstant(*Context) == false)
 						out() << "ref ";
 				}
-				PrintType(Type->getPointeeType());
+				else
+					out() << "ref ";
 			}
-			else
-			{
-				PrintType(Type->getPointeeType());
-				if(getSemantic(Type->getPointeeType()) == Value)
-					out() << "[]";
-			}
+			PrintType(Type->getPointeeType());
+		}
+		else
+		{
+			PrintType(Type->getPointeeType());
+			if(getSemantic(Type->getPointeeType()) == Value)
+				out() << "[]";
 		}
 		return true;
 	}
@@ -2160,6 +2187,7 @@ public:
 
 	bool TraverseDeclStmt(DeclStmt* Stmt)
 	{
+		if(pass_stmt(Stmt)) return false;
 		if(Stmt->isSingleDecl()) //May be in for or catch
 			TraverseDecl(Stmt->getSingleDecl());
 		else
@@ -2187,8 +2215,10 @@ public:
 
 	bool TraverseReturnStmt(ReturnStmt* Stmt)
 	{
+		if(pass_stmt(Stmt)) return false;
 		out() << "return";
-		if (Stmt->getRetValue()) {
+		if(Stmt->getRetValue())
+		{
 			out() << " ";
 			TraverseStmt(Stmt->getRetValue());
 		}
@@ -2204,6 +2234,7 @@ public:
 
 	bool TraverseCXXOperatorCallExpr(CXXOperatorCallExpr* Stmt)
 	{
+		if(pass_stmt(Stmt)) return true;
 		auto const numArgs = Stmt->getNumArgs();
 		const OverloadedOperatorKind kind = Stmt->getOperator();
 		char const* opStr = getOperatorSpelling(kind);
@@ -2254,9 +2285,9 @@ public:
 				TraverseStmt(ro);
 			}
 		}
-		else if (kind == OverloadedOperatorKind::OO_PlusPlus || kind == OverloadedOperatorKind::OO_MinusMinus)
+		else if(kind == OverloadedOperatorKind::OO_PlusPlus || kind == OverloadedOperatorKind::OO_MinusMinus)
 		{
-			if (numArgs == 2)
+			if(numArgs == 2)
 			{
 				TraverseStmt(*Stmt->arg_begin());
 				out() << opStr;
@@ -2309,6 +2340,7 @@ public:
 
 	bool TraverseArraySubscriptExpr(ArraySubscriptExpr* Expr)
 	{
+		if(pass_stmt(Expr)) return true;
 		TraverseStmt(Expr->getLHS());
 		out() << '[';
 		TraverseStmt(Expr->getRHS());
@@ -2340,6 +2372,7 @@ public:
 
 	bool TraverseForStmt(ForStmt* Stmt)
 	{
+		if(pass_stmt(Stmt)) return false;
 		out() << "for(";
 		TraverseStmt(Stmt->getInit());
 		out() << "; ";
@@ -2353,6 +2386,7 @@ public:
 
 	bool TraverseWhileStmt(WhileStmt* Stmt)
 	{
+		if(pass_stmt(Stmt)) return false;
 		out() << "while(";
 		TraverseStmt(Stmt->getCond());
 		out() << ")" << std::endl;
@@ -2362,6 +2396,7 @@ public:
 
 	bool TraverseIfStmt(IfStmt* Stmt)
 	{
+		if(pass_stmt(Stmt)) return false;
 		out() << "if(";
 		TraverseStmt(Stmt->getCond());
 		out() << ")" << std::endl;
@@ -2382,12 +2417,14 @@ public:
 
 	bool TraverseCXXBindTemporaryExpr(CXXBindTemporaryExpr* Stmt)
 	{
+		if(pass_stmt(Stmt)) return true;
 		TraverseStmt(Stmt->getSubExpr());
 		return true;
 	}
 
 	bool TraverseCXXThrowExpr(CXXThrowExpr* Stmt)
 	{
+		if(pass_stmt(Stmt)) return true;
 		out() << "throw ";
 		TraverseStmt(Stmt->getSubExpr());
 		return true;
@@ -2395,12 +2432,14 @@ public:
 
 	bool TraverseMaterializeTemporaryExpr(MaterializeTemporaryExpr* Stmt)
 	{
+		if(pass_stmt(Stmt)) return true;
 		TraverseStmt(Stmt->GetTemporaryExpr());
 		return true;
 	}
 
 	bool TraverseCXXFunctionalCastExpr(CXXFunctionalCastExpr* Stmt)
 	{
+		if(pass_stmt(Stmt)) return true;
 		PrintType(Stmt->getTypeInfoAsWritten()->getType());
 		out() << '(';
 		TraverseStmt(Stmt->getSubExpr());
@@ -2436,12 +2475,14 @@ public:
 
 	bool TraverseCXXTemporaryObjectExpr(CXXTemporaryObjectExpr* Stmt)
 	{
+		if(pass_stmt(Stmt)) return true;
 		TraverseCXXConstructExpr(Stmt);
 		return true;
 	}
 
-	bool TraverseNullStmt(NullStmt*)
+	bool TraverseNullStmt(NullStmt* Stmt)
 	{
+		if(pass_stmt(Stmt)) return false;
 		return true;
 	}
 
@@ -2510,12 +2551,14 @@ public:
 
 	bool TraverseCXXBoolLiteralExpr(CXXBoolLiteralExpr* Stmt)
 	{
+		if(pass_stmt(Stmt)) return true;
 		out() << (Stmt->getValue() ? "true" : "false");
 		return true;
 	}
 
 	bool TraverseUnaryExprOrTypeTraitExpr(UnaryExprOrTypeTraitExpr* Expr)
 	{
+		if(pass_stmt(Expr)) return true;
 		//out() << '(';
 		if(Expr->isArgumentType())
 			PrintType(Expr->getArgumentType());
@@ -2549,6 +2592,7 @@ public:
 
 	bool TraverseLambdaExpr(LambdaExpr* S)
 	{
+		if(pass_stmt(S)) return true;
 		TypeLoc TL = S->getCallOperator()->getTypeSourceInfo()->getTypeLoc();
 		FunctionProtoTypeLoc Proto = TL.castAs<FunctionProtoTypeLoc>();
 
@@ -2601,6 +2645,7 @@ public:
 
 	bool TraverseCallExpr(CallExpr* Stmt)
 	{
+		if(pass_stmt(Stmt)) return true;
 		Expr* func = Stmt->getCallee();
 		dont_take_ptr.insert(func);
 		TraverseStmt(func);
@@ -2624,6 +2669,7 @@ public:
 
 	bool TraverseImplicitCastExpr(ImplicitCastExpr* Stmt)
 	{
+		if(pass_stmt(Stmt)) return true;
 		if(Stmt->getCastKind() == CK_FunctionToPointerDecay && dont_take_ptr.count(Stmt) == 0)
 			out() << "&";
 		TraverseStmt(Stmt->getSubExpr());
@@ -2632,6 +2678,7 @@ public:
 
 	bool TraverseCXXThisExpr(CXXThisExpr* expr)
 	{
+		if(pass_stmt(expr)) return true;
 		QualType pointee = expr->getType()->getPointeeType();
 		if(getSemantic(pointee) == Semantic::Value)
 			out() << "(&this)[0..1]";
@@ -2665,11 +2712,13 @@ public:
 
 	bool TraverseCXXDependentScopeMemberExpr(CXXDependentScopeMemberExpr* expr)
 	{
+		if(pass_stmt(expr)) return true;
 		return TraverseMemberExprImpl(expr);
 	}
 
 	bool TraverseMemberExpr(MemberExpr* Stmt)
 	{
+		if(pass_stmt(Stmt)) return true;
 		return TraverseMemberExprImpl(Stmt);
 	}
 
@@ -2720,6 +2769,7 @@ public:
 
 	bool TraverseCXXMemberCallExpr(CXXMemberCallExpr* Stmt)
 	{
+		if(pass_stmt(Stmt)) return true;
 		TraverseStmt(Stmt->getCallee());
 		out() << '(';
 		Spliter spliter(", ");
@@ -2737,6 +2787,7 @@ public:
 
 	bool TraverseCXXStaticCastExpr(CXXStaticCastExpr* Stmt)
 	{
+		if(pass_stmt(Stmt)) return true;
 		out() << "cast(";
 		PrintType(Stmt->getTypeInfoAsWritten()->getType());
 		out() << ')';
@@ -2746,6 +2797,7 @@ public:
 
 	bool TraverseCStyleCastExpr(CStyleCastExpr* Stmt)
 	{
+		if(pass_stmt(Stmt)) return true;
 		out() << "cast(";
 		PrintType(Stmt->getTypeInfoAsWritten()->getType());
 		out() << ')';
@@ -2795,6 +2847,7 @@ public:
 
 	bool TraverseSubstNonTypeTemplateParmExpr(SubstNonTypeTemplateParmExpr* Expr)
 	{
+		if(pass_stmt(Expr)) return true;
 		TraverseStmt(Expr->getReplacement());
 		return true;
 	}
@@ -2877,8 +2930,9 @@ public:
 			}
 			else if(Stmt->getOpcode() == UnaryOperatorKind::UO_Deref)
 			{
-				if (auto* t = dyn_cast<CXXThisExpr>(Stmt->getSubExpr()))
-				{   // (*this) in C++ mean (this) in D
+				if(auto* t = dyn_cast<CXXThisExpr>(Stmt->getSubExpr()))
+				{
+					// (*this) in C++ mean (this) in D
 					out() << "this";
 					return true;
 				}
@@ -2943,6 +2997,7 @@ public:
 
 	bool TraverseDeclRefExpr(DeclRefExpr* Expr)
 	{
+		if(pass_stmt(Expr)) return true;
 		QualType nnsQualType;
 		if(Expr->hasQualifier())
 		{
@@ -2966,6 +3021,7 @@ public:
 
 	bool TraverseDependentScopeDeclRefExpr(DependentScopeDeclRefExpr* expr)
 	{
+		if(pass_stmt(expr)) return true;
 		NestedNameSpecifier* nns = expr->getQualifier();
 		TraverseNestedNameSpecifier(nns);
 		out() << expr->getDeclName().getAsString();
@@ -3017,6 +3073,7 @@ public:
 
 	bool TraverseInitListExpr(InitListExpr* Expr)
 	{
+		if(pass_stmt(Expr)) return true;
 		bool const isArray =
 		  (Expr->ClassifyLValue(*Context) == clang::Expr::LV_ArrayTemporary);
 		out() << (isArray ? '[' : '{') << " " << std::endl;
@@ -3037,6 +3094,7 @@ public:
 
 	bool TraverseParenExpr(ParenExpr* expr)
 	{
+		if(pass_stmt(expr)) return true;
 		if(auto* binOp = dyn_cast<BinaryOperator>(expr->getSubExpr()))
 		{
 			Expr* lhs = binOp->getLHS();
@@ -3096,8 +3154,9 @@ public:
 		return true;
 	}
 
-	bool TraverseImplicitValueInitExpr(ImplicitValueInitExpr*)
+	bool TraverseImplicitValueInitExpr(ImplicitValueInitExpr* expr)
 	{
+		if(pass_stmt(expr)) return true;
 		return true;
 	}
 
@@ -3128,7 +3187,7 @@ public:
 				TraverseNestedNameSpecifier(qualifier);
 		}
 		out() << mangleName(Decl->getNameAsString());
-		bool const in_foreach_decl = receiver.forrange_loopvar.count(Decl) != 0;
+		bool const in_foreach_decl = inForRangeInit;//receiver.forrange_loopvar.count(Decl) != 0;
 		if(Decl->hasInit() && !in_foreach_decl)
 		{
 			Expr* init = Decl->getInit();
@@ -3295,7 +3354,7 @@ public:
 	  llvm::StringRef InFile
 	)
 		: Compiler(Compiler)
-		, finder(getMatcher(receiver))
+		, finder(receiver.getMatcher())
 		, finderConsumer(finder.newASTConsumer())
 		, InFile(InFile.str())
 		, Visitor(&Compiler.getASTContext(), receiver, InFile)

@@ -12,14 +12,28 @@
 
 class MatchContainer : public clang::ast_matchers::MatchFinder::MatchCallback
 {
+	std::unordered_map<std::string, std::function<void(clang::Stmt const*)>> on_stmt_match;
+	std::unordered_map<std::string, std::function<void(clang::Decl const*)>> on_decl_match;
+	std::unordered_map<std::string, std::function<void(clang::Type const*)>> on_type_match;
+
 public:
+	clang::ast_matchers::MatchFinder getMatcher();
+
 	void run(clang::ast_matchers::MatchFinder::MatchResult const& Result) override;
 
-	std::unordered_set<clang::VarDecl const*> forrange_loopvar;
-	std::unordered_set<clang::AutoType const*> forrange_loopvar_auto;
-	std::unordered_set<clang::LValueReferenceType const*> ref_to_class;
 	std::unordered_map<std::string, clang::CXXMethodDecl const*> hash_traits;
-	std::unordered_set<clang::Decl const*> dont_print_this_decl;
 	std::unordered_multimap<std::string, clang::FunctionDecl const*> free_operator;  //left operand will become this
 	std::unordered_multimap<std::string, clang::FunctionDecl const*> free_operator_right; //right operand will become this
+
+	std::unordered_multimap<clang::Stmt const*, std::string> stmtTags;
+	std::unordered_multimap<clang::Decl const*, std::string> declTags;
+	std::unordered_multimap<clang::Type const*, std::string> typeTags;
+
+	std::unordered_map<std::string, std::function<void(clang::Type const*)>> typePrinters;
+	std::unordered_map<std::string, std::function<void(clang::Stmt const*)>> stmtPrinters;
+	std::unordered_map<std::string, std::function<void(clang::Decl const*)>> declPrinters;
+
+	std::function<void(clang::Stmt const*)> getPrinter(clang::Stmt const*) const;
+	std::function<void(clang::Decl const*)> getPrinter(clang::Decl const*) const;
+	std::function<void(clang::Type const*)> getPrinter(clang::Type const*) const;
 };
