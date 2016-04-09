@@ -6,7 +6,7 @@
 #include <llvm/Support/Path.h>
 #pragma warning(pop)
 
-#include "Find_Includes.h"
+#include "CPP2DPPHandling.h"
 
 #include <fstream>
 #include <sstream>
@@ -26,7 +26,7 @@ VisitorToDConsumer::VisitorToDConsumer(
 void VisitorToDConsumer::HandleTranslationUnit(clang::ASTContext& Context)
 {
 	//Find_Includes
-	auto& ppcallback = dynamic_cast<Find_Includes&>(*Compiler.getPreprocessor().getPPCallbacks());
+	auto& ppcallback = dynamic_cast<CPP2DPPHandling&>(*Compiler.getPreprocessor().getPPCallbacks());
 	auto& incs = ppcallback.includes_in_file;
 	includes_in_file.insert(incs.begin(), incs.end());
 

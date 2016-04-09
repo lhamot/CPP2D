@@ -6,7 +6,7 @@
 #pragma warning(pop)
 
 #include "CPP2DConsumer.h"
-#include "Find_Includes.h"
+#include "CPP2DPPHandling.h"
 
 using namespace clang;
 
@@ -22,7 +22,8 @@ std::unique_ptr<clang::ASTConsumer> CPP2DFrontendAction::CreateASTConsumer(
 bool CPP2DFrontendAction::BeginSourceFileAction(CompilerInstance& ci, StringRef file)
 {
 	Preprocessor& pp = ci.getPreprocessor();
-	std::unique_ptr<Find_Includes> find_includes_callback(new Find_Includes(pp, file));
+	std::unique_ptr<CPP2DPPHandling> find_includes_callback(
+		new CPP2DPPHandling(pp, file));
 	pp.addPPCallbacks(std::move(find_includes_callback));
 	return true;
 }

@@ -1,4 +1,4 @@
-#include "VisitorToD.h"
+#include "DPrinter.h"
 
 #include <iostream>
 #include <fstream>
@@ -186,7 +186,7 @@ static char const* AccessSpecifierStr[] =
 
 std::set<std::string> includes_in_file;
 
-void VisitorToD::include_file(std::string const& decl_inc)
+void DPrinter::include_file(std::string const& decl_inc)
 {
 	for(std::string include : includes_in_file)
 	{
@@ -210,7 +210,7 @@ void VisitorToD::include_file(std::string const& decl_inc)
 	}
 }
 
-std::string VisitorToD::mangleType(NamedDecl const* decl)
+std::string DPrinter::mangleType(NamedDecl const* decl)
 {
 	NamedDecl const* can_decl = nullptr;
 	std::string const& name = decl->getNameAsString();
@@ -245,7 +245,7 @@ std::string VisitorToD::mangleType(NamedDecl const* decl)
 	}
 }
 
-std::string VisitorToD::mangleVar(DeclRefExpr* expr)
+std::string DPrinter::mangleVar(DeclRefExpr* expr)
 {
 	std::string name = expr->getNameInfo().getName().getAsString();
 	if(name == "printf")
@@ -261,7 +261,7 @@ std::string VisitorToD::mangleVar(DeclRefExpr* expr)
 	}
 }
 
-std::string VisitorToD::replace(std::string str, std::string const& in, std::string const& out)
+std::string DPrinter::replace(std::string str, std::string const& in, std::string const& out)
 {
 	size_t pos = 0;
 	std::string::iterator iter;
@@ -279,7 +279,7 @@ std::string VisitorToD::replace(std::string str, std::string const& in, std::str
 	return str;
 }
 
-void VisitorToD::printCommentBefore(Decl* t)
+void DPrinter::printCommentBefore(Decl* t)
 {
 	SourceManager& sm = Context->getSourceManager();
 	std::stringstream line_return;
@@ -296,7 +296,7 @@ void VisitorToD::printCommentBefore(Decl* t)
 		out() << std::endl << indent_str();
 }
 
-void VisitorToD::printCommentAfter(Decl* t)
+void DPrinter::printCommentAfter(Decl* t)
 {
 	SourceManager& sm = Context->getSourceManager();
 	const RawComment* rc = Context->getRawCommentForDeclNoCache(t);
@@ -305,7 +305,7 @@ void VisitorToD::printCommentAfter(Decl* t)
 }
 
 // trim from both ends
-std::string VisitorToD::trim(std::string const& s)
+std::string DPrinter::trim(std::string const& s)
 {
 	auto const pos1 = s.find_first_not_of("\r\n\t ");
 	auto const pos2 = s.find_last_not_of("\r\n\t ");
@@ -314,7 +314,7 @@ std::string VisitorToD::trim(std::string const& s)
 	       s.substr(pos1, (pos2 - pos1) + 1);
 }
 
-std::vector<std::string> VisitorToD::split(std::string const& instr)
+std::vector<std::string> DPrinter::split(std::string const& instr)
 {
 	std::vector<std::string> result;
 	auto prevIter = std::begin(instr);
@@ -330,7 +330,7 @@ std::vector<std::string> VisitorToD::split(std::string const& instr)
 	return result;
 }
 
-void VisitorToD::printStmtComment(SourceLocation& locStart,
+void DPrinter::printStmtComment(SourceLocation& locStart,
                                   SourceLocation const& locEnd,
                                   SourceLocation const& nextStart)
 {
@@ -386,7 +386,7 @@ void VisitorToD::printStmtComment(SourceLocation& locStart,
 	locStart = nextStart;
 }
 
-void VisitorToD::PrintMacroArgs(CallExpr* macro_args)
+void DPrinter::PrintMacroArgs(CallExpr* macro_args)
 {
 	Spliter split(", ");
 	for(Expr* arg : macro_args->arguments())
@@ -425,7 +425,7 @@ void VisitorToD::PrintMacroArgs(CallExpr* macro_args)
 	}
 }
 
-void VisitorToD::PrintStmtMacro(std::string const& varName, Expr* init)
+void DPrinter::PrintStmtMacro(std::string const& varName, Expr* init)
 {
 	if(varName.find("CPP2D_MACRO_STMT_END") == 0)
 		--isInMacro;
@@ -445,7 +445,7 @@ void VisitorToD::PrintStmtMacro(std::string const& varName, Expr* init)
 	}
 }
 
-VisitorToD::VisitorToD(
+DPrinter::DPrinter(
   ASTContext* Context,
   MatchContainer const& receiver,
   StringRef file)
@@ -455,12 +455,12 @@ VisitorToD::VisitorToD(
 {
 }
 
-std::string VisitorToD::indent_str() const
+std::string DPrinter::indent_str() const
 {
 	return std::string(indent * 4, ' ');
 }
 
-bool VisitorToD::TraverseTranslationUnitDecl(TranslationUnitDecl* Decl)
+bool DPrinter::TraverseTranslationUnitDecl(TranslationUnitDecl* Decl)
 {
 	if(pass_decl(Decl)) return true;
 	//SourceManager& sm = Context->getSourceManager();
@@ -491,7 +491,7 @@ bool VisitorToD::TraverseTranslationUnitDecl(TranslationUnitDecl* Decl)
 	return true;
 }
 
-bool VisitorToD::TraverseTypedefDecl(TypedefDecl* Decl)
+bool DPrinter::TraverseTypedefDecl(TypedefDecl* Decl)
 {
 	if(pass_decl(Decl)) return true;
 	out() << "alias " << mangleName(Decl->getNameAsString()) << " = ";
@@ -499,7 +499,7 @@ bool VisitorToD::TraverseTypedefDecl(TypedefDecl* Decl)
 	return true;
 }
 
-bool VisitorToD::TraverseTypeAliasDecl(TypeAliasDecl* Decl)
+bool DPrinter::TraverseTypeAliasDecl(TypeAliasDecl* Decl)
 {
 	if(pass_decl(Decl)) return true;
 	out() << "alias " << mangleName(Decl->getNameAsString()) << " = ";
@@ -507,7 +507,7 @@ bool VisitorToD::TraverseTypeAliasDecl(TypeAliasDecl* Decl)
 	return true;
 }
 
-bool VisitorToD::TraverseTypeAliasTemplateDecl(TypeAliasTemplateDecl* Decl)
+bool DPrinter::TraverseTypeAliasTemplateDecl(TypeAliasTemplateDecl* Decl)
 {
 	if(pass_decl(Decl)) return true;
 	out() << "alias " << mangleName(Decl->getNameAsString());
@@ -517,7 +517,7 @@ bool VisitorToD::TraverseTypeAliasTemplateDecl(TypeAliasTemplateDecl* Decl)
 	return true;
 }
 
-bool VisitorToD::TraverseFieldDecl(FieldDecl* Decl)
+bool DPrinter::TraverseFieldDecl(FieldDecl* Decl)
 {
 	std::string const varName = Decl->getNameAsString();
 	if(varName.find("CPP2D_MACRO_STMT") == 0)
@@ -551,26 +551,26 @@ bool VisitorToD::TraverseFieldDecl(FieldDecl* Decl)
 	return true;
 }
 
-bool VisitorToD::TraverseDependentNameType(DependentNameType* Type)
+bool DPrinter::TraverseDependentNameType(DependentNameType* Type)
 {
 	TraverseNestedNameSpecifier(Type->getQualifier());
 	out() << Type->getIdentifier()->getName().str();
 	return true;
 }
 
-bool VisitorToD::TraverseAttributedType(AttributedType* Type)
+bool DPrinter::TraverseAttributedType(AttributedType* Type)
 {
 	PrintType(Type->getEquivalentType());
 	return true;
 }
 
-bool VisitorToD::TraverseDecayedType(DecayedType* Type)
+bool DPrinter::TraverseDecayedType(DecayedType* Type)
 {
 	PrintType(Type->getOriginalType());
 	return true;
 }
 
-bool VisitorToD::TraverseElaboratedType(ElaboratedType* Type)
+bool DPrinter::TraverseElaboratedType(ElaboratedType* Type)
 {
 	if(Type->getQualifier())
 		TraverseNestedNameSpecifier(Type->getQualifier());
@@ -578,18 +578,18 @@ bool VisitorToD::TraverseElaboratedType(ElaboratedType* Type)
 	return true;
 }
 
-bool VisitorToD::TraverseInjectedClassNameType(InjectedClassNameType* Type)
+bool DPrinter::TraverseInjectedClassNameType(InjectedClassNameType* Type)
 {
 	PrintType(Type->getInjectedSpecializationType());
 	return true;
 }
 
-bool VisitorToD::TraverseSubstTemplateTypeParmType(SubstTemplateTypeParmType*)
+bool DPrinter::TraverseSubstTemplateTypeParmType(SubstTemplateTypeParmType*)
 {
 	return true;
 }
 
-bool VisitorToD::TraverseNestedNameSpecifier(NestedNameSpecifier* NNS)
+bool DPrinter::TraverseNestedNameSpecifier(NestedNameSpecifier* NNS)
 {
 	if(NNS->getPrefix())
 		TraverseNestedNameSpecifier(NNS->getPrefix());
@@ -613,7 +613,7 @@ bool VisitorToD::TraverseNestedNameSpecifier(NestedNameSpecifier* NNS)
 	return true;
 }
 
-void VisitorToD::printTmpArgList(std::string const& tmpArgListStr)
+void DPrinter::printTmpArgList(std::string const& tmpArgListStr)
 {
 	out() << '!';
 	if(tmpArgListStr.find_first_of("!,(") != std::string::npos)
@@ -622,7 +622,7 @@ void VisitorToD::printTmpArgList(std::string const& tmpArgListStr)
 		out() << tmpArgListStr;
 }
 
-bool VisitorToD::TraverseTemplateSpecializationType(TemplateSpecializationType* Type)
+bool DPrinter::TraverseTemplateSpecializationType(TemplateSpecializationType* Type)
 {
 	if(isStdArray(Type->desugar()))
 	{
@@ -653,14 +653,14 @@ bool VisitorToD::TraverseTemplateSpecializationType(TemplateSpecializationType* 
 	return true;
 }
 
-bool VisitorToD::TraverseTypedefType(TypedefType* Type)
+bool DPrinter::TraverseTypedefType(TypedefType* Type)
 {
 	out() << mangleType(Type->getDecl());
 	return true;
 }
 
 template<typename InitList>
-bool VisitorToD::TraverseCompoundStmtImpl(CompoundStmt* Stmt, InitList initList)
+bool DPrinter::TraverseCompoundStmtImpl(CompoundStmt* Stmt, InitList initList)
 {
 	SourceLocation locStart = Stmt->getLBracLoc().getLocWithOffset(1);
 	out() << "{";
@@ -684,14 +684,14 @@ bool VisitorToD::TraverseCompoundStmtImpl(CompoundStmt* Stmt, InitList initList)
 	return true;
 }
 
-bool VisitorToD::TraverseCompoundStmt(CompoundStmt* Stmt)
+bool DPrinter::TraverseCompoundStmt(CompoundStmt* Stmt)
 {
 	if(pass_stmt(Stmt)) return false;
 	return TraverseCompoundStmtImpl(Stmt, [] {});
 }
 
 template<typename InitList>
-bool VisitorToD::TraverseCXXTryStmtImpl(CXXTryStmt* Stmt, InitList initList)
+bool DPrinter::TraverseCXXTryStmtImpl(CXXTryStmt* Stmt, InitList initList)
 {
 	out() << "try" << std::endl << indent_str();
 	auto tryBlock = Stmt->getTryBlock();
@@ -705,13 +705,13 @@ bool VisitorToD::TraverseCXXTryStmtImpl(CXXTryStmt* Stmt, InitList initList)
 	return true;
 }
 
-bool VisitorToD::TraverseCXXTryStmt(CXXTryStmt* Stmt)
+bool DPrinter::TraverseCXXTryStmt(CXXTryStmt* Stmt)
 {
 	if(pass_stmt(Stmt)) return false;
 	return TraverseCXXTryStmtImpl(Stmt, [] {});
 }
 
-bool VisitorToD::pass_decl(Decl* decl)
+bool DPrinter::pass_decl(Decl* decl)
 {
 	auto printer = receiver.getPrinter(decl);
 	if(printer)
@@ -723,7 +723,7 @@ bool VisitorToD::pass_decl(Decl* decl)
 		return false;
 }
 
-bool VisitorToD::pass_stmt(Stmt* stmt)
+bool DPrinter::pass_stmt(Stmt* stmt)
 {
 	auto printer = receiver.getPrinter(stmt);
 	if(printer)
@@ -735,7 +735,7 @@ bool VisitorToD::pass_stmt(Stmt* stmt)
 		return false;
 }
 
-bool VisitorToD::TraverseNamespaceDecl(NamespaceDecl* Decl)
+bool DPrinter::TraverseNamespaceDecl(NamespaceDecl* Decl)
 {
 	if(pass_decl(Decl)) return true;
 	out() << "// -> module " << mangleName(Decl->getNameAsString()) << ';' << std::endl;
@@ -759,7 +759,7 @@ bool VisitorToD::TraverseNamespaceDecl(NamespaceDecl* Decl)
 	return true;
 }
 
-bool VisitorToD::TraverseCXXCatchStmt(CXXCatchStmt* Stmt)
+bool DPrinter::TraverseCXXCatchStmt(CXXCatchStmt* Stmt)
 {
 	if(pass_stmt(Stmt)) return false;
 	out() << "catch";
@@ -775,13 +775,13 @@ bool VisitorToD::TraverseCXXCatchStmt(CXXCatchStmt* Stmt)
 	return true;
 }
 
-bool VisitorToD::TraverseAccessSpecDecl(AccessSpecDecl* Decl)
+bool DPrinter::TraverseAccessSpecDecl(AccessSpecDecl* Decl)
 {
 	if(pass_decl(Decl)) return true;
 	return true;
 }
 
-void VisitorToD::printBasesClass(CXXRecordDecl* decl)
+void DPrinter::printBasesClass(CXXRecordDecl* decl)
 {
 	Spliter splitBase(", ");
 	if(decl->getNumBases() + decl->getNumVBases() != 0)
@@ -806,20 +806,20 @@ void VisitorToD::printBasesClass(CXXRecordDecl* decl)
 	}
 }
 
-bool VisitorToD::TraverseCXXRecordDecl(CXXRecordDecl* decl)
+bool DPrinter::TraverseCXXRecordDecl(CXXRecordDecl* decl)
 {
 	if(pass_decl(decl)) return true;
 	return TraverseCXXRecordDeclImpl(decl, [] {}, [this, decl] {printBasesClass(decl); });
 }
 
-bool VisitorToD::TraverseRecordDecl(RecordDecl* Decl)
+bool DPrinter::TraverseRecordDecl(RecordDecl* Decl)
 {
 	if(pass_decl(Decl)) return true;
 	return TraverseCXXRecordDeclImpl(Decl, [] {}, [] {});
 }
 
 template<typename TmpSpecFunc, typename PrintBasesClass>
-bool VisitorToD::TraverseCXXRecordDeclImpl(
+bool DPrinter::TraverseCXXRecordDeclImpl(
   RecordDecl* decl,
   TmpSpecFunc traverseTmpSpecs,
   PrintBasesClass printBasesClass)
@@ -987,7 +987,7 @@ bool VisitorToD::TraverseCXXRecordDeclImpl(
 	return true;
 }
 
-void VisitorToD::PrintTemplateParameterList(TemplateParameterList* tmpParams, std::string const& prevTmplParmsStr)
+void DPrinter::PrintTemplateParameterList(TemplateParameterList* tmpParams, std::string const& prevTmplParmsStr)
 {
 	out() << "(";
 	Spliter spliter1(", ");
@@ -1030,7 +1030,7 @@ void VisitorToD::PrintTemplateParameterList(TemplateParameterList* tmpParams, st
 	out() << ')';
 }
 
-bool VisitorToD::TraverseClassTemplateDecl(ClassTemplateDecl* Decl)
+bool DPrinter::TraverseClassTemplateDecl(ClassTemplateDecl* Decl)
 {
 	if(pass_decl(Decl)) return true;
 	TraverseCXXRecordDeclImpl(Decl->getTemplatedDecl(), [Decl, this]
@@ -1041,30 +1041,30 @@ bool VisitorToD::TraverseClassTemplateDecl(ClassTemplateDecl* Decl)
 	return true;
 }
 
-TemplateParameterList* VisitorToD::getTemplateParameters(ClassTemplateSpecializationDecl*)
+TemplateParameterList* DPrinter::getTemplateParameters(ClassTemplateSpecializationDecl*)
 {
 	return nullptr;
 }
 
-TemplateParameterList* VisitorToD::getTemplateParameters(ClassTemplatePartialSpecializationDecl* Decl)
+TemplateParameterList* DPrinter::getTemplateParameters(ClassTemplatePartialSpecializationDecl* Decl)
 {
 	return Decl->getTemplateParameters();
 }
 
-bool VisitorToD::TraverseClassTemplatePartialSpecializationDecl(
+bool DPrinter::TraverseClassTemplatePartialSpecializationDecl(
   ClassTemplatePartialSpecializationDecl* Decl)
 {
 	if(pass_decl(Decl)) return true;
 	return TraverseClassTemplateSpecializationDeclImpl(Decl);
 }
 
-bool VisitorToD::TraverseClassTemplateSpecializationDecl(ClassTemplateSpecializationDecl* Decl)
+bool DPrinter::TraverseClassTemplateSpecializationDecl(ClassTemplateSpecializationDecl* Decl)
 {
 	if(pass_decl(Decl)) return true;
 	return TraverseClassTemplateSpecializationDeclImpl(Decl);
 }
 
-void VisitorToD::PrintTemplateArgument(TemplateArgument const& ta)
+void DPrinter::PrintTemplateArgument(TemplateArgument const& ta)
 {
 	switch(ta.getKind())
 	{
@@ -1077,7 +1077,7 @@ void VisitorToD::PrintTemplateArgument(TemplateArgument const& ta)
 	}
 }
 
-void VisitorToD::PrintTemplateSpec_TmpArgsAndParms(
+void DPrinter::PrintTemplateSpec_TmpArgsAndParms(
   TemplateParameterList& primaryTmpParams,
   TemplateArgumentList const& tmpArgs,
   TemplateParameterList* newTmpParams,
@@ -1124,7 +1124,7 @@ void VisitorToD::PrintTemplateSpec_TmpArgsAndParms(
 }
 
 template<typename D>
-bool VisitorToD::TraverseClassTemplateSpecializationDeclImpl(D* Decl)
+bool DPrinter::TraverseClassTemplateSpecializationDeclImpl(D* Decl)
 {
 	if(pass_decl(Decl)) return true;
 	if(Decl->getSpecializationKind() == TSK_ExplicitInstantiationDeclaration
@@ -1151,25 +1151,25 @@ bool VisitorToD::TraverseClassTemplateSpecializationDeclImpl(D* Decl)
 	return true;
 }
 
-bool VisitorToD::TraverseCXXConversionDecl(CXXConversionDecl* Decl)
+bool DPrinter::TraverseCXXConversionDecl(CXXConversionDecl* Decl)
 {
 	if(pass_decl(Decl)) return true;
 	return TraverseFunctionDeclImpl(Decl);
 }
 
-bool VisitorToD::TraverseCXXConstructorDecl(CXXConstructorDecl* Decl)
+bool DPrinter::TraverseCXXConstructorDecl(CXXConstructorDecl* Decl)
 {
 	if(pass_decl(Decl)) return true;
 	return TraverseFunctionDeclImpl(Decl);
 }
 
-bool VisitorToD::TraverseCXXDestructorDecl(CXXDestructorDecl* Decl)
+bool DPrinter::TraverseCXXDestructorDecl(CXXDestructorDecl* Decl)
 {
 	if(pass_decl(Decl)) return true;
 	return TraverseFunctionDeclImpl(Decl);
 }
 
-bool VisitorToD::TraverseCXXMethodDecl(CXXMethodDecl* Decl)
+bool DPrinter::TraverseCXXMethodDecl(CXXMethodDecl* Decl)
 {
 	if(pass_decl(Decl)) return true;
 	if(Decl->getLexicalParent() == Decl->getParent())
@@ -1178,20 +1178,20 @@ bool VisitorToD::TraverseCXXMethodDecl(CXXMethodDecl* Decl)
 		return true;
 }
 
-bool VisitorToD::TraversePredefinedExpr(PredefinedExpr* expr)
+bool DPrinter::TraversePredefinedExpr(PredefinedExpr* expr)
 {
 	if(pass_stmt(expr)) return true;
 	out() << "__PRETTY_FUNCTION__";
 	return true;
 }
 
-bool VisitorToD::TraverseCXXDefaultArgExpr(CXXDefaultArgExpr* expr)
+bool DPrinter::TraverseCXXDefaultArgExpr(CXXDefaultArgExpr* expr)
 {
 	if(pass_stmt(expr)) return true;
 	return true;
 }
 
-bool VisitorToD::TraverseCXXUnresolvedConstructExpr(CXXUnresolvedConstructExpr*  Expr)
+bool DPrinter::TraverseCXXUnresolvedConstructExpr(CXXUnresolvedConstructExpr*  Expr)
 {
 	if(pass_stmt(Expr)) return true;
 	PrintType(Expr->getTypeAsWritten());
@@ -1210,7 +1210,7 @@ bool VisitorToD::TraverseCXXUnresolvedConstructExpr(CXXUnresolvedConstructExpr* 
 	return true;
 }
 
-bool VisitorToD::TraverseUnresolvedLookupExpr(UnresolvedLookupExpr*  Expr)
+bool DPrinter::TraverseUnresolvedLookupExpr(UnresolvedLookupExpr*  Expr)
 {
 	if(pass_stmt(Expr)) return true;
 	out() << mangleName(Expr->getName().getAsString());
@@ -1230,7 +1230,7 @@ bool VisitorToD::TraverseUnresolvedLookupExpr(UnresolvedLookupExpr*  Expr)
 	return true;
 }
 
-bool VisitorToD::TraverseCXXForRangeStmt(CXXForRangeStmt*  Stmt)
+bool DPrinter::TraverseCXXForRangeStmt(CXXForRangeStmt*  Stmt)
 {
 	if(pass_stmt(Stmt)) return false;
 	out() << "foreach(";
@@ -1246,7 +1246,7 @@ bool VisitorToD::TraverseCXXForRangeStmt(CXXForRangeStmt*  Stmt)
 	return true;
 }
 
-bool VisitorToD::TraverseDoStmt(DoStmt*  Stmt)
+bool DPrinter::TraverseDoStmt(DoStmt*  Stmt)
 {
 	if(pass_stmt(Stmt)) return false;
 	out() << "do" << std::endl;
@@ -1257,7 +1257,7 @@ bool VisitorToD::TraverseDoStmt(DoStmt*  Stmt)
 	return true;
 }
 
-bool VisitorToD::TraverseSwitchStmt(SwitchStmt* Stmt)
+bool DPrinter::TraverseSwitchStmt(SwitchStmt* Stmt)
 {
 	if(pass_stmt(Stmt)) return false;
 	out() << "switch(";
@@ -1267,7 +1267,7 @@ bool VisitorToD::TraverseSwitchStmt(SwitchStmt* Stmt)
 	return true;
 }
 
-bool VisitorToD::TraverseCaseStmt(CaseStmt* Stmt)
+bool DPrinter::TraverseCaseStmt(CaseStmt* Stmt)
 {
 	if(pass_stmt(Stmt)) return false;
 	out() << "case ";
@@ -1280,14 +1280,14 @@ bool VisitorToD::TraverseCaseStmt(CaseStmt* Stmt)
 	return true;
 }
 
-bool VisitorToD::TraverseBreakStmt(BreakStmt* Stmt)
+bool DPrinter::TraverseBreakStmt(BreakStmt* Stmt)
 {
 	if(pass_stmt(Stmt)) return false;
 	out() << "break";
 	return true;
 }
 
-bool VisitorToD::TraverseStaticAssertDecl(StaticAssertDecl* Decl)
+bool DPrinter::TraverseStaticAssertDecl(StaticAssertDecl* Decl)
 {
 	if(pass_decl(Decl)) return true;
 	out() << "static assert(";
@@ -1298,7 +1298,7 @@ bool VisitorToD::TraverseStaticAssertDecl(StaticAssertDecl* Decl)
 	return true;
 }
 
-bool VisitorToD::TraverseDefaultStmt(DefaultStmt* Stmt)
+bool DPrinter::TraverseDefaultStmt(DefaultStmt* Stmt)
 {
 	if(pass_stmt(Stmt)) return false;
 	out() << "default:" << std::endl;
@@ -1309,7 +1309,7 @@ bool VisitorToD::TraverseDefaultStmt(DefaultStmt* Stmt)
 	return true;
 }
 
-bool VisitorToD::TraverseCXXDeleteExpr(CXXDeleteExpr* Expr)
+bool DPrinter::TraverseCXXDeleteExpr(CXXDeleteExpr* Expr)
 {
 	if(pass_stmt(Expr)) return true;
 	TraverseStmt(Expr->getArgument());
@@ -1317,7 +1317,7 @@ bool VisitorToD::TraverseCXXDeleteExpr(CXXDeleteExpr* Expr)
 	return true;
 }
 
-bool VisitorToD::TraverseCXXNewExpr(CXXNewExpr* Expr)
+bool DPrinter::TraverseCXXNewExpr(CXXNewExpr* Expr)
 {
 	if(pass_stmt(Expr)) return true;
 	out() << "new ";
@@ -1349,7 +1349,7 @@ bool VisitorToD::TraverseCXXNewExpr(CXXNewExpr* Expr)
 	return true;
 }
 
-void VisitorToD::PrintCXXConstructExprParams(CXXConstructExpr* Init)
+void DPrinter::PrintCXXConstructExprParams(CXXConstructExpr* Init)
 {
 	if(Init->getNumArgs() == 1)   //Handle Copy ctor
 	{
@@ -1375,7 +1375,7 @@ void VisitorToD::PrintCXXConstructExprParams(CXXConstructExpr* Init)
 	out() << ')';
 }
 
-bool VisitorToD::TraverseCXXConstructExpr(CXXConstructExpr* Init)
+bool DPrinter::TraverseCXXConstructExpr(CXXConstructExpr* Init)
 {
 	if(pass_stmt(Init)) return true;
 	Spliter spliter(", ");
@@ -1391,7 +1391,7 @@ bool VisitorToD::TraverseCXXConstructExpr(CXXConstructExpr* Init)
 	return true;
 }
 
-void VisitorToD::PrintType(QualType const& type)
+void DPrinter::PrintType(QualType const& type)
 {
 	if(type.getTypePtr()->getTypeClass() == Type::TypeClass::Auto)
 	{
@@ -1409,7 +1409,7 @@ void VisitorToD::PrintType(QualType const& type)
 	}
 }
 
-bool VisitorToD::TraverseConstructorInitializer(CXXCtorInitializer* Init)
+bool DPrinter::TraverseConstructorInitializer(CXXCtorInitializer* Init)
 {
 	if(Init->getMember())
 		out() << mangleName(Init->getMember()->getNameAsString());
@@ -1425,9 +1425,9 @@ bool VisitorToD::TraverseConstructorInitializer(CXXCtorInitializer* Init)
 }
 
 
-void VisitorToD::startCtorBody(FunctionDecl*) {}
+void DPrinter::startCtorBody(FunctionDecl*) {}
 
-void VisitorToD::startCtorBody(CXXConstructorDecl* Decl)
+void DPrinter::startCtorBody(CXXConstructorDecl* Decl)
 {
 	auto ctor_init_count = Decl->getNumCtorInitializers();
 	if(ctor_init_count != 0)
@@ -1444,15 +1444,15 @@ void VisitorToD::startCtorBody(CXXConstructorDecl* Decl)
 	}
 }
 
-void VisitorToD::printFuncEnd(CXXMethodDecl* Decl)
+void DPrinter::printFuncEnd(CXXMethodDecl* Decl)
 {
 	if(Decl->isConst())
 		out() << " const";
 }
 
-void VisitorToD::printFuncEnd(FunctionDecl*) {}
+void DPrinter::printFuncEnd(FunctionDecl*) {}
 
-void VisitorToD::printSpecialMethodAttribute(CXXMethodDecl* Decl)
+void DPrinter::printSpecialMethodAttribute(CXXMethodDecl* Decl)
 {
 	if(Decl->isStatic())
 		out() << "static ";
@@ -1485,7 +1485,7 @@ void VisitorToD::printSpecialMethodAttribute(CXXMethodDecl* Decl)
 	}
 }
 
-bool VisitorToD::printFuncBegin(CXXMethodDecl* Decl, std::string& tmpParams, int arg_become_this)
+bool DPrinter::printFuncBegin(CXXMethodDecl* Decl, std::string& tmpParams, int arg_become_this)
 {
 	if(Decl->isOverloadedOperator()
 	   && Decl->getOverloadedOperator() == OverloadedOperatorKind::OO_ExclaimEqual)
@@ -1495,7 +1495,7 @@ bool VisitorToD::printFuncBegin(CXXMethodDecl* Decl, std::string& tmpParams, int
 	return true;
 }
 
-bool VisitorToD::printFuncBegin(FunctionDecl* Decl, std::string& tmpParams, int arg_become_this)
+bool DPrinter::printFuncBegin(FunctionDecl* Decl, std::string& tmpParams, int arg_become_this)
 {
 	if(Decl->isOverloadedOperator()
 	   && Decl->getOverloadedOperator() == OverloadedOperatorKind::OO_ExclaimEqual)
@@ -1607,7 +1607,7 @@ bool VisitorToD::printFuncBegin(FunctionDecl* Decl, std::string& tmpParams, int 
 	return true;
 }
 
-bool VisitorToD::printFuncBegin(CXXConversionDecl* Decl, std::string& tmpParams, int)
+bool DPrinter::printFuncBegin(CXXConversionDecl* Decl, std::string& tmpParams, int)
 {
 	printSpecialMethodAttribute(Decl);
 	PrintType(Decl->getConversionType());
@@ -1621,7 +1621,7 @@ bool VisitorToD::printFuncBegin(CXXConversionDecl* Decl, std::string& tmpParams,
 	return true;
 }
 
-bool VisitorToD::printFuncBegin(CXXConstructorDecl* Decl,
+bool DPrinter::printFuncBegin(CXXConstructorDecl* Decl,
                                 std::string&,	//tmpParams
                                 int				//arg_become_this = -1
                                )
@@ -1633,7 +1633,7 @@ bool VisitorToD::printFuncBegin(CXXConstructorDecl* Decl,
 	return true;
 }
 
-bool VisitorToD::printFuncBegin(CXXDestructorDecl*,
+bool DPrinter::printFuncBegin(CXXDestructorDecl*,
                                 std::string&,	//tmpParams,
                                 int				//arg_become_this = -1
                                )
@@ -1647,7 +1647,7 @@ bool VisitorToD::printFuncBegin(CXXDestructorDecl*,
 
 
 template<typename D>
-bool VisitorToD::TraverseFunctionDeclImpl(
+bool DPrinter::TraverseFunctionDeclImpl(
   D* Decl,
   int arg_become_this)
 {
@@ -1796,27 +1796,27 @@ bool VisitorToD::TraverseFunctionDeclImpl(
 	return true;
 }
 
-bool VisitorToD::TraverseUsingDecl(UsingDecl* Decl)
+bool DPrinter::TraverseUsingDecl(UsingDecl* Decl)
 {
 	if(pass_decl(Decl)) return true;
 	out() << "//using " << Decl->getNameAsString();
 	return true;
 }
 
-bool VisitorToD::TraverseFunctionDecl(FunctionDecl* Decl)
+bool DPrinter::TraverseFunctionDecl(FunctionDecl* Decl)
 {
 	if(pass_decl(Decl)) return true;
 	return TraverseFunctionDeclImpl(Decl);
 }
 
-bool VisitorToD::TraverseUsingDirectiveDecl(UsingDirectiveDecl* Decl)
+bool DPrinter::TraverseUsingDirectiveDecl(UsingDirectiveDecl* Decl)
 {
 	if(pass_decl(Decl)) return true;
 	return true;
 }
 
 
-bool VisitorToD::TraverseFunctionTemplateDecl(FunctionTemplateDecl* Decl)
+bool DPrinter::TraverseFunctionTemplateDecl(FunctionTemplateDecl* Decl)
 {
 	if(pass_decl(Decl)) return true;
 	FunctionDecl* FDecl = Decl->getTemplatedDecl();
@@ -1837,7 +1837,7 @@ bool VisitorToD::TraverseFunctionTemplateDecl(FunctionTemplateDecl* Decl)
 	}
 }
 
-bool VisitorToD::TraverseBuiltinType(BuiltinType* Type)
+bool DPrinter::TraverseBuiltinType(BuiltinType* Type)
 {
 	//PrintingPolicy pp = LangOptions();
 	//pp.Bool = 1;
@@ -1908,14 +1908,14 @@ bool VisitorToD::TraverseBuiltinType(BuiltinType* Type)
 	return true;
 }
 
-VisitorToD::Semantic VisitorToD::getSemantic(QualType qt)
+DPrinter::Semantic DPrinter::getSemantic(QualType qt)
 {
 	Type const* type = qt.getTypePtr();
 	return type->isClassType() || type->isFunctionType() ? Reference : Value;
 }
 
 template<typename PType>
-bool VisitorToD::TraversePointerTypeImpl(PType* Type)
+bool DPrinter::TraversePointerTypeImpl(PType* Type)
 {
 	QualType const pointee = Type->getPointeeType();
 	Type::TypeClass const tc = pointee->getTypeClass();
@@ -1930,23 +1930,23 @@ bool VisitorToD::TraversePointerTypeImpl(PType* Type)
 	return true;
 }
 
-bool VisitorToD::TraverseMemberPointerType(MemberPointerType* Type)
+bool DPrinter::TraverseMemberPointerType(MemberPointerType* Type)
 {
 	return TraversePointerTypeImpl(Type);
 }
-bool VisitorToD::TraversePointerType(PointerType* Type)
+bool DPrinter::TraversePointerType(PointerType* Type)
 {
 	return TraversePointerTypeImpl(Type);
 }
 
-bool VisitorToD::TraverseCXXNullPtrLiteralExpr(CXXNullPtrLiteralExpr* Expr)
+bool DPrinter::TraverseCXXNullPtrLiteralExpr(CXXNullPtrLiteralExpr* Expr)
 {
 	if(pass_stmt(Expr)) return true;
 	out() << "null";
 	return true;
 }
 
-bool VisitorToD::TraverseEnumConstantDecl(EnumConstantDecl* Decl)
+bool DPrinter::TraverseEnumConstantDecl(EnumConstantDecl* Decl)
 {
 	if(pass_decl(Decl)) return true;
 	out() << mangleName(Decl->getNameAsString());
@@ -1958,7 +1958,7 @@ bool VisitorToD::TraverseEnumConstantDecl(EnumConstantDecl* Decl)
 	return true;
 }
 
-bool VisitorToD::TraverseEnumDecl(EnumDecl* Decl)
+bool DPrinter::TraverseEnumDecl(EnumDecl* Decl)
 {
 	if(pass_decl(Decl)) return true;
 	out() << "enum " << mangleName(Decl->getNameAsString());
@@ -1984,19 +1984,19 @@ bool VisitorToD::TraverseEnumDecl(EnumDecl* Decl)
 	return true;
 }
 
-bool VisitorToD::TraverseEnumType(EnumType* Type)
+bool DPrinter::TraverseEnumType(EnumType* Type)
 {
 	out() << mangleName(Type->getDecl()->getNameAsString());
 	return true;
 }
 
-bool VisitorToD::TraverseIntegerLiteral(IntegerLiteral* Stmt)
+bool DPrinter::TraverseIntegerLiteral(IntegerLiteral* Stmt)
 {
 	out() << Stmt->getValue().toString(10, true);
 	return true;
 }
 
-bool VisitorToD::TraverseDecltypeType(DecltypeType* Type)
+bool DPrinter::TraverseDecltypeType(DecltypeType* Type)
 {
 	out() << "typeof(";
 	TraverseStmt(Type->getUnderlyingExpr());
@@ -2004,20 +2004,20 @@ bool VisitorToD::TraverseDecltypeType(DecltypeType* Type)
 	return true;
 }
 
-bool VisitorToD::TraverseAutoType(AutoType*)
+bool DPrinter::TraverseAutoType(AutoType*)
 {
 	if(not inForRangeInit)
 		out() << "auto";
 	return true;
 }
 
-/*bool VisitorToD::TraverseMemberPointerType(MemberPointerType *Type)
+/*bool DPrinter::TraverseMemberPointerType(MemberPointerType *Type)
 {
 //out() << Type->getTypeClassName();
 return true;
 }*/
 
-bool VisitorToD::TraverseLinkageSpecDecl(LinkageSpecDecl* Decl)
+bool DPrinter::TraverseLinkageSpecDecl(LinkageSpecDecl* Decl)
 {
 	if(pass_decl(Decl)) return true;
 	switch(Decl->getLanguage())
@@ -2047,7 +2047,7 @@ bool VisitorToD::TraverseLinkageSpecDecl(LinkageSpecDecl* Decl)
 	return true;
 }
 
-bool VisitorToD::TraverseFriendDecl(FriendDecl* Decl)
+bool DPrinter::TraverseFriendDecl(FriendDecl* Decl)
 {
 	if(pass_decl(Decl)) return true;
 	out() << "//friend ";
@@ -2058,7 +2058,7 @@ bool VisitorToD::TraverseFriendDecl(FriendDecl* Decl)
 	return true;
 }
 
-bool VisitorToD::TraverseParmVarDecl(ParmVarDecl* Decl)
+bool DPrinter::TraverseParmVarDecl(ParmVarDecl* Decl)
 {
 	if(pass_decl(Decl)) return true;
 	PrintType(Decl->getType());
@@ -2076,14 +2076,14 @@ bool VisitorToD::TraverseParmVarDecl(ParmVarDecl* Decl)
 	return true;
 }
 
-bool VisitorToD::TraverseRValueReferenceType(RValueReferenceType* Type)
+bool DPrinter::TraverseRValueReferenceType(RValueReferenceType* Type)
 {
 	PrintType(Type->getPointeeType());
 	out() << "/*&&*/";
 	return true;
 }
 
-bool VisitorToD::TraverseLValueReferenceType(LValueReferenceType* Type)
+bool DPrinter::TraverseLValueReferenceType(LValueReferenceType* Type)
 {
 	if(refAccepted)
 	{
@@ -2110,7 +2110,7 @@ bool VisitorToD::TraverseLValueReferenceType(LValueReferenceType* Type)
 	return true;
 }
 
-bool VisitorToD::TraverseTemplateTypeParmType(TemplateTypeParmType* Type)
+bool DPrinter::TraverseTemplateTypeParmType(TemplateTypeParmType* Type)
 {
 	if(Type->getDecl())
 		TraverseDecl(Type->getDecl());
@@ -2133,7 +2133,7 @@ bool VisitorToD::TraverseTemplateTypeParmType(TemplateTypeParmType* Type)
 	return true;
 }
 
-bool VisitorToD::TraverseTemplateTypeParmDecl(TemplateTypeParmDecl* Decl)
+bool DPrinter::TraverseTemplateTypeParmDecl(TemplateTypeParmDecl* Decl)
 {
 	if(pass_decl(Decl)) return true;
 	IdentifierInfo* identifier = Decl->getIdentifier();
@@ -2148,7 +2148,7 @@ bool VisitorToD::TraverseTemplateTypeParmDecl(TemplateTypeParmDecl* Decl)
 	return true;
 }
 
-bool VisitorToD::TraverseNonTypeTemplateParmDecl(NonTypeTemplateParmDecl* Decl)
+bool DPrinter::TraverseNonTypeTemplateParmDecl(NonTypeTemplateParmDecl* Decl)
 {
 	if(pass_decl(Decl)) return true;
 	PrintType(Decl->getType());
@@ -2160,7 +2160,7 @@ bool VisitorToD::TraverseNonTypeTemplateParmDecl(NonTypeTemplateParmDecl* Decl)
 }
 
 
-bool VisitorToD::TraverseDeclStmt(DeclStmt* Stmt)
+bool DPrinter::TraverseDeclStmt(DeclStmt* Stmt)
 {
 	if(pass_stmt(Stmt)) return false;
 	if(Stmt->isSingleDecl()) //May be in for or catch
@@ -2182,13 +2182,13 @@ bool VisitorToD::TraverseDeclStmt(DeclStmt* Stmt)
 	return true;
 }
 
-bool VisitorToD::TraverseNamespaceAliasDecl(NamespaceAliasDecl* Decl)
+bool DPrinter::TraverseNamespaceAliasDecl(NamespaceAliasDecl* Decl)
 {
 	if(pass_decl(Decl)) return true;
 	return true;
 }
 
-bool VisitorToD::TraverseReturnStmt(ReturnStmt* Stmt)
+bool DPrinter::TraverseReturnStmt(ReturnStmt* Stmt)
 {
 	if(pass_stmt(Stmt)) return false;
 	out() << "return";
@@ -2207,7 +2207,7 @@ bool VisitorToD::TraverseReturnStmt(ReturnStmt* Stmt)
 	return true;
 }
 
-bool VisitorToD::TraverseCXXOperatorCallExpr(CXXOperatorCallExpr* Stmt)
+bool DPrinter::TraverseCXXOperatorCallExpr(CXXOperatorCallExpr* Stmt)
 {
 	if(pass_stmt(Stmt)) return true;
 	auto const numArgs = Stmt->getNumArgs();
@@ -2289,13 +2289,13 @@ bool VisitorToD::TraverseCXXOperatorCallExpr(CXXOperatorCallExpr* Stmt)
 	return true;
 }
 
-bool VisitorToD::TraverseExprWithCleanups(ExprWithCleanups* Stmt)
+bool DPrinter::TraverseExprWithCleanups(ExprWithCleanups* Stmt)
 {
 	TraverseStmt(Stmt->getSubExpr());
 	return true;
 }
 
-void VisitorToD::TraverseCompoundStmtOrNot(Stmt* Stmt)
+void DPrinter::TraverseCompoundStmtOrNot(Stmt* Stmt)
 {
 	if(Stmt->getStmtClass() == Stmt::StmtClass::CompoundStmtClass)
 	{
@@ -2313,7 +2313,7 @@ void VisitorToD::TraverseCompoundStmtOrNot(Stmt* Stmt)
 	}
 }
 
-bool VisitorToD::TraverseArraySubscriptExpr(ArraySubscriptExpr* Expr)
+bool DPrinter::TraverseArraySubscriptExpr(ArraySubscriptExpr* Expr)
 {
 	if(pass_stmt(Expr)) return true;
 	TraverseStmt(Expr->getLHS());
@@ -2323,7 +2323,7 @@ bool VisitorToD::TraverseArraySubscriptExpr(ArraySubscriptExpr* Expr)
 	return true;
 }
 
-bool VisitorToD::TraverseFloatingLiteral(FloatingLiteral* Expr)
+bool DPrinter::TraverseFloatingLiteral(FloatingLiteral* Expr)
 {
 	const llvm::fltSemantics& sem = Expr->getSemantics();
 	llvm::SmallString<1000> str;
@@ -2345,7 +2345,7 @@ bool VisitorToD::TraverseFloatingLiteral(FloatingLiteral* Expr)
 	return true;
 }
 
-bool VisitorToD::TraverseForStmt(ForStmt* Stmt)
+bool DPrinter::TraverseForStmt(ForStmt* Stmt)
 {
 	if(pass_stmt(Stmt)) return false;
 	out() << "for(";
@@ -2359,7 +2359,7 @@ bool VisitorToD::TraverseForStmt(ForStmt* Stmt)
 	return true;
 }
 
-bool VisitorToD::TraverseWhileStmt(WhileStmt* Stmt)
+bool DPrinter::TraverseWhileStmt(WhileStmt* Stmt)
 {
 	if(pass_stmt(Stmt)) return false;
 	out() << "while(";
@@ -2369,7 +2369,7 @@ bool VisitorToD::TraverseWhileStmt(WhileStmt* Stmt)
 	return true;
 }
 
-bool VisitorToD::TraverseIfStmt(IfStmt* Stmt)
+bool DPrinter::TraverseIfStmt(IfStmt* Stmt)
 {
 	if(pass_stmt(Stmt)) return false;
 	out() << "if(";
@@ -2390,14 +2390,14 @@ bool VisitorToD::TraverseIfStmt(IfStmt* Stmt)
 	return true;
 }
 
-bool VisitorToD::TraverseCXXBindTemporaryExpr(CXXBindTemporaryExpr* Stmt)
+bool DPrinter::TraverseCXXBindTemporaryExpr(CXXBindTemporaryExpr* Stmt)
 {
 	if(pass_stmt(Stmt)) return true;
 	TraverseStmt(Stmt->getSubExpr());
 	return true;
 }
 
-bool VisitorToD::TraverseCXXThrowExpr(CXXThrowExpr* Stmt)
+bool DPrinter::TraverseCXXThrowExpr(CXXThrowExpr* Stmt)
 {
 	if(pass_stmt(Stmt)) return true;
 	out() << "throw ";
@@ -2405,14 +2405,14 @@ bool VisitorToD::TraverseCXXThrowExpr(CXXThrowExpr* Stmt)
 	return true;
 }
 
-bool VisitorToD::TraverseMaterializeTemporaryExpr(MaterializeTemporaryExpr* Stmt)
+bool DPrinter::TraverseMaterializeTemporaryExpr(MaterializeTemporaryExpr* Stmt)
 {
 	if(pass_stmt(Stmt)) return true;
 	TraverseStmt(Stmt->GetTemporaryExpr());
 	return true;
 }
 
-bool VisitorToD::TraverseCXXFunctionalCastExpr(CXXFunctionalCastExpr* Stmt)
+bool DPrinter::TraverseCXXFunctionalCastExpr(CXXFunctionalCastExpr* Stmt)
 {
 	if(pass_stmt(Stmt)) return true;
 	PrintType(Stmt->getTypeInfoAsWritten()->getType());
@@ -2422,14 +2422,14 @@ bool VisitorToD::TraverseCXXFunctionalCastExpr(CXXFunctionalCastExpr* Stmt)
 	return true;
 }
 
-bool VisitorToD::TraverseParenType(ParenType* Type)
+bool DPrinter::TraverseParenType(ParenType* Type)
 {
 	// Parenthesis are useless (and illegal) on function types
 	PrintType(Type->getInnerType());
 	return true;
 }
 
-bool VisitorToD::TraverseFunctionProtoType(FunctionProtoType* Type)
+bool DPrinter::TraverseFunctionProtoType(FunctionProtoType* Type)
 {
 	PrintType(Type->getReturnType());
 	out() << " function(";
@@ -2448,20 +2448,20 @@ bool VisitorToD::TraverseFunctionProtoType(FunctionProtoType* Type)
 	return true;
 }
 
-bool VisitorToD::TraverseCXXTemporaryObjectExpr(CXXTemporaryObjectExpr* Stmt)
+bool DPrinter::TraverseCXXTemporaryObjectExpr(CXXTemporaryObjectExpr* Stmt)
 {
 	if(pass_stmt(Stmt)) return true;
 	TraverseCXXConstructExpr(Stmt);
 	return true;
 }
 
-bool VisitorToD::TraverseNullStmt(NullStmt* Stmt)
+bool DPrinter::TraverseNullStmt(NullStmt* Stmt)
 {
 	if(pass_stmt(Stmt)) return false;
 	return true;
 }
 
-bool VisitorToD::TraverseCharacterLiteral(CharacterLiteral* Stmt)
+bool DPrinter::TraverseCharacterLiteral(CharacterLiteral* Stmt)
 {
 	out() << '\'';
 	int c = Stmt->getValue();
@@ -2477,7 +2477,7 @@ bool VisitorToD::TraverseCharacterLiteral(CharacterLiteral* Stmt)
 	return true;
 }
 
-bool VisitorToD::TraverseStringLiteral(StringLiteral* Stmt)
+bool DPrinter::TraverseStringLiteral(StringLiteral* Stmt)
 {
 	out() << "\"";
 	std::string literal;
@@ -2524,14 +2524,14 @@ bool VisitorToD::TraverseStringLiteral(StringLiteral* Stmt)
 	return true;
 }
 
-bool VisitorToD::TraverseCXXBoolLiteralExpr(CXXBoolLiteralExpr* Stmt)
+bool DPrinter::TraverseCXXBoolLiteralExpr(CXXBoolLiteralExpr* Stmt)
 {
 	if(pass_stmt(Stmt)) return true;
 	out() << (Stmt->getValue() ? "true" : "false");
 	return true;
 }
 
-bool VisitorToD::TraverseUnaryExprOrTypeTraitExpr(UnaryExprOrTypeTraitExpr* Expr)
+bool DPrinter::TraverseUnaryExprOrTypeTraitExpr(UnaryExprOrTypeTraitExpr* Expr)
 {
 	if(pass_stmt(Expr)) return true;
 	//out() << '(';
@@ -2558,14 +2558,14 @@ bool VisitorToD::TraverseUnaryExprOrTypeTraitExpr(UnaryExprOrTypeTraitExpr* Expr
 	return true;
 }
 
-bool VisitorToD::TraverseEmptyDecl(EmptyDecl* Decl)
+bool DPrinter::TraverseEmptyDecl(EmptyDecl* Decl)
 {
 	if(pass_decl(Decl)) return true;
 	return true;
 }
 
 
-bool VisitorToD::TraverseLambdaExpr(LambdaExpr* S)
+bool DPrinter::TraverseLambdaExpr(LambdaExpr* S)
 {
 	if(pass_stmt(S)) return true;
 	TypeLoc TL = S->getCallOperator()->getTypeSourceInfo()->getTypeLoc();
@@ -2618,7 +2618,7 @@ bool VisitorToD::TraverseLambdaExpr(LambdaExpr* S)
 
 std::set<Expr*> dont_take_ptr;
 
-bool VisitorToD::TraverseCallExpr(CallExpr* Stmt)
+bool DPrinter::TraverseCallExpr(CallExpr* Stmt)
 {
 	if(pass_stmt(Stmt)) return true;
 	Expr* func = Stmt->getCallee();
@@ -2642,7 +2642,7 @@ bool VisitorToD::TraverseCallExpr(CallExpr* Stmt)
 	return true;
 }
 
-bool VisitorToD::TraverseImplicitCastExpr(ImplicitCastExpr* Stmt)
+bool DPrinter::TraverseImplicitCastExpr(ImplicitCastExpr* Stmt)
 {
 	if(pass_stmt(Stmt)) return true;
 	if(Stmt->getCastKind() == CK_FunctionToPointerDecay && dont_take_ptr.count(Stmt) == 0)
@@ -2651,7 +2651,7 @@ bool VisitorToD::TraverseImplicitCastExpr(ImplicitCastExpr* Stmt)
 	return true;
 }
 
-bool VisitorToD::TraverseCXXThisExpr(CXXThisExpr* expr)
+bool DPrinter::TraverseCXXThisExpr(CXXThisExpr* expr)
 {
 	if(pass_stmt(expr)) return true;
 	QualType pointee = expr->getType()->getPointeeType();
@@ -2662,7 +2662,7 @@ bool VisitorToD::TraverseCXXThisExpr(CXXThisExpr* expr)
 	return true;
 }
 
-bool VisitorToD::isStdArray(QualType const& type)
+bool DPrinter::isStdArray(QualType const& type)
 {
 	QualType const rawType = type.isCanonical() ?
 	                         type :
@@ -2675,7 +2675,7 @@ bool VisitorToD::isStdArray(QualType const& type)
 	  name.substr(0, std_array.size()) == std_array;
 }
 
-bool VisitorToD::isStdUnorderedMap(QualType const& type)
+bool DPrinter::isStdUnorderedMap(QualType const& type)
 {
 	QualType const rawType = type.isCanonical() ?
 	                         type :
@@ -2685,20 +2685,20 @@ bool VisitorToD::isStdUnorderedMap(QualType const& type)
 	return name.substr(0, std_unordered_map.size()) == std_unordered_map;
 }
 
-bool VisitorToD::TraverseCXXDependentScopeMemberExpr(CXXDependentScopeMemberExpr* expr)
+bool DPrinter::TraverseCXXDependentScopeMemberExpr(CXXDependentScopeMemberExpr* expr)
 {
 	if(pass_stmt(expr)) return true;
 	return TraverseMemberExprImpl(expr);
 }
 
-bool VisitorToD::TraverseMemberExpr(MemberExpr* Stmt)
+bool DPrinter::TraverseMemberExpr(MemberExpr* Stmt)
 {
 	if(pass_stmt(Stmt)) return true;
 	return TraverseMemberExprImpl(Stmt);
 }
 
 template<typename ME>
-bool VisitorToD::TraverseMemberExprImpl(ME* Stmt)
+bool DPrinter::TraverseMemberExprImpl(ME* Stmt)
 {
 	if(Stmt->getQualifier())
 		TraverseNestedNameSpecifier(Stmt->getQualifier());
@@ -2742,7 +2742,7 @@ bool VisitorToD::TraverseMemberExprImpl(ME* Stmt)
 	return true;
 }
 
-bool VisitorToD::TraverseCXXMemberCallExpr(CXXMemberCallExpr* Stmt)
+bool DPrinter::TraverseCXXMemberCallExpr(CXXMemberCallExpr* Stmt)
 {
 	if(pass_stmt(Stmt)) return true;
 	TraverseStmt(Stmt->getCallee());
@@ -2760,7 +2760,7 @@ bool VisitorToD::TraverseCXXMemberCallExpr(CXXMemberCallExpr* Stmt)
 	return true;
 }
 
-bool VisitorToD::TraverseCXXStaticCastExpr(CXXStaticCastExpr* Stmt)
+bool DPrinter::TraverseCXXStaticCastExpr(CXXStaticCastExpr* Stmt)
 {
 	if(pass_stmt(Stmt)) return true;
 	out() << "cast(";
@@ -2770,7 +2770,7 @@ bool VisitorToD::TraverseCXXStaticCastExpr(CXXStaticCastExpr* Stmt)
 	return true;
 }
 
-bool VisitorToD::TraverseCStyleCastExpr(CStyleCastExpr* Stmt)
+bool DPrinter::TraverseCStyleCastExpr(CStyleCastExpr* Stmt)
 {
 	if(pass_stmt(Stmt)) return true;
 	out() << "cast(";
@@ -2780,7 +2780,7 @@ bool VisitorToD::TraverseCStyleCastExpr(CStyleCastExpr* Stmt)
 	return true;
 }
 
-bool VisitorToD::TraverseConditionalOperator(ConditionalOperator* op)
+bool DPrinter::TraverseConditionalOperator(ConditionalOperator* op)
 {
 	TraverseStmt(op->getCond());
 	out() << "? ";
@@ -2790,13 +2790,13 @@ bool VisitorToD::TraverseConditionalOperator(ConditionalOperator* op)
 	return true;
 }
 
-bool VisitorToD::TraverseCompoundAssignOperator(CompoundAssignOperator* op)
+bool DPrinter::TraverseCompoundAssignOperator(CompoundAssignOperator* op)
 {
-	VisitorToD::TraverseBinaryOperator(op);
+	DPrinter::TraverseBinaryOperator(op);
 	return true;
 }
 
-bool VisitorToD::TraverseBinAddAssign(CompoundAssignOperator* expr)
+bool DPrinter::TraverseBinAddAssign(CompoundAssignOperator* expr)
 {
 	if(expr->getLHS()->getType()->isPointerType())
 	{
@@ -2813,21 +2813,21 @@ bool VisitorToD::TraverseBinAddAssign(CompoundAssignOperator* expr)
 
 
 #define OPERATOR(NAME)                                        \
-	bool VisitorToD::TraverseBin##NAME##Assign(CompoundAssignOperator *S) \
+	bool DPrinter::TraverseBin##NAME##Assign(CompoundAssignOperator *S) \
 	{return TraverseCompoundAssignOperator(S);}
 OPERATOR(Mul) OPERATOR(Div) OPERATOR(Rem) OPERATOR(Sub)
 OPERATOR(Shl) OPERATOR(Shr) OPERATOR(And) OPERATOR(Or) OPERATOR(Xor)
 #undef OPERATOR
 
 
-bool VisitorToD::TraverseSubstNonTypeTemplateParmExpr(SubstNonTypeTemplateParmExpr* Expr)
+bool DPrinter::TraverseSubstNonTypeTemplateParmExpr(SubstNonTypeTemplateParmExpr* Expr)
 {
 	if(pass_stmt(Expr)) return true;
 	TraverseStmt(Expr->getReplacement());
 	return true;
 }
 
-bool VisitorToD::TraverseBinaryOperator(BinaryOperator* Stmt)
+bool DPrinter::TraverseBinaryOperator(BinaryOperator* Stmt)
 {
 	Expr* lhs = Stmt->getLHS();
 	Expr* rhs = Stmt->getRHS();
@@ -2853,7 +2853,7 @@ bool VisitorToD::TraverseBinaryOperator(BinaryOperator* Stmt)
 	return true;
 }
 
-bool VisitorToD::TraverseBinAdd(BinaryOperator* expr)
+bool DPrinter::TraverseBinAdd(BinaryOperator* expr)
 {
 	if(expr->getLHS()->getType()->isPointerType())
 	{
@@ -2868,7 +2868,7 @@ bool VisitorToD::TraverseBinAdd(BinaryOperator* expr)
 }
 
 #define OPERATOR(NAME) \
-	bool VisitorToD::TraverseBin##NAME(BinaryOperator* Stmt) {return TraverseBinaryOperator(Stmt);}
+	bool DPrinter::TraverseBin##NAME(BinaryOperator* Stmt) {return TraverseBinaryOperator(Stmt);}
 OPERATOR(PtrMemD) OPERATOR(PtrMemI) OPERATOR(Mul) OPERATOR(Div)
 OPERATOR(Rem) OPERATOR(Sub) OPERATOR(Shl) OPERATOR(Shr)
 OPERATOR(LT) OPERATOR(GT) OPERATOR(LE) OPERATOR(GE) OPERATOR(EQ)
@@ -2876,7 +2876,7 @@ OPERATOR(NE) OPERATOR(And) OPERATOR(Xor) OPERATOR(Or) OPERATOR(LAnd)
 OPERATOR(LOr) OPERATOR(Assign) OPERATOR(Comma)
 #undef OPERATOR
 
-bool VisitorToD::TraverseUnaryOperator(UnaryOperator* Stmt)
+bool DPrinter::TraverseUnaryOperator(UnaryOperator* Stmt)
 {
 	if(Stmt->isIncrementOp())
 	{
@@ -2943,7 +2943,7 @@ bool VisitorToD::TraverseUnaryOperator(UnaryOperator* Stmt)
 	return true;
 }
 #define OPERATOR(NAME) \
-	bool VisitorToD::TraverseUnary##NAME(UnaryOperator* Stmt) {return TraverseUnaryOperator(Stmt);}
+	bool DPrinter::TraverseUnary##NAME(UnaryOperator* Stmt) {return TraverseUnaryOperator(Stmt);}
 OPERATOR(PostInc) OPERATOR(PostDec) OPERATOR(PreInc) OPERATOR(PreDec)
 OPERATOR(AddrOf) OPERATOR(Deref) OPERATOR(Plus) OPERATOR(Minus)
 OPERATOR(Not) OPERATOR(LNot) OPERATOR(Real) OPERATOR(Imag)
@@ -2951,7 +2951,7 @@ OPERATOR(Extension) OPERATOR(Coawait)
 #undef OPERATOR
 
 template<typename TDeclRefExpr>
-bool VisitorToD::TraverseDeclRefExprImpl(TDeclRefExpr* Expr)
+bool DPrinter::TraverseDeclRefExprImpl(TDeclRefExpr* Expr)
 {
 	unsigned const argNum = Expr->getNumTemplateArgs();
 	if(argNum != 0)
@@ -2970,7 +2970,7 @@ bool VisitorToD::TraverseDeclRefExprImpl(TDeclRefExpr* Expr)
 	return true;
 }
 
-bool VisitorToD::TraverseDeclRefExpr(DeclRefExpr* Expr)
+bool DPrinter::TraverseDeclRefExpr(DeclRefExpr* Expr)
 {
 	if(pass_stmt(Expr)) return true;
 	QualType nnsQualType;
@@ -2994,7 +2994,7 @@ bool VisitorToD::TraverseDeclRefExpr(DeclRefExpr* Expr)
 	return TraverseDeclRefExprImpl(Expr);
 }
 
-bool VisitorToD::TraverseDependentScopeDeclRefExpr(DependentScopeDeclRefExpr* expr)
+bool DPrinter::TraverseDependentScopeDeclRefExpr(DependentScopeDeclRefExpr* expr)
 {
 	if(pass_stmt(expr)) return true;
 	NestedNameSpecifier* nns = expr->getQualifier();
@@ -3003,7 +3003,7 @@ bool VisitorToD::TraverseDependentScopeDeclRefExpr(DependentScopeDeclRefExpr* ex
 	return TraverseDeclRefExprImpl(expr);
 }
 
-bool VisitorToD::TraverseRecordType(RecordType* Type)
+bool DPrinter::TraverseRecordType(RecordType* Type)
 {
 	out() << mangleType(Type->getDecl());
 	RecordDecl* decl = Type->getDecl();
@@ -3032,21 +3032,21 @@ bool VisitorToD::TraverseRecordType(RecordType* Type)
 	return true;
 }
 
-bool VisitorToD::TraverseConstantArrayType(ConstantArrayType* Type)
+bool DPrinter::TraverseConstantArrayType(ConstantArrayType* Type)
 {
 	PrintType(Type->getElementType());
 	out() << '[' << Type->getSize().toString(10, false) << ']';
 	return true;
 }
 
-bool VisitorToD::TraverseIncompleteArrayType(IncompleteArrayType* Type)
+bool DPrinter::TraverseIncompleteArrayType(IncompleteArrayType* Type)
 {
 	PrintType(Type->getElementType());
 	out() << "[]";
 	return true;
 }
 
-bool VisitorToD::TraverseInitListExpr(InitListExpr* Expr)
+bool DPrinter::TraverseInitListExpr(InitListExpr* Expr)
 {
 	if(pass_stmt(Expr)) return true;
 	bool const isArray =
@@ -3067,7 +3067,7 @@ bool VisitorToD::TraverseInitListExpr(InitListExpr* Expr)
 	return true;
 }
 
-bool VisitorToD::TraverseParenExpr(ParenExpr* expr)
+bool DPrinter::TraverseParenExpr(ParenExpr* expr)
 {
 	if(pass_stmt(expr)) return true;
 	if(auto* binOp = dyn_cast<BinaryOperator>(expr->getSubExpr()))
@@ -3129,13 +3129,13 @@ bool VisitorToD::TraverseParenExpr(ParenExpr* expr)
 	return true;
 }
 
-bool VisitorToD::TraverseImplicitValueInitExpr(ImplicitValueInitExpr* expr)
+bool DPrinter::TraverseImplicitValueInitExpr(ImplicitValueInitExpr* expr)
 {
 	if(pass_stmt(expr)) return true;
 	return true;
 }
 
-void VisitorToD::TraverseVarDeclImpl(VarDecl* Decl)
+void DPrinter::TraverseVarDeclImpl(VarDecl* Decl)
 {
 	std::string const varName = Decl->getNameAsString();
 	if(varName.find("CPP2D_MACRO_STMT") == 0)
@@ -3209,31 +3209,31 @@ void VisitorToD::TraverseVarDeclImpl(VarDecl* Decl)
 	}
 }
 
-bool VisitorToD::TraverseVarDecl(VarDecl* Decl)
+bool DPrinter::TraverseVarDecl(VarDecl* Decl)
 {
 	TraverseVarDeclImpl(Decl);
 	return true;
 }
 
-bool VisitorToD::VisitDecl(Decl* Decl)
+bool DPrinter::VisitDecl(Decl* Decl)
 {
 	out() << indent_str() << "/*" << Decl->getDeclKindName() << " Decl*/";
 	return true;
 }
 
-bool VisitorToD::VisitStmt(Stmt* Stmt)
+bool DPrinter::VisitStmt(Stmt* Stmt)
 {
 	out() << indent_str() << "/*" << Stmt->getStmtClassName() << " Stmt*/";
 	return true;
 }
 
-bool VisitorToD::VisitType(Type* Type)
+bool DPrinter::VisitType(Type* Type)
 {
 	out() << indent_str() << "/*" << Type->getTypeClassName() << " Type*/";
 	return true;
 }
 
-const char* VisitorToD::getFile(Stmt const* d)
+const char* DPrinter::getFile(Stmt const* d)
 {
 	/*Module* module = d->getLocalOwningModule();
 	if (clang::FileEntry const* f = module->getASTFile())
@@ -3251,7 +3251,7 @@ const char* VisitorToD::getFile(Stmt const* d)
 		return nullptr;
 }
 
-const char* VisitorToD::getFile(Decl const* d)
+const char* DPrinter::getFile(Decl const* d)
 {
 	/*Module* module = d->getLocalOwningModule();
 	if (clang::FileEntry const* f = module->getASTFile())
@@ -3269,7 +3269,7 @@ const char* VisitorToD::getFile(Decl const* d)
 		return nullptr;
 }
 
-bool VisitorToD::checkFilename(Decl const* d)
+bool DPrinter::checkFilename(Decl const* d)
 {
 	char const* filepath_str = getFile(d);
 	if(filepath_str == nullptr)

@@ -170,16 +170,16 @@
     <ClCompile Include="CPP2D.cpp" />
     <ClCompile Include="CPP2DConsumer.cpp" />
     <ClCompile Include="CPP2DFrontendAction.cpp" />
-    <ClCompile Include="Find_Includes.cpp" />
+    <ClCompile Include="CPP2DPPHandling.cpp" />
     <ClCompile Include="MatchContainer.cpp" />
-    <ClCompile Include="VisitorToD.cpp" />
+    <ClCompile Include="DPrinter.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CPP2DConsumer.h" />
     <ClInclude Include="CPP2DFrontendAction.h" />
-    <ClInclude Include="Find_Includes.h" />
+    <ClInclude Include="CPP2DPPHandling.h" />
     <ClInclude Include="MatchContainer.h" />
-    <ClInclude Include="VisitorToD.h" />
+    <ClInclude Include="DPrinter.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

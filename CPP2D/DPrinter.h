@@ -13,9 +13,9 @@ extern std::vector<std::unique_ptr<std::stringstream> > outStack;
 
 std::stringstream& out();
 
-class VisitorToD : public clang::RecursiveASTVisitor<VisitorToD>
+class DPrinter : public clang::RecursiveASTVisitor<DPrinter>
 {
-	typedef RecursiveASTVisitor<VisitorToD> Base;
+	typedef RecursiveASTVisitor<DPrinter> Base;
 
 	void include_file(std::string const& decl_inc);
 
@@ -56,7 +56,7 @@ class VisitorToD : public clang::RecursiveASTVisitor<VisitorToD>
 	};
 
 public:
-	explicit VisitorToD(
+	explicit DPrinter(
 	  clang::ASTContext* Context,
 	  MatchContainer const& receiver,
 	  llvm::StringRef file);

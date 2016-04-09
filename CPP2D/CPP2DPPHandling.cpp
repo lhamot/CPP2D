@@ -1,4 +1,4 @@
-#include "Find_Includes.h"
+#include "CPP2DPPHandling.h"
 
 #pragma warning(push, 0)
 #pragma warning(disable, 4702)
@@ -20,7 +20,7 @@ std::set<std::string> new_macros_name;
 extern cl::list<std::string> MacroAsExpr;
 extern cl::list<std::string> MacroAsStmt;
 
-Find_Includes::Find_Includes(Preprocessor& pp, StringRef inFile)
+CPP2DPPHandling::CPP2DPPHandling(Preprocessor& pp, StringRef inFile)
 	: pp_(pp)
 	, inFile_(inFile)
 	, modulename_(llvm::sys::path::stem(inFile))
@@ -57,7 +57,7 @@ Find_Includes::Find_Includes(Preprocessor& pp, StringRef inFile)
 	pp_.setPredefines(predefines);
 }
 
-void Find_Includes::InclusionDirective(
+void CPP2DPPHandling::InclusionDirective(
   SourceLocation,		//hash_loc,
   const Token&,			//include_token,
   StringRef file_name,
@@ -210,7 +210,7 @@ std::string make_d_macro(MacroInfo const* MI, std::string const& name)
 	return d_templ_str;
 }
 
-void Find_Includes::inject_macro(
+void CPP2DPPHandling::inject_macro(
   MacroDirective const* MD,
   std::string const& name,
   std::string const& new_macro)
@@ -225,7 +225,7 @@ void Find_Includes::inject_macro(
 	add_before_decl.insert(make_d_macro(MD->getMacroInfo(), name));
 }
 
-void Find_Includes::TransformMacroExpr(
+void CPP2DPPHandling::TransformMacroExpr(
   Token const& MacroNameTok,
   MacroDirective const* MD,
   std::string const& name,
@@ -254,7 +254,7 @@ void Find_Includes::TransformMacroExpr(
 	inject_macro(MD, name, new_macro.str());
 }
 
-void Find_Includes::TransformMacroStmt(
+void CPP2DPPHandling::TransformMacroStmt(
   Token const& MacroNameTok,
   MacroDirective const* MD,
   std::string const& name,
@@ -288,7 +288,7 @@ void Find_Includes::TransformMacroStmt(
 }
 
 
-void Find_Includes::MacroDefined(const Token& MacroNameTok, const MacroDirective* MD)
+void CPP2DPPHandling::MacroDefined(const Token& MacroNameTok, const MacroDirective* MD)
 {
 	std::string const& name = MacroNameTok.getIdentifierInfo()->getName();
 	MacroInfo const* MI = MD->getMacroInfo();
@@ -303,7 +303,7 @@ void Find_Includes::MacroDefined(const Token& MacroNameTok, const MacroDirective
 		TransformMacroStmt(MacroNameTok, MD, name, macro_stmt_iter->second);
 }
 
-void Find_Includes::MacroExpands(
+void CPP2DPPHandling::MacroExpands(
   const clang::Token&, //MacroNameTok,
   const clang::MacroDefinition&, //MD,
   clang::SourceRange, //Range,

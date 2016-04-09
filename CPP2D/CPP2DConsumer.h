@@ -6,7 +6,7 @@
 #pragma warning(pop)
 
 #include "MatchContainer.h"
-#include "VisitorToD.h"
+#include "DPrinter.h"
 
 namespace clang
 {
@@ -29,6 +29,6 @@ private:
 	clang::ast_matchers::MatchFinder finder;
 	std::unique_ptr<clang::ASTConsumer> finderConsumer;
 	std::string InFile;
-	VisitorToD Visitor;
+	DPrinter Visitor;
 };
 
