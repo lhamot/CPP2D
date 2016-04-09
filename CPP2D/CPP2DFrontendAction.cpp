@@ -23,7 +23,7 @@ bool CPP2DFrontendAction::BeginSourceFileAction(CompilerInstance& ci, StringRef 
 {
 	Preprocessor& pp = ci.getPreprocessor();
 	std::unique_ptr<CPP2DPPHandling> find_includes_callback(
-		new CPP2DPPHandling(pp, file));
+	  new CPP2DPPHandling(pp, file));
 	pp.addPPCallbacks(std::move(find_includes_callback));
 	return true;
 }

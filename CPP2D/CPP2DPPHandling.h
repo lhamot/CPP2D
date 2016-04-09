@@ -27,8 +27,9 @@ public:
 	                  const clang::MacroDefinition& MD, clang::SourceRange Range,
 	                  const clang::MacroArgs* Args) override;
 
-	std::set<std::string> includes_in_file;
-	std::set<std::string> add_before_decl;
+	std::set<std::string> const& getIncludes() const;
+	std::set<std::string> const& getInsertedBeforeDecls() const;
+
 private:
 	void CPP2DPPHandling::inject_macro(
 	  clang::MacroDirective const* MD,
@@ -48,4 +49,7 @@ private:
 	llvm::StringRef modulename_;
 	std::map<std::string, std::string> macro_expr;
 	std::map<std::string, std::string> macro_stmt;
+
+	std::set<std::string> includes_in_file;
+	std::set<std::string> add_before_decl;
 };

@@ -184,7 +184,10 @@ static char const* AccessSpecifierStr[] =
 	"private"  // ...the special value "none" which means different things in different contexts. (from the clang doxy)
 };
 
-std::set<std::string> includes_in_file;
+void DPrinter::setIncludes(std::set<std::string> const& includes)
+{
+	includes_in_file = includes;
+}
 
 void DPrinter::include_file(std::string const& decl_inc)
 {
@@ -331,8 +334,8 @@ std::vector<std::string> DPrinter::split(std::string const& instr)
 }
 
 void DPrinter::printStmtComment(SourceLocation& locStart,
-                                  SourceLocation const& locEnd,
-                                  SourceLocation const& nextStart)
+                                SourceLocation const& locEnd,
+                                SourceLocation const& nextStart)
 {
 	if(locStart.isInvalid() || locEnd.isInvalid() || locStart.isMacroID() || locEnd.isMacroID())
 	{
@@ -463,6 +466,10 @@ std::string DPrinter::indent_str() const
 bool DPrinter::TraverseTranslationUnitDecl(TranslationUnitDecl* Decl)
 {
 	if(pass_decl(Decl)) return true;
+
+	outStack.clear();
+	outStack.emplace_back(std::make_unique<std::stringstream>());
+
 	//SourceManager& sm = Context->getSourceManager();
 	//SourceLocation prevDeclEnd;
 	//for(auto c: Context->Comments.getComments())
@@ -1424,7 +1431,6 @@ bool DPrinter::TraverseConstructorInitializer(CXXCtorInitializer* Init)
 	return true;
 }
 
-
 void DPrinter::startCtorBody(FunctionDecl*) {}
 
 void DPrinter::startCtorBody(CXXConstructorDecl* Decl)
@@ -1622,9 +1628,9 @@ bool DPrinter::printFuncBegin(CXXConversionDecl* Decl, std::string& tmpParams, i
 }
 
 bool DPrinter::printFuncBegin(CXXConstructorDecl* Decl,
-                                std::string&,	//tmpParams
-                                int				//arg_become_this = -1
-                               )
+                              std::string&,	//tmpParams
+                              int				//arg_become_this = -1
+                             )
 {
 	auto record = Decl->getParent();
 	if(record->isStruct() && Decl->getNumParams() == 0)
@@ -1634,9 +1640,9 @@ bool DPrinter::printFuncBegin(CXXConstructorDecl* Decl,
 }
 
 bool DPrinter::printFuncBegin(CXXDestructorDecl*,
-                                std::string&,	//tmpParams,
-                                int				//arg_become_this = -1
-                               )
+                              std::string&,	//tmpParams,
+                              int				//arg_become_this = -1
+                             )
 {
 	//if(Decl->isPure() && !Decl->hasBody())
 	//	return false; //ctor and dtor can't be abstract
@@ -2159,7 +2165,6 @@ bool DPrinter::TraverseNonTypeTemplateParmDecl(NonTypeTemplateParmDecl* Decl)
 	return true;
 }
 
-
 bool DPrinter::TraverseDeclStmt(DeclStmt* Stmt)
 {
 	if(pass_stmt(Stmt)) return false;
@@ -2564,7 +2569,6 @@ bool DPrinter::TraverseEmptyDecl(EmptyDecl* Decl)
 	return true;
 }
 
-
 bool DPrinter::TraverseLambdaExpr(LambdaExpr* S)
 {
 	if(pass_stmt(S)) return true;
@@ -2615,8 +2619,6 @@ bool DPrinter::TraverseLambdaExpr(LambdaExpr* S)
 	return true;
 	//return TRAVERSE_STMT_BASE(LambdaBody, LambdaExpr, S, Queue);
 }
-
-std::set<Expr*> dont_take_ptr;
 
 bool DPrinter::TraverseCallExpr(CallExpr* Stmt)
 {
@@ -3162,7 +3164,7 @@ void DPrinter::TraverseVarDeclImpl(VarDecl* Decl)
 			TraverseNestedNameSpecifier(qualifier);
 	}
 	out() << mangleName(Decl->getNameAsString());
-	bool const in_foreach_decl = inForRangeInit;//receiver.forrange_loopvar.count(Decl) != 0;
+	bool const in_foreach_decl = inForRangeInit;
 	if(Decl->hasInit() && !in_foreach_decl)
 	{
 		Expr* init = Decl->getInit();
@@ -3300,5 +3302,14 @@ bool DPrinter::checkFilename(Decl const* d)
 	}
 }
 
+std::set<std::string> const& DPrinter::getExternIncludes() const
+{
+	return extern_includes;
+}
 
+
+std::string DPrinter::getDCode() const
+{
+	return out().str();
+}
 

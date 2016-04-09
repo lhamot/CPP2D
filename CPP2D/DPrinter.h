@@ -8,11 +8,6 @@
 
 class MatchContainer;
 
-extern std::set<std::string> includes_in_file;
-extern std::vector<std::unique_ptr<std::stringstream> > outStack;
-
-std::stringstream& out();
-
 class DPrinter : public clang::RecursiveASTVisitor<DPrinter>
 {
 	typedef RecursiveASTVisitor<DPrinter> Base;
@@ -60,6 +55,8 @@ public:
 	  clang::ASTContext* Context,
 	  MatchContainer const& receiver,
 	  llvm::StringRef file);
+
+	void setIncludes(std::set<std::string> const& includes);
 
 	std::string indent_str() const;
 
@@ -330,8 +327,6 @@ public:
 
 	bool TraverseLambdaExpr(clang::LambdaExpr* S);
 
-	std::set<clang::Expr* > dont_take_ptr;
-
 	bool TraverseCallExpr(clang::CallExpr* Stmt);
 
 	bool TraverseImplicitCastExpr(clang::ImplicitCastExpr* Stmt);
@@ -418,9 +413,9 @@ public:
 
 	bool VisitType(clang::Type* Type);
 
-	std::set<std::string> extern_includes;
-	std::string modulename;
-	std::string insert_after_import;
+	std::set<std::string> const& getExternIncludes() const;
+
+	std::string getDCode() const;
 
 private:
 
@@ -429,6 +424,11 @@ private:
 	const char* getFile(clang::Decl const* d);
 
 	bool checkFilename(clang::Decl const* d);
+
+	std::set<std::string> includes_in_file;
+	std::set<clang::Expr*> dont_take_ptr;
+	std::set<std::string> extern_includes;
+	std::string modulename;
 
 	MatchContainer const& receiver;
 	size_t indent = 0;

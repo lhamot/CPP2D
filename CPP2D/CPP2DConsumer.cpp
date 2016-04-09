@@ -27,13 +27,10 @@ void VisitorToDConsumer::HandleTranslationUnit(clang::ASTContext& Context)
 {
 	//Find_Includes
 	auto& ppcallback = dynamic_cast<CPP2DPPHandling&>(*Compiler.getPreprocessor().getPPCallbacks());
-	auto& incs = ppcallback.includes_in_file;
-	includes_in_file.insert(incs.begin(), incs.end());
-
-	outStack.clear();
-	outStack.emplace_back(std::make_unique<std::stringstream>());
+	auto& incs = ppcallback.getIncludes();
 
 	finderConsumer->HandleTranslationUnit(Context);
+	Visitor.setIncludes(incs);
 	Visitor.TraverseTranslationUnitDecl(Context.getTranslationUnitDecl());
 
 	std::string modulename = llvm::sys::path::stem(InFile).str();
@@ -42,10 +39,10 @@ void VisitorToDConsumer::HandleTranslationUnit(clang::ASTContext& Context)
 	std::replace_copy(std::begin(modulename), std::end(modulename), std::back_inserter(new_modulename), '-', '_'); //Replace illegal characters
 	if(new_modulename != modulename)  // When filename has some illegal characters
 		file << "module " << new_modulename << ';';
-	for(auto const& import : Visitor.extern_includes)
+	for(auto const& import : Visitor.getExternIncludes())
 		file << "import " << import << ";" << std::endl;
 	file << "\n\n";
-	for(auto const& code : ppcallback.add_before_decl)
+	for(auto const& code : ppcallback.getInsertedBeforeDecls())
 		file << code << '\n';
-	file << out().str();
+	file << Visitor.getDCode();
 }

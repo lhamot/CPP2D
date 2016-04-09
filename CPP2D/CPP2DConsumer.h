@@ -21,7 +21,7 @@ public:
 	  llvm::StringRef InFile
 	);
 
-	virtual void HandleTranslationUnit(clang::ASTContext& Context);
+	void HandleTranslationUnit(clang::ASTContext& Context) override;
 
 private:
 	clang::CompilerInstance& Compiler;

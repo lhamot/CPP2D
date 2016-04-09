@@ -16,7 +16,7 @@ class CPP2DFrontendAction : public clang::ASTFrontendAction
 public:
 	std::unique_ptr<clang::ASTConsumer> CreateASTConsumer(
 	  clang::CompilerInstance& Compiler,
-	  llvm::StringRef //InFile
+	  llvm::StringRef InFile
 	) override;
 
 	bool BeginSourceFileAction(clang::CompilerInstance& ci, llvm::StringRef) override;

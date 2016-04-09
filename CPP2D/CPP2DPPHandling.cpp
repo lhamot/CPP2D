@@ -311,3 +311,13 @@ void CPP2DPPHandling::MacroExpands(
 )
 {
 }
+
+std::set<std::string> const& CPP2DPPHandling::getIncludes() const
+{
+	return includes_in_file;
+}
+
+std::set<std::string> const& CPP2DPPHandling::getInsertedBeforeDecls() const
+{
+	return add_before_decl;
+}
