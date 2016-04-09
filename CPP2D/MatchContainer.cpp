@@ -1,5 +1,7 @@
 #include "MatchContainer.h"
 
+#include "DPrinter.h"
+
 #include <iostream>
 
 using namespace clang;
@@ -26,7 +28,7 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 	    )
 	  );
 	finder.addMatcher(hash_trait, this);
-	declPrinters.emplace("dont_print_this_decl", [this](Decl const*) {});
+	declPrinters.emplace("dont_print_this_decl", [this](DPrinter&, Decl const*) {});
 	on_decl_match.emplace("hash_method", [this](Decl const * d)
 	{
 		if(auto* methDecl = dyn_cast<CXXMethodDecl>(d))
@@ -41,14 +43,13 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 		}
 	});
 
-
 	DeclarationMatcher out_stream_op =
 	  functionDecl(
 	    unless(hasDeclContext(recordDecl())),
 	    matchesName("operator[\\+-\\*\\^\\[\\(\\!\\&\\|\\~\\=\\/\\%\\<\\>]")
 	  ).bind("free_operator");
 	finder.addMatcher(out_stream_op, this);
-	declPrinters.emplace("free_operator", [this](Decl const*) {});
+	declPrinters.emplace("free_operator", [this](DPrinter&, Decl const*) {});
 	on_decl_match.emplace("free_operator", [this](Decl const * d)
 	{
 		if(auto* funcDecl = dyn_cast<FunctionDecl>(d))
@@ -76,8 +77,12 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 	});
 
 	// printf
-	//finder.addMatcher(declRefExpr(hasDeclaration(functionDecl(hasName("::printf")))).bind("printf"), this);
-	//stmtPrinters.emplace("printf", [this](Stmt const*) {llvm::errs() << "printf!"; });
+	finder.addMatcher(declRefExpr(hasDeclaration(functionDecl(hasName("::printf")))).bind("printf"), this);
+	stmtPrinters.emplace("printf", [this](DPrinter & printer, Stmt const*)
+	{
+		printer.addExternInclude("std.stdio");
+		printer.stream() << "writef";
+	});
 
 	return finder;
 }
@@ -120,7 +125,7 @@ void MatchContainer::run(const ast_matchers::MatchFinder::MatchResult& Result)
 }
 
 
-std::function<void(clang::Stmt const*)> MatchContainer::getPrinter(clang::Stmt const* node) const
+std::function<void(DPrinter& printer, clang::Stmt const*)> MatchContainer::getPrinter(clang::Stmt const* node) const
 {
 	auto iter_pair = stmtTags.equal_range(node);
 	if(iter_pair.first != iter_pair.second)
@@ -130,10 +135,10 @@ std::function<void(clang::Stmt const*)> MatchContainer::getPrinter(clang::Stmt c
 			return iter2->second;
 	}
 
-	return std::function<void(clang::Stmt const*)>();
+	return std::function<void(DPrinter& printer, clang::Stmt const*)>();
 }
 
-std::function<void(clang::Decl const*)> MatchContainer::getPrinter(clang::Decl const* node) const
+std::function<void(DPrinter& printer, clang::Decl const*)> MatchContainer::getPrinter(clang::Decl const* node) const
 {
 	auto iter_pair = declTags.equal_range(node);
 	if(iter_pair.first != iter_pair.second)
@@ -143,10 +148,10 @@ std::function<void(clang::Decl const*)> MatchContainer::getPrinter(clang::Decl c
 			return iter2->second;
 	}
 
-	return std::function<void(clang::Decl const*)>();
+	return std::function<void(DPrinter& printer, clang::Decl const*)>();
 }
 
-std::function<void(clang::Type const*)> MatchContainer::getPrinter(clang::Type const* node) const
+std::function<void(DPrinter& printer, clang::Type const*)> MatchContainer::getPrinter(clang::Type const* node) const
 {
 	auto iter_pair = typeTags.equal_range(node);
 	if(iter_pair.first != iter_pair.second)
@@ -156,5 +161,5 @@ std::function<void(clang::Type const*)> MatchContainer::getPrinter(clang::Type c
 			return iter2->second;
 	}
 
-	return std::function<void(clang::Type const*)>();
+	return std::function<void(DPrinter& printer, clang::Type const*)>();
 }

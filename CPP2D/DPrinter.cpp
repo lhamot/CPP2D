@@ -251,17 +251,9 @@ std::string DPrinter::mangleType(NamedDecl const* decl)
 std::string DPrinter::mangleVar(DeclRefExpr* expr)
 {
 	std::string name = expr->getNameInfo().getName().getAsString();
-	if(name == "printf")
-	{
-		extern_includes.insert("std.stdio");
-		return "writef";
-	}
-	else
-	{
-		if(char const* filename = getFile(expr->getDecl()))
-			include_file(filename);
-		return mangleName(name);
-	}
+	if(char const* filename = getFile(expr->getDecl()))
+		include_file(filename);
+	return mangleName(name);
 }
 
 std::string DPrinter::replace(std::string str, std::string const& in, std::string const& out)
@@ -723,7 +715,7 @@ bool DPrinter::pass_decl(Decl* decl)
 	auto printer = receiver.getPrinter(decl);
 	if(printer)
 	{
-		printer(decl);
+		printer(*this, decl);
 		return true;
 	}
 	else
@@ -735,7 +727,7 @@ bool DPrinter::pass_stmt(Stmt* stmt)
 	auto printer = receiver.getPrinter(stmt);
 	if(printer)
 	{
-		printer(stmt);
+		printer(*this, stmt);
 		return true;
 	}
 	else
@@ -3300,6 +3292,16 @@ bool DPrinter::checkFilename(Decl const* d)
 		}
 		return false;
 	}
+}
+
+void DPrinter::addExternInclude(std::string include)
+{
+	extern_includes.emplace(std::move(include));
+}
+
+std::ostream& DPrinter::stream()
+{
+	return out();
 }
 
 std::set<std::string> const& DPrinter::getExternIncludes() const

@@ -417,6 +417,10 @@ public:
 
 	std::string getDCode() const;
 
+	std::ostream& stream();
+
+	void addExternInclude(std::string include);
+
 private:
 
 	const char* getFile(clang::Stmt const* d);
