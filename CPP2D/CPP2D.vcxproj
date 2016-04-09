@@ -168,11 +168,15 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CPP2D.cpp" />
+    <ClCompile Include="CPP2DConsumer.cpp" />
+    <ClCompile Include="CPP2DFrontendAction.cpp" />
     <ClCompile Include="Find_Includes.cpp" />
     <ClCompile Include="MatchContainer.cpp" />
     <ClCompile Include="VisitorToD.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="CPP2DConsumer.h" />
+    <ClInclude Include="CPP2DFrontendAction.h" />
     <ClInclude Include="Find_Includes.h" />
     <ClInclude Include="MatchContainer.h" />
     <ClInclude Include="VisitorToD.h" />

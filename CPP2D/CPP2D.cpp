@@ -6,7 +6,7 @@
 #include <iostream>
 #include <fstream>
 
-#include "VisitorToD.h"
+#include "CPP2DFrontendAction.h"
 
 using namespace clang::tooling;
 using namespace llvm;
@@ -53,5 +53,5 @@ int main(int argc, char const** argv)
 	ClangTool Tool(
 	  OptionsParser.getCompilations(),
 	  OptionsParser.getSourcePathList());
-	return Tool.run(newFrontendActionFactory<VisitorToDAction>().get());
+	return Tool.run(newFrontendActionFactory<CPP2DFrontendAction>().get());
 }

@@ -1,22 +1,22 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <LocalDebuggerCommandArguments>I:\C\CPP2D\CPP2D_UT_CPP\source_file.cpp  -- -x c++ -fms-compatibility-version=19 -fcxx-exceptions</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>I:\C\CPP2D\CPP2D_UT_CPP\main.cpp I:\C\CPP2D\CPP2D_UT_CPP\framework.cpp I:\C\CPP2D\CPP2D_UT_CPP\test.cpp -macro-expr=UT_MACRO_EXPR/nn -macro-expr=CHECK/e -macro-expr=UT_MACRO/eee -macro-stmt=UT_MACRO_STMT -macro-stmt=UT_MACRO_STMT_CLASS/ntne -- -fms-extensions -fms-compatibility</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerWorkingDirectory>I:\C\CPP2D_UT_D\CPP2D_UT_D</LocalDebuggerWorkingDirectory>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <LocalDebuggerCommandArguments>I:\C\CPP2D\CPP2D_UT_CPP\source_file.cpp  -- -x c++ -fms-compatibility-version=19 -fcxx-exceptions</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>I:\C\CPP2D\CPP2D_UT_CPP\main.cpp I:\C\CPP2D\CPP2D_UT_CPP\framework.cpp I:\C\CPP2D\CPP2D_UT_CPP\test.cpp -macro-expr=UT_MACRO_EXPR/nn -macro-expr=CHECK/e -macro-expr=UT_MACRO/eee -macro-stmt=UT_MACRO_STMT -macro-stmt=UT_MACRO_STMT_CLASS/ntne -- -fms-extensions -fms-compatibility</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerWorkingDirectory>I:\C\CPP2D_UT_D\CPP2D_UT_D</LocalDebuggerWorkingDirectory>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LocalDebuggerCommandArguments>I:\C\CPP2D\CPP2D_UT_CPP\source_file.cpp  -- -x c++ -fms-compatibility-version=19 -fcxx-exceptions</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>I:\C\CPP2D\CPP2D_UT_CPP\main.cpp I:\C\CPP2D\CPP2D_UT_CPP\framework.cpp I:\C\CPP2D\CPP2D_UT_CPP\test.cpp -macro-expr=UT_MACRO_EXPR/nn -macro-expr=CHECK/e -macro-expr=UT_MACRO/eee -macro-stmt=UT_MACRO_STMT -macro-stmt=UT_MACRO_STMT_CLASS/ntne -- -fms-extensions -fms-compatibility</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerWorkingDirectory>I:\C\CPP2D_UT_D\CPP2D_UT_D</LocalDebuggerWorkingDirectory>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <LocalDebuggerCommandArguments>I:\C\CPP2D\CPP2D_UT_CPP\source_file.cpp  -- -x c++ -fms-compatibility-version=19 -fcxx-exceptions</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>I:\C\CPP2D\CPP2D_UT_CPP\main.cpp I:\C\CPP2D\CPP2D_UT_CPP\framework.cpp I:\C\CPP2D\CPP2D_UT_CPP\test.cpp -macro-expr=UT_MACRO_EXPR/nn -macro-expr=CHECK/e -macro-expr=UT_MACRO/eee -macro-stmt=UT_MACRO_STMT -macro-stmt=UT_MACRO_STMT_CLASS/ntne -- -fms-extensions -fms-compatibility</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerWorkingDirectory>I:\C\CPP2D_UT_D\CPP2D_UT_D</LocalDebuggerWorkingDirectory>
   </PropertyGroup>
