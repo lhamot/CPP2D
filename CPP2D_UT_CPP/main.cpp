@@ -65,6 +65,8 @@ int main()
 
 	check_lib_porting_pair();
 
+	check_union();
+
 	print_results();
 
 	return 0;

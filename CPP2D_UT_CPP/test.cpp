@@ -691,14 +691,14 @@ void check_tmpl_meth()
 
 int tata(short a) { return a * 2; }
 
-int toto(short a) { return a * 2; }
+int toto(short a) { return a * 4; }
 
 void check_function_pointer()
 {
 	int(*a)(short) = tata;
 	int(*b)(short) = toto;
 	CHECK(a != b);
-	CHECK(a(2) == b(2));
+	CHECK(2 * a(2) == b(2));
 	a = b;
 	CHECK(a == b);
 }
@@ -1632,4 +1632,33 @@ void check_lib_porting_pair()
 	std::pair<int, double> toto(3, 6.66);
 	CHECK(toto.first == 3);
 	CHECK(toto.second == 6.66);
+}
+
+
+void check_union()
+{
+	union U
+	{
+		int i;
+		double d;
+		bool b;
+	} u;
+	u.i = 45;
+	CHECK(u.i == 45);
+	u.d = 6.66;
+	CHECK(u.d == 6.66);
+
+	struct Foo
+	{
+		union
+		{
+			int i;
+			double d;
+			bool b;
+		};
+	} foo;
+	foo.i = 45;
+	CHECK(foo.i == 45);
+	foo.d = 6.66;
+	CHECK(foo.d == 6.66);
 }

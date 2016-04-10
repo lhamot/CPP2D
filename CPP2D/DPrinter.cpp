@@ -849,7 +849,10 @@ bool DPrinter::TraverseCXXRecordDeclImpl(
 		return true;
 
 	const bool isClass = decl->isClass();// || decl->isPolymorphic();
-	char const* struct_class = decl->isClass() ? "class" : "struct";
+	char const* struct_class =
+	  decl->isClass() ? "class" :
+	  decl->isUnion() ? "union" :
+	  "struct";
 	/*if(decl->isCompleteDefinition())
 	{
 		size_t field_count = std::distance(decl->field_begin(), decl->field_end());
@@ -2735,6 +2738,7 @@ bool DPrinter::TraverseMemberExprImpl(ME* Stmt)
 	if(Stmt->getQualifier())
 		TraverseNestedNameSpecifier(Stmt->getQualifier());
 	DeclarationName const declName = Stmt->getMemberNameInfo().getName();
+	auto const kind = declName.getNameKind();
 	std::string const memberName = Stmt->getMemberNameInfo().getAsString();
 	Expr* base = Stmt->isImplicitAccess() ? nullptr : Stmt->getBase();
 	if(base && isStdArray(base->getType()) && memberName == "assign")
@@ -2746,9 +2750,9 @@ bool DPrinter::TraverseMemberExprImpl(ME* Stmt)
 	if(base && base->getStmtClass() != Stmt::StmtClass::CXXThisExprClass)
 	{
 		TraverseStmt(base);
-		out() << '.';
+		if(memberName.empty() == false)
+			out() << '.';
 	}
-	auto const kind = declName.getNameKind();
 	if(kind == DeclarationName::NameKind::CXXConversionFunctionName)
 	{
 		out() << "opCast!(";
