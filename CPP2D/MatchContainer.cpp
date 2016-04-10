@@ -84,6 +84,20 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 		printer.stream() << "writef";
 	});
 
+	// pair
+	finder.addMatcher(templateSpecializationType(hasDeclaration(namedDecl(hasName("std::pair")))).bind("std::pair"), this);
+	typePrinters.emplace("std::pair", [this](DPrinter & printer, Type const * Type)
+	{
+		auto* TSType = dyn_cast<TemplateSpecializationType>(Type);
+		printer.addExternInclude("std.typecons");
+		printer.stream() << "Tuple!(";
+		printer.PrintTemplateArgument(TSType->getArg(0));
+		printer.stream() << ", \"first\", ";
+		printer.PrintTemplateArgument(TSType->getArg(1));
+		printer.stream() << ", \"second\")";
+	});
+
+
 	return finder;
 }
 

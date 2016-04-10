@@ -63,6 +63,8 @@ int main()
 
 	check_extern_overloaded_operator();
 
+	check_lib_porting_pair();
+
 	print_results();
 
 	return 0;

@@ -2,6 +2,7 @@
 #include "framework.h"
 #include <cstdarg>
 #include <cstdio>
+#include <utility>
 
 #define CHECK(COND) check(COND, #COND, __LINE__) //if(!(COND)) error(#COND)
 
@@ -1510,7 +1511,6 @@ int* operator & (ExtOverloadOpStuct& self)
 	return &self.value;
 }
 
-
 void check_extern_overloaded_operator()
 {
 	//****************   Unary operators  *********************************************************
@@ -1625,4 +1625,11 @@ void check_extern_overloaded_operator()
 		CHECK((a110 >> 1) == ExtOverloadOpStuct(3));
 		CHECK((a110 << 1) == ExtOverloadOpStuct(12));
 	}
+}
+
+void check_lib_porting_pair()
+{
+	std::pair<int, double> toto(3, 6.66);
+	CHECK(toto.first == 3);
+	CHECK(toto.second == 6.66);
 }

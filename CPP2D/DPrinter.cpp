@@ -518,6 +518,7 @@ bool DPrinter::TraverseTypeAliasTemplateDecl(TypeAliasTemplateDecl* Decl)
 
 bool DPrinter::TraverseFieldDecl(FieldDecl* Decl)
 {
+	if(pass_decl(Decl)) return true;
 	std::string const varName = Decl->getNameAsString();
 	if(varName.find("CPP2D_MACRO_STMT") == 0)
 	{
@@ -552,6 +553,7 @@ bool DPrinter::TraverseFieldDecl(FieldDecl* Decl)
 
 bool DPrinter::TraverseDependentNameType(DependentNameType* Type)
 {
+	if(pass_type(Type)) return false;
 	TraverseNestedNameSpecifier(Type->getQualifier());
 	out() << Type->getIdentifier()->getName().str();
 	return true;
@@ -559,18 +561,21 @@ bool DPrinter::TraverseDependentNameType(DependentNameType* Type)
 
 bool DPrinter::TraverseAttributedType(AttributedType* Type)
 {
+	if(pass_type(Type)) return false;
 	PrintType(Type->getEquivalentType());
 	return true;
 }
 
 bool DPrinter::TraverseDecayedType(DecayedType* Type)
 {
+	if(pass_type(Type)) return false;
 	PrintType(Type->getOriginalType());
 	return true;
 }
 
 bool DPrinter::TraverseElaboratedType(ElaboratedType* Type)
 {
+	if(pass_type(Type)) return false;
 	if(Type->getQualifier())
 		TraverseNestedNameSpecifier(Type->getQualifier());
 	PrintType(Type->getNamedType());
@@ -579,12 +584,14 @@ bool DPrinter::TraverseElaboratedType(ElaboratedType* Type)
 
 bool DPrinter::TraverseInjectedClassNameType(InjectedClassNameType* Type)
 {
+	if(pass_type(Type)) return false;
 	PrintType(Type->getInjectedSpecializationType());
 	return true;
 }
 
-bool DPrinter::TraverseSubstTemplateTypeParmType(SubstTemplateTypeParmType*)
+bool DPrinter::TraverseSubstTemplateTypeParmType(SubstTemplateTypeParmType* Type)
 {
+	if(pass_type(Type)) return false;
 	return true;
 }
 
@@ -623,6 +630,7 @@ void DPrinter::printTmpArgList(std::string const& tmpArgListStr)
 
 bool DPrinter::TraverseTemplateSpecializationType(TemplateSpecializationType* Type)
 {
+	if(pass_type(Type)) return false;
 	if(isStdArray(Type->desugar()))
 	{
 		PrintTemplateArgument(Type->getArg(0));
@@ -654,6 +662,7 @@ bool DPrinter::TraverseTemplateSpecializationType(TemplateSpecializationType* Ty
 
 bool DPrinter::TraverseTypedefType(TypedefType* Type)
 {
+	if(pass_type(Type)) return false;
 	out() << mangleType(Type->getDecl());
 	return true;
 }
@@ -733,6 +742,19 @@ bool DPrinter::pass_stmt(Stmt* stmt)
 	else
 		return false;
 }
+
+bool DPrinter::pass_type(Type* type)
+{
+	auto printer = receiver.getPrinter(type);
+	if(printer)
+	{
+		printer(*this, type);
+		return true;
+	}
+	else
+		return false;
+}
+
 
 bool DPrinter::TraverseNamespaceDecl(NamespaceDecl* Decl)
 {
@@ -1837,6 +1859,7 @@ bool DPrinter::TraverseFunctionTemplateDecl(FunctionTemplateDecl* Decl)
 
 bool DPrinter::TraverseBuiltinType(BuiltinType* Type)
 {
+	if(pass_type(Type)) return false;
 	//PrintingPolicy pp = LangOptions();
 	//pp.Bool = 1;
 	//out() << Type->getNameAsCString(pp);
@@ -1930,10 +1953,12 @@ bool DPrinter::TraversePointerTypeImpl(PType* Type)
 
 bool DPrinter::TraverseMemberPointerType(MemberPointerType* Type)
 {
+	if(pass_type(Type)) return false;
 	return TraversePointerTypeImpl(Type);
 }
 bool DPrinter::TraversePointerType(PointerType* Type)
 {
+	if(pass_type(Type)) return false;
 	return TraversePointerTypeImpl(Type);
 }
 
@@ -1984,26 +2009,30 @@ bool DPrinter::TraverseEnumDecl(EnumDecl* Decl)
 
 bool DPrinter::TraverseEnumType(EnumType* Type)
 {
+	if(pass_type(Type)) return false;
 	out() << mangleName(Type->getDecl()->getNameAsString());
 	return true;
 }
 
 bool DPrinter::TraverseIntegerLiteral(IntegerLiteral* Stmt)
 {
+	if(pass_stmt(Stmt)) return true;
 	out() << Stmt->getValue().toString(10, true);
 	return true;
 }
 
 bool DPrinter::TraverseDecltypeType(DecltypeType* Type)
 {
+	if(pass_type(Type)) return false;
 	out() << "typeof(";
 	TraverseStmt(Type->getUnderlyingExpr());
 	out() << ')';
 	return true;
 }
 
-bool DPrinter::TraverseAutoType(AutoType*)
+bool DPrinter::TraverseAutoType(AutoType* Type)
 {
+	if(pass_type(Type)) return false;
 	if(not inForRangeInit)
 		out() << "auto";
 	return true;
@@ -2076,6 +2105,7 @@ bool DPrinter::TraverseParmVarDecl(ParmVarDecl* Decl)
 
 bool DPrinter::TraverseRValueReferenceType(RValueReferenceType* Type)
 {
+	if(pass_type(Type)) return false;
 	PrintType(Type->getPointeeType());
 	out() << "/*&&*/";
 	return true;
@@ -2083,6 +2113,7 @@ bool DPrinter::TraverseRValueReferenceType(RValueReferenceType* Type)
 
 bool DPrinter::TraverseLValueReferenceType(LValueReferenceType* Type)
 {
+	if(pass_type(Type)) return false;
 	if(refAccepted)
 	{
 		if(getSemantic(Type->getPointeeType()) == Value)
@@ -2110,6 +2141,7 @@ bool DPrinter::TraverseLValueReferenceType(LValueReferenceType* Type)
 
 bool DPrinter::TraverseTemplateTypeParmType(TemplateTypeParmType* Type)
 {
+	if(pass_type(Type)) return false;
 	if(Type->getDecl())
 		TraverseDecl(Type->getDecl());
 	else
@@ -2288,11 +2320,12 @@ bool DPrinter::TraverseCXXOperatorCallExpr(CXXOperatorCallExpr* Stmt)
 
 bool DPrinter::TraverseExprWithCleanups(ExprWithCleanups* Stmt)
 {
+	if(pass_stmt(Stmt)) return true;
 	TraverseStmt(Stmt->getSubExpr());
 	return true;
 }
 
-void DPrinter::TraverseCompoundStmtOrNot(Stmt* Stmt)
+void DPrinter::TraverseCompoundStmtOrNot(Stmt* Stmt)  //Impl
 {
 	if(Stmt->getStmtClass() == Stmt::StmtClass::CompoundStmtClass)
 	{
@@ -2322,6 +2355,7 @@ bool DPrinter::TraverseArraySubscriptExpr(ArraySubscriptExpr* Expr)
 
 bool DPrinter::TraverseFloatingLiteral(FloatingLiteral* Expr)
 {
+	if(pass_stmt(Expr)) return true;
 	const llvm::fltSemantics& sem = Expr->getSemantics();
 	llvm::SmallString<1000> str;
 	if(APFloat::semanticsSizeInBits(sem) < 64)
@@ -2421,6 +2455,7 @@ bool DPrinter::TraverseCXXFunctionalCastExpr(CXXFunctionalCastExpr* Stmt)
 
 bool DPrinter::TraverseParenType(ParenType* Type)
 {
+	if(pass_type(Type)) return false;
 	// Parenthesis are useless (and illegal) on function types
 	PrintType(Type->getInnerType());
 	return true;
@@ -2428,6 +2463,7 @@ bool DPrinter::TraverseParenType(ParenType* Type)
 
 bool DPrinter::TraverseFunctionProtoType(FunctionProtoType* Type)
 {
+	if(pass_type(Type)) return false;
 	PrintType(Type->getReturnType());
 	out() << " function(";
 	Spliter spliter(", ");
@@ -2460,6 +2496,7 @@ bool DPrinter::TraverseNullStmt(NullStmt* Stmt)
 
 bool DPrinter::TraverseCharacterLiteral(CharacterLiteral* Stmt)
 {
+	if(pass_stmt(Stmt)) return true;
 	out() << '\'';
 	int c = Stmt->getValue();
 	switch(c)
@@ -2476,6 +2513,7 @@ bool DPrinter::TraverseCharacterLiteral(CharacterLiteral* Stmt)
 
 bool DPrinter::TraverseStringLiteral(StringLiteral* Stmt)
 {
+	if(pass_stmt(Stmt)) return true;
 	out() << "\"";
 	std::string literal;
 	auto str = Stmt->getString();
@@ -2776,6 +2814,7 @@ bool DPrinter::TraverseCStyleCastExpr(CStyleCastExpr* Stmt)
 
 bool DPrinter::TraverseConditionalOperator(ConditionalOperator* op)
 {
+	if(pass_stmt(op)) return true;
 	TraverseStmt(op->getCond());
 	out() << "? ";
 	TraverseStmt(op->getTrueExpr());
@@ -2786,12 +2825,14 @@ bool DPrinter::TraverseConditionalOperator(ConditionalOperator* op)
 
 bool DPrinter::TraverseCompoundAssignOperator(CompoundAssignOperator* op)
 {
+	if(pass_stmt(op)) return true;
 	DPrinter::TraverseBinaryOperator(op);
 	return true;
 }
 
 bool DPrinter::TraverseBinAddAssign(CompoundAssignOperator* expr)
 {
+	if(pass_stmt(expr)) return true;
 	if(expr->getLHS()->getType()->isPointerType())
 	{
 		TraverseStmt(expr->getLHS());
@@ -2808,7 +2849,7 @@ bool DPrinter::TraverseBinAddAssign(CompoundAssignOperator* expr)
 
 #define OPERATOR(NAME)                                        \
 	bool DPrinter::TraverseBin##NAME##Assign(CompoundAssignOperator *S) \
-	{return TraverseCompoundAssignOperator(S);}
+	{if (pass_stmt(S)) return true; return TraverseCompoundAssignOperator(S);}
 OPERATOR(Mul) OPERATOR(Div) OPERATOR(Rem) OPERATOR(Sub)
 OPERATOR(Shl) OPERATOR(Shr) OPERATOR(And) OPERATOR(Or) OPERATOR(Xor)
 #undef OPERATOR
@@ -2823,6 +2864,7 @@ bool DPrinter::TraverseSubstNonTypeTemplateParmExpr(SubstNonTypeTemplateParmExpr
 
 bool DPrinter::TraverseBinaryOperator(BinaryOperator* Stmt)
 {
+	if(pass_stmt(Stmt)) return true;
 	Expr* lhs = Stmt->getLHS();
 	Expr* rhs = Stmt->getRHS();
 	Type const* typeL = lhs->getType().getTypePtr();
@@ -2849,6 +2891,7 @@ bool DPrinter::TraverseBinaryOperator(BinaryOperator* Stmt)
 
 bool DPrinter::TraverseBinAdd(BinaryOperator* expr)
 {
+	if(pass_stmt(expr)) return true;
 	if(expr->getLHS()->getType()->isPointerType())
 	{
 		TraverseStmt(expr->getLHS());
@@ -2862,7 +2905,8 @@ bool DPrinter::TraverseBinAdd(BinaryOperator* expr)
 }
 
 #define OPERATOR(NAME) \
-	bool DPrinter::TraverseBin##NAME(BinaryOperator* Stmt) {return TraverseBinaryOperator(Stmt);}
+	bool DPrinter::TraverseBin##NAME(BinaryOperator* Stmt) \
+	{if (pass_stmt(Stmt)) return true; return TraverseBinaryOperator(Stmt);}
 OPERATOR(PtrMemD) OPERATOR(PtrMemI) OPERATOR(Mul) OPERATOR(Div)
 OPERATOR(Rem) OPERATOR(Sub) OPERATOR(Shl) OPERATOR(Shr)
 OPERATOR(LT) OPERATOR(GT) OPERATOR(LE) OPERATOR(GE) OPERATOR(EQ)
@@ -2872,6 +2916,7 @@ OPERATOR(LOr) OPERATOR(Assign) OPERATOR(Comma)
 
 bool DPrinter::TraverseUnaryOperator(UnaryOperator* Stmt)
 {
+	if(pass_stmt(Stmt)) return true;
 	if(Stmt->isIncrementOp())
 	{
 		if(Stmt->getSubExpr()->getType()->isPointerType())
@@ -2937,7 +2982,8 @@ bool DPrinter::TraverseUnaryOperator(UnaryOperator* Stmt)
 	return true;
 }
 #define OPERATOR(NAME) \
-	bool DPrinter::TraverseUnary##NAME(UnaryOperator* Stmt) {return TraverseUnaryOperator(Stmt);}
+	bool DPrinter::TraverseUnary##NAME(UnaryOperator* Stmt) \
+	{if (pass_stmt(Stmt)) return true; return TraverseUnaryOperator(Stmt);}
 OPERATOR(PostInc) OPERATOR(PostDec) OPERATOR(PreInc) OPERATOR(PreDec)
 OPERATOR(AddrOf) OPERATOR(Deref) OPERATOR(Plus) OPERATOR(Minus)
 OPERATOR(Not) OPERATOR(LNot) OPERATOR(Real) OPERATOR(Imag)
@@ -2947,6 +2993,7 @@ OPERATOR(Extension) OPERATOR(Coawait)
 template<typename TDeclRefExpr>
 bool DPrinter::TraverseDeclRefExprImpl(TDeclRefExpr* Expr)
 {
+	if(pass_stmt(Expr)) return true;
 	unsigned const argNum = Expr->getNumTemplateArgs();
 	if(argNum != 0)
 	{
@@ -2999,6 +3046,7 @@ bool DPrinter::TraverseDependentScopeDeclRefExpr(DependentScopeDeclRefExpr* expr
 
 bool DPrinter::TraverseRecordType(RecordType* Type)
 {
+	if(pass_type(Type)) return false;
 	out() << mangleType(Type->getDecl());
 	RecordDecl* decl = Type->getDecl();
 	switch(decl->getKind())
@@ -3028,6 +3076,7 @@ bool DPrinter::TraverseRecordType(RecordType* Type)
 
 bool DPrinter::TraverseConstantArrayType(ConstantArrayType* Type)
 {
+	if(pass_type(Type)) return false;
 	PrintType(Type->getElementType());
 	out() << '[' << Type->getSize().toString(10, false) << ']';
 	return true;
@@ -3035,6 +3084,7 @@ bool DPrinter::TraverseConstantArrayType(ConstantArrayType* Type)
 
 bool DPrinter::TraverseIncompleteArrayType(IncompleteArrayType* Type)
 {
+	if(pass_type(Type)) return false;
 	PrintType(Type->getElementType());
 	out() << "[]";
 	return true;
@@ -3205,6 +3255,7 @@ void DPrinter::TraverseVarDeclImpl(VarDecl* Decl)
 
 bool DPrinter::TraverseVarDecl(VarDecl* Decl)
 {
+	if(pass_decl(Decl)) return true;
 	TraverseVarDeclImpl(Decl);
 	return true;
 }

@@ -61,3 +61,5 @@ void check_range_based_for_loop();
 void check_overloaded_operator();
 
 void check_extern_overloaded_operator();
+
+void check_lib_porting_pair();

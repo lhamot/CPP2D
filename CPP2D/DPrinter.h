@@ -100,10 +100,6 @@ public:
 
 	bool TraverseCXXTryStmt(clang::CXXTryStmt* Stmt);
 
-	bool pass_decl(clang::Decl* decl);
-
-	bool pass_stmt(clang::Stmt* stmt);
-
 	bool TraverseNamespaceDecl(clang::NamespaceDecl* Decl);
 
 	bool TraverseCXXCatchStmt(clang::CXXCatchStmt* Stmt);
@@ -422,6 +418,11 @@ public:
 	void addExternInclude(std::string include);
 
 private:
+	bool pass_decl(clang::Decl* decl);
+
+	bool pass_stmt(clang::Stmt* stmt);
+
+	bool pass_type(clang::Type* type);
 
 	const char* getFile(clang::Stmt const* d);
 
