@@ -1656,7 +1656,10 @@ void check_union()
 			double d;
 			bool b;
 		};
-	} foo;
+		Foo(bool b2) : b(b2) {}
+
+	} foo(true);
+	CHECK(foo.b == true);
 	foo.i = 45;
 	CHECK(foo.i == 45);
 	foo.d = 6.66;

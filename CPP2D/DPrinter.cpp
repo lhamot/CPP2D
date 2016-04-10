@@ -1435,16 +1435,18 @@ void DPrinter::PrintType(QualType const& type)
 
 bool DPrinter::TraverseConstructorInitializer(CXXCtorInitializer* Init)
 {
-	if(Init->getMember())
-		out() << mangleName(Init->getMember()->getNameAsString());
-	if(TypeSourceInfo* TInfo = Init->getTypeSourceInfo())
-		PrintType(TInfo->getType());
-	out() << " = ";
-	TraverseStmt(Init->getInit());
-
-	if(Init->getNumArrayIndices() && getDerived().shouldVisitImplicitCode())
-		for(VarDecl* VD : Init->getArrayIndexes())
-			TraverseDecl(VD);
+	if(Init->isAnyMemberInitializer())
+	{
+		out() << Init->getAnyMember()->getNameAsString();
+		out() << " = ";
+		TraverseStmt(Init->getInit());
+	}
+	else
+	{
+		out() << "super(";
+		TraverseStmt(Init->getInit());
+		out() << ")";
+	}
 	return true;
 }
 
