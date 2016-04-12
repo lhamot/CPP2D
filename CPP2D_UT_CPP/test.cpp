@@ -448,8 +448,7 @@ void check_decayed_type()
 template <typename T> struct InjectedClassNameType
 {
 public:
-	InjectedClassNameType():data(2) {  }
-	T data;
+	T data = 2;
 	InjectedClassNameType const& toto(InjectedClassNameType const* a)
 	{
 		return *a;
@@ -634,7 +633,7 @@ struct TmplMethstruct
 {
 	int a = I;
 
-	TmplMethstruct() :a(I) {}
+	TmplMethstruct() = default;
 
 	template<int I2>
 	TmplMethstruct(TmplMethstruct<I2> const&) : a(I2) {}
@@ -1664,4 +1663,66 @@ void check_union()
 	CHECK(foo.i == 45);
 	foo.d = 6.66;
 	CHECK(foo.d == 6.66);
+}
+template<typename F, typename A>
+auto call_func(F f, A v) //->decltype(F())
+{
+	return f(v);
+}
+
+void check_lambda()
+{
+	auto give_1 = []() {return 1; };
+	CHECK(give_1() == 1);
+
+	auto give_x = [](int x) {return x; };
+	CHECK(give_x(1) == 1);
+	CHECK(call_func(give_x, 2) == 2);
+	CHECK(call_func([](int x) {return x; }, 3) == 3);
+
+	auto give_tx = [](auto x) {return x; };
+	CHECK(give_tx(1) == 1);
+	CHECK(call_func(give_tx, -12) == -12);
+	CHECK(call_func([](auto x) {return x; }, 6.66) == 6.66);
+
+	auto to_1 = [](int& x) {x = 1; };
+	int x;
+	to_1(x);
+	CHECK(x == 1);
+
+	auto ext_to_2 = [&x]() {x = 2; };
+	ext_to_2();
+	CHECK(x == 2);
+
+	auto give_x_or_y = [](bool s, int x, int y) -> int {if (s) return x; else return y; };
+	CHECK(give_x(1) == 1);
+
+	auto give_tx_plus_ty = [](auto x, auto y) {return x + y; };
+	CHECK(give_tx_plus_ty(1, 3.33) == 4.33);
+}
+
+struct StructWithDefCtor
+{
+	int i = 42;
+};
+
+struct StructWithoutDefCtor
+{
+	int i = 42;
+
+	StructWithoutDefCtor(int = 0)
+	{
+		i = 2;
+	}
+};
+
+void check_struct_default_ctor()
+{
+	StructWithDefCtor foo;
+	CHECK(foo.i == 42);
+	CHECK(StructWithDefCtor().i == 42);
+
+	StructWithoutDefCtor foo2;
+	CHECK(foo2.i == 2);
+	CHECK(StructWithoutDefCtor().i == 2);
 }

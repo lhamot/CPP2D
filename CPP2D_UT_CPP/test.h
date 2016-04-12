@@ -65,3 +65,8 @@ void check_extern_overloaded_operator();
 void check_lib_porting_pair();
 
 void check_union();
+
+void check_lambda();
+
+void check_struct_default_ctor();
+

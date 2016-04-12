@@ -1212,6 +1212,7 @@ bool DPrinter::TraversePredefinedExpr(PredefinedExpr* expr)
 bool DPrinter::TraverseCXXDefaultArgExpr(CXXDefaultArgExpr* expr)
 {
 	if(pass_stmt(expr)) return true;
+	TraverseStmt(expr->getExpr());
 	return true;
 }
 
@@ -1388,13 +1389,14 @@ void DPrinter::PrintCXXConstructExprParams(CXXConstructExpr* Init)
 	PrintType(Init->getType());
 	out() << '(';
 	Spliter spliter(", ");
+	size_t counter = 0;
 	for(auto arg : Init->arguments())
 	{
-		if(arg->getStmtClass() != Stmt::StmtClass::CXXDefaultArgExprClass)
-		{
-			spliter.split();
-			TraverseStmt(arg);
-		}
+		if(arg->getStmtClass() == Stmt::StmtClass::CXXDefaultArgExprClass && (counter != 0))
+			break;
+		spliter.split();
+		TraverseStmt(arg);
+		++counter;
 	}
 	out() << ')';
 }
@@ -1403,13 +1405,15 @@ bool DPrinter::TraverseCXXConstructExpr(CXXConstructExpr* Init)
 {
 	if(pass_stmt(Init)) return true;
 	Spliter spliter(", ");
+	size_t count = 0;
 	for(unsigned i = 0, e = Init->getNumArgs(); i != e; ++i)
 	{
-		if(isa<CXXDefaultArgExpr>(Init->getArg(i)))
+		if(isa<CXXDefaultArgExpr>(Init->getArg(i)) && (count != 0))
 			break; // Don't print any defaulted arguments
 
 		spliter.split();
 		TraverseStmt(Init->getArg(i));
+		++count;
 	}
 
 	return true;
@@ -1653,7 +1657,15 @@ bool DPrinter::printFuncBegin(CXXConstructorDecl* Decl,
 {
 	auto record = Decl->getParent();
 	if(record->isStruct() && Decl->getNumParams() == 0)
+	{
+		if(Decl->isDefaulted() == false)
+		{
+			llvm::errs() << "error : " << Decl->getNameAsString() << " struct has an explicit default ctor.\n";
+			llvm::errs() << "\tThis is illegal in D language.\n";
+			llvm::errs() << "\tRemove it, default it or replace it by a factory method.\n";
+		}
 		return false; //If default struct ctor : don't print
+	}
 	out() << "this";
 	return true;
 }
@@ -1937,7 +1949,11 @@ bool DPrinter::TraverseBuiltinType(BuiltinType* Type)
 DPrinter::Semantic DPrinter::getSemantic(QualType qt)
 {
 	Type const* type = qt.getTypePtr();
-	return type->isClassType() || type->isFunctionType() ? Reference : Value;
+	Type::TypeClass const cla = type->getTypeClass();
+	return
+	  cla == Type::TypeClass::Auto ? Value :
+	  (type->isClassType() || type->isFunctionType()) ? Reference :
+	  Value;
 }
 
 template<typename PType>
@@ -2180,6 +2196,8 @@ bool DPrinter::TraverseTemplateTypeParmDecl(TemplateTypeParmDecl* Decl)
 		else
 			out() << identifier->getName().str();
 	}
+	// A template type without name is a auto param of a lambda
+	// Add "else" to handle it
 	return true;
 }
 
@@ -2489,7 +2507,10 @@ bool DPrinter::TraverseFunctionProtoType(FunctionProtoType* Type)
 bool DPrinter::TraverseCXXTemporaryObjectExpr(CXXTemporaryObjectExpr* Stmt)
 {
 	if(pass_stmt(Stmt)) return true;
+	PrintType(Stmt->getType());
+	out() << '(';
 	TraverseCXXConstructExpr(Stmt);
+	out() << ')';
 	return true;
 }
 
@@ -2604,55 +2625,68 @@ bool DPrinter::TraverseEmptyDecl(EmptyDecl* Decl)
 	return true;
 }
 
-bool DPrinter::TraverseLambdaExpr(LambdaExpr* S)
+
+bool DPrinter::TraverseLambdaExpr(LambdaExpr* Node)
 {
-	if(pass_stmt(S)) return true;
-	TypeLoc TL = S->getCallOperator()->getTypeSourceInfo()->getTypeLoc();
-	FunctionProtoTypeLoc Proto = TL.castAs<FunctionProtoTypeLoc>();
+	if(pass_stmt(Node)) return true;
+	CXXMethodDecl* Method = Node->getCallOperator();
 
-	if(S->hasExplicitParameters() && S->hasExplicitResultType())
+	// Has some auto type?
+	bool hasAuto = false;
+	if(Node->hasExplicitParameters())
 	{
-		out() << '(';
-		// Visit the whole type.
-		TraverseTypeLoc(TL);
-		out() << ')' << std::endl;
-	}
-	else
-	{
-		if(S->hasExplicitParameters())
+		for(ParmVarDecl* P : Method->params())
 		{
-			Spliter spliter2(", ");
-			out() << '(';
-			refAccepted = true;
-			inFuncArgs = true;
-			// Visit parameters.
-			for(unsigned I = 0, N = Proto.getNumParams(); I != N; ++I)
+			if(P->getType()->getTypeClass() == Type::TypeClass::TemplateTypeParm)
 			{
-				spliter2.split();
-				TraverseDecl(Proto.getParam(I));
+				hasAuto = true;
+				break;
 			}
-			refAccepted = false;
-			inFuncArgs = false;
-			out() << ')' << std::endl;
 		}
-		else if(S->hasExplicitResultType())
-		{
-			TraverseTypeLoc(Proto.getReturnLoc());
-		}
-
-		auto* T = Proto.getTypePtr();
-		for(const auto& E : T->exceptions())
-		{
-			TraverseType(E);
-		}
-
-		//if (Expr *NE = T->getNoexceptExpr())
-		//	TRY_TO_TRAVERSE_OR_ENQUEUE_STMT(NE);
 	}
-	out() << indent_str();
-	TraverseStmt(S->getBody());
+
+	if(hasAuto)
+	{
+		extern_includes.insert("cpp_std");
+		out() << "toFunctor!(";
+	}
+
+	const FunctionProtoType* Proto = Method->getType()->getAs<FunctionProtoType>();
+
+	if(Node->hasExplicitResultType())
+	{
+		out() << "function ";
+		PrintType(Proto->getReturnType());
+	}
+
+	if(Node->hasExplicitParameters())
+	{
+		out() << "(";
+		inFuncArgs = true;
+		refAccepted = true;
+		Spliter split(", ");
+		for(ParmVarDecl* P : Method->params())
+		{
+			split.split();
+			TraverseDecl(P);
+		}
+		if(Method->isVariadic())
+		{
+			split.split();
+			out() << "...";
+		}
+		out() << ')';
+		inFuncArgs = false;
+		refAccepted = false;
+	}
+
+	// Print the body.
+	out() << "\n" << indent_str();
+	CompoundStmt* Body = Node->getBody();
+	TraverseStmt(Body);
+	if(hasAuto)
+		out() << ")()";
 	return true;
-	//return TRAVERSE_STMT_BASE(LambdaBody, LambdaExpr, S, Queue);
 }
 
 bool DPrinter::TraverseCallExpr(CallExpr* Stmt)

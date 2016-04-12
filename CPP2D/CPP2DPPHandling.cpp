@@ -249,8 +249,6 @@ void CPP2DPPHandling::TransformMacroExpr(
 		new_macro << "()";
 	new_macro << "), " + expand_macro(MI) + "))\n";
 
-	errs() << new_macro.str();
-
 	inject_macro(MD, name, new_macro.str());
 }
 
@@ -281,8 +279,6 @@ void CPP2DPPHandling::TransformMacroStmt(
 
 	new_macro << expand_macro(MI) << "\\\n";
 	new_macro << "int CPP2D_ADD(CPP2D_MACRO_STMT_END, __COUNTER__);";
-
-	errs() << new_macro.str();
 
 	inject_macro(MD, name, new_macro.str());
 }

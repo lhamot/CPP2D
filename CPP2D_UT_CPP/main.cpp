@@ -67,6 +67,10 @@ int main()
 
 	check_union();
 
+	check_lambda();
+
+	check_struct_default_ctor();
+
 	print_results();
 
 	return 0;
