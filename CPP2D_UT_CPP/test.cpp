@@ -3,6 +3,7 @@
 #include <cstdarg>
 #include <cstdio>
 #include <utility>
+#include <stdexcept>
 
 #define CHECK(COND) check(COND, #COND, __LINE__) //if(!(COND)) error(#COND)
 
@@ -1664,6 +1665,7 @@ void check_union()
 	foo.d = 6.66;
 	CHECK(foo.d == 6.66);
 }
+
 template<typename F, typename A>
 auto call_func(F f, A v) //->decltype(F())
 {
@@ -1725,4 +1727,143 @@ void check_struct_default_ctor()
 	StructWithoutDefCtor foo2;
 	CHECK(foo2.i == 2);
 	CHECK(StructWithoutDefCtor().i == 2);
+}
+
+struct Struct781
+{
+	int i = 0;
+	Struct781() = default;
+	Struct781(int u):i(u) {};
+};
+
+struct Struct782
+{
+	Struct781 toto;
+
+	Struct782() = default;
+	Struct782(int i) : toto(i){};
+};
+
+int take_struct(Struct781 const& s)
+{
+	return s.i;
+}
+
+void check_struct_ctor_call()
+{
+	Struct782 tutu;
+	CHECK(tutu.toto.i == 0);
+	Struct782 tutu2(5);
+	CHECK(tutu2.toto.i == 5);
+	Struct782 tutu3 = 6;
+	CHECK(tutu3.toto.i == 6);
+	CHECK(take_struct(Struct781(57)) == 57);
+}
+
+
+class Class781
+{
+public:
+	int i = 0;
+	Class781() {};
+	Class781(int u):i(u) {};
+};
+
+class Class782
+{
+public:
+	Class781 toto;
+	Class781* toto2;
+
+	//Class782():toto2(new Class781()) {};
+	Class782() = default;
+	Class782(int i) : toto(i), toto2(new Class781(i)) {};
+};
+
+Class781 const& take_class(Class781 const& s)
+{
+	return s;
+}
+
+Class781* take_class(Class781* s)
+{
+	return s;
+}
+
+void check_class_ctor_call()
+{
+	Class782 tutu;
+	CHECK(tutu.toto.i == 0);
+	Class782 tutu2(5);
+	CHECK(tutu2.toto.i == 5);
+	Class782 tutu3 = 6;
+	CHECK(tutu3.toto.i == 6);
+	CHECK(take_class(Class781(57)).i == 57);
+
+	Class782* tutu4 = new Class782();
+	CHECK(tutu4->toto.i == 0);
+	delete tutu4;
+	Class782* tutu5 = new Class782(5);
+	CHECK(tutu5->toto.i == 5);
+	delete tutu5;
+	CHECK(take_class(Class781(57)).i == 57);
+
+	Class781* tutu6 = take_class(new Class781(58));
+	CHECK(tutu6->i == 58);
+	delete tutu6;
+}
+
+void func_throw_except()
+{
+	throw std::runtime_error("error test");
+}
+/*
+void func_throw_except(std::runtime_error const& ex)
+{
+
+}
+*/
+void check_exception()
+{
+	bool catched = false;
+	try
+	{
+		//func_throw_except(std::runtime_error("toto"));
+		func_throw_except();
+	}
+	catch (std::logic_error&)
+	{
+
+	}
+	catch (std::runtime_error& ex)
+	{
+		CHECK(cmp_string(ex.what(), "error test"));
+		catched = true;
+	}
+	catch (std::exception&)
+	{
+
+	}
+	CHECK(catched);
+}
+
+void check_exception2()
+try
+{
+	//func_throw_except(std::runtime_error("toto"));
+	func_throw_except();
+	CHECK(false);
+}
+catch (std::logic_error&)
+{
+	CHECK(false);
+}
+catch (std::runtime_error& ex)
+{
+	CHECK(cmp_string(ex.what(), "error test"));
+}
+catch (std::exception&)
+{
+	CHECK(false);
+
 }

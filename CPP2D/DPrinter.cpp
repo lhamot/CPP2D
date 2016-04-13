@@ -59,8 +59,6 @@ static std::map<std::string, std::string> type2type =
 	{ "boost::optional", "std.typecons.Nullable" },
 	{ "std::vector", "cpp_std.vector" },
 	{ "std::set", "std.container.rbtree.RedBlackTree" },
-	{ "std::logic_error", "object.error" },
-	{ "std::runtime_error", "object.Exception" },
 	{ "boost::shared_mutex", "core.sync.rwmutex.ReadWriteMutex" },
 	{ "boost::mutex", "core.sync.mutex.Mutex" },
 	{ "std::allocator", "cpp_std.allocator" },
@@ -1441,11 +1439,25 @@ bool DPrinter::TraverseConstructorInitializer(CXXCtorInitializer* Init)
 {
 	if(Init->isAnyMemberInitializer())
 	{
-		out() << Init->getAnyMember()->getNameAsString();
+		if(Init->getInit()->getStmtClass() == Stmt::StmtClass::CXXDefaultInitExprClass)
+			return true;
+
+		FieldDecl* fieldDecl = Init->getAnyMember();
+		Semantic const sem = getSemantic(fieldDecl->getType());
+		out() << fieldDecl->getNameAsString();
 		out() << " = ";
-		TraverseStmt(Init->getInit());
+		if(sem == Semantic::Value)
+			TraverseStmt(Init->getInit());
+		else
+		{
+			out() << "new ";
+			PrintType(fieldDecl->getType());
+			out() << '(';
+			TraverseStmt(Init->getInit());
+			out() << ')';
+		}
 	}
-	else
+	else if(Init->isWritten())
 	{
 		out() << "super(";
 		TraverseStmt(Init->getInit());
@@ -1461,12 +1473,15 @@ void DPrinter::startCtorBody(CXXConstructorDecl* Decl)
 	auto ctor_init_count = Decl->getNumCtorInitializers();
 	if(ctor_init_count != 0)
 	{
-		for(auto init : Decl->inits())
+		for(CXXCtorInitializer* init : Decl->inits())
 		{
-			if(init->isWritten())
+			pushStream();
+			TraverseConstructorInitializer(init);
+			std::string const initStr = popStream();
+			if(initStr.empty() == false)
 			{
 				out() << std::endl << indent_str();
-				TraverseConstructorInitializer(init);
+				out() << initStr;
 				out() << ";";
 			}
 		}
@@ -2469,7 +2484,10 @@ bool DPrinter::TraverseMaterializeTemporaryExpr(MaterializeTemporaryExpr* Stmt)
 bool DPrinter::TraverseCXXFunctionalCastExpr(CXXFunctionalCastExpr* Stmt)
 {
 	if(pass_stmt(Stmt)) return true;
-	PrintType(Stmt->getTypeInfoAsWritten()->getType());
+	QualType qt = Stmt->getTypeInfoAsWritten()->getType();
+	if(getSemantic(qt) == Semantic::Reference)
+		out() << "new ";
+	PrintType(qt);
 	out() << '(';
 	TraverseStmt(Stmt->getSubExpr());
 	out() << ')';
@@ -2689,6 +2707,20 @@ bool DPrinter::TraverseLambdaExpr(LambdaExpr* Node)
 	return true;
 }
 
+void DPrinter::printCallExprArgument(CallExpr* Stmt)
+{
+	out() << "(";
+	Spliter spliter(", ");
+	for(Expr* arg : Stmt->arguments())
+	{
+		if(arg->getStmtClass() == Stmt::StmtClass::CXXDefaultArgExprClass)
+			break;
+		spliter.split();
+		TraverseStmt(arg);
+	}
+	out() << ")";
+}
+
 bool DPrinter::TraverseCallExpr(CallExpr* Stmt)
 {
 	if(pass_stmt(Stmt)) return true;
@@ -2699,17 +2731,7 @@ bool DPrinter::TraverseCallExpr(CallExpr* Stmt)
 	// Are parentezis on zero argument needed?
 	//if (Stmt->getNumArgs() == 0)
 	//	return true;
-	out() << "(";
-	Spliter spliter(", ");
-	for(Expr* c : Stmt->arguments())
-	{
-		if(c->getStmtClass() != Stmt::StmtClass::CXXDefaultArgExprClass)
-		{
-			spliter.split();
-			TraverseStmt(c);
-		}
-	}
-	out() << ")";// << std::endl;
+	printCallExprArgument(Stmt);
 	return true;
 }
 
@@ -2818,17 +2840,7 @@ bool DPrinter::TraverseCXXMemberCallExpr(CXXMemberCallExpr* Stmt)
 {
 	if(pass_stmt(Stmt)) return true;
 	TraverseStmt(Stmt->getCallee());
-	out() << '(';
-	Spliter spliter(", ");
-	for(auto c : Stmt->arguments())
-	{
-		if(c->getStmtClass() != Stmt::StmtClass::CXXDefaultArgExprClass)
-		{
-			spliter.split();
-			TraverseStmt(c);
-		}
-	}
-	out() << ')';
+	printCallExprArgument(Stmt);
 	return true;
 }
 

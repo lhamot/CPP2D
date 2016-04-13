@@ -11,7 +11,17 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 	using namespace clang::ast_matchers;
 	MatchFinder finder;
 
+	// Some debug bind slot
+	on_stmt_match.emplace("dump", [this](Stmt const * d) {d->dump(); });
+	on_type_match.emplace("dump", [this](Type const * d) {d->dump(); });
+	on_decl_match.emplace("dump", [this](Decl const * d) {d->dump(); });
+	on_decl_match.emplace("print_name", [this](Decl const * d)
+	{
+		if(auto* nd = dyn_cast<NamedDecl>(d))
+			llvm::errs() << nd->getNameAsString() << "\n";
+	});
 
+	// std::hash
 	DeclarationMatcher hash_trait =
 	  namespaceDecl(
 	    allOf(
@@ -28,7 +38,7 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 	    )
 	  );
 	finder.addMatcher(hash_trait, this);
-	declPrinters.emplace("dont_print_this_decl", [this](DPrinter&, Decl const*) {});
+	declPrinters.emplace("dont_print_this_decl", [this](DPrinter&, Decl*) {});
 	on_decl_match.emplace("hash_method", [this](Decl const * d)
 	{
 		if(auto* methDecl = dyn_cast<CXXMethodDecl>(d))
@@ -43,13 +53,14 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 		}
 	});
 
+	//free operators
 	DeclarationMatcher out_stream_op =
 	  functionDecl(
 	    unless(hasDeclContext(recordDecl())),
 	    matchesName("operator[\\+-\\*\\^\\[\\(\\!\\&\\|\\~\\=\\/\\%\\<\\>]")
 	  ).bind("free_operator");
 	finder.addMatcher(out_stream_op, this);
-	declPrinters.emplace("free_operator", [this](DPrinter&, Decl const*) {});
+	declPrinters.emplace("free_operator", [this](DPrinter&, Decl*) {});
 	on_decl_match.emplace("free_operator", [this](Decl const * d)
 	{
 		if(auto* funcDecl = dyn_cast<FunctionDecl>(d))
@@ -78,7 +89,7 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 
 	// printf
 	finder.addMatcher(declRefExpr(hasDeclaration(functionDecl(hasName("::printf")))).bind("printf"), this);
-	stmtPrinters.emplace("printf", [this](DPrinter & printer, Stmt const*)
+	stmtPrinters.emplace("printf", [this](DPrinter & printer, Stmt*)
 	{
 		printer.addExternInclude("std.stdio");
 		printer.stream() << "writef";
@@ -86,7 +97,7 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 
 	// pair
 	finder.addMatcher(templateSpecializationType(hasDeclaration(namedDecl(hasName("std::pair")))).bind("std::pair"), this);
-	typePrinters.emplace("std::pair", [this](DPrinter & printer, Type const * Type)
+	typePrinters.emplace("std::pair", [this](DPrinter & printer, Type * Type)
 	{
 		auto* TSType = dyn_cast<TemplateSpecializationType>(Type);
 		printer.addExternInclude("std.typecons");
@@ -97,6 +108,30 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 		printer.stream() << ", \"second\")";
 	});
 
+	// std::exception
+	finder.addMatcher(recordType(hasDeclaration(namedDecl(hasName("std::exception")))).bind("std::exception"), this);
+	typePrinters.emplace("std::exception", [this](DPrinter & pr, Type*) {pr.stream() << "Throwable";});
+
+	finder.addMatcher(recordType(hasDeclaration(namedDecl(hasName("std::logic_error")))).bind("std::logic_error"), this);
+	typePrinters.emplace("std::logic_error", [this](DPrinter & pr, Type*) {pr.stream() << "Error";});
+
+	finder.addMatcher(recordType(hasDeclaration(namedDecl(hasName("std::runtime_error")))).bind("std::runtime_error"), this);
+	typePrinters.emplace("std::runtime_error", [this](DPrinter & pr, Type*) {pr.stream() << "Exception";});
+
+	finder.addMatcher(cxxMemberCallExpr(thisPointerType(namedDecl(hasName("std::exception")))).bind("std::runtime_error::what"), this); //namedDecl(hasName("std::runtime_error"))
+	stmtPrinters.emplace("std::runtime_error::what", [this](DPrinter & pr, Stmt * s)
+	{
+		if(auto* memCall = dyn_cast<CXXMemberCallExpr>(s))
+		{
+			if(auto* memExpr = dyn_cast<MemberExpr>(memCall->getCallee()))
+			{
+				Expr* base = memExpr->isImplicitAccess() ? nullptr : memExpr->getBase();
+				pr.TraverseStmt(base);
+				pr.stream() << ".";
+				pr.stream() << "msg";
+			}
+		}
+	});
 
 	return finder;
 }
@@ -139,7 +174,7 @@ void MatchContainer::run(const ast_matchers::MatchFinder::MatchResult& Result)
 }
 
 
-std::function<void(DPrinter& printer, clang::Stmt const*)> MatchContainer::getPrinter(clang::Stmt const* node) const
+std::function<void(DPrinter& printer, clang::Stmt*)> MatchContainer::getPrinter(clang::Stmt const* node) const
 {
 	auto iter_pair = stmtTags.equal_range(node);
 	if(iter_pair.first != iter_pair.second)
@@ -152,7 +187,7 @@ std::function<void(DPrinter& printer, clang::Stmt const*)> MatchContainer::getPr
 	return std::function<void(DPrinter& printer, clang::Stmt const*)>();
 }
 
-std::function<void(DPrinter& printer, clang::Decl const*)> MatchContainer::getPrinter(clang::Decl const* node) const
+std::function<void(DPrinter& printer, clang::Decl*)> MatchContainer::getPrinter(clang::Decl const* node) const
 {
 	auto iter_pair = declTags.equal_range(node);
 	if(iter_pair.first != iter_pair.second)
@@ -165,7 +200,7 @@ std::function<void(DPrinter& printer, clang::Decl const*)> MatchContainer::getPr
 	return std::function<void(DPrinter& printer, clang::Decl const*)>();
 }
 
-std::function<void(DPrinter& printer, clang::Type const*)> MatchContainer::getPrinter(clang::Type const* node) const
+std::function<void(DPrinter& printer, clang::Type*)> MatchContainer::getPrinter(clang::Type const* node) const
 {
 	auto iter_pair = typeTags.equal_range(node);
 	if(iter_pair.first != iter_pair.second)

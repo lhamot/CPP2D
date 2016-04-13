@@ -70,3 +70,11 @@ void check_lambda();
 
 void check_struct_default_ctor();
 
+void check_struct_ctor_call();
+
+void check_class_ctor_call();
+
+void check_exception();
+
+void check_exception2();
+

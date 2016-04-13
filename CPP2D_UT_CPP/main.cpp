@@ -71,6 +71,14 @@ int main()
 
 	check_struct_default_ctor();
 
+	check_struct_ctor_call();
+
+	check_class_ctor_call();
+
+	check_exception();
+
+	check_exception2();
+
 	print_results();
 
 	return 0;

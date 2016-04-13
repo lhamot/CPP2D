@@ -417,6 +417,8 @@ public:
 
 	void addExternInclude(std::string include);
 
+	void printCallExprArgument(clang::CallExpr* Stmt);
+
 private:
 	bool pass_decl(clang::Decl* decl);
 
