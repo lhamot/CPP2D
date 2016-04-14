@@ -106,22 +106,14 @@ static const std::set<Stmt::StmtClass> noSemiCommaStmtKind =
 	Stmt::StmtClass::CompoundStmtClass,
 	Stmt::StmtClass::CXXCatchStmtClass,
 	Stmt::StmtClass::CXXTryStmtClass,
+	Stmt::StmtClass::NullStmtClass,
 	//Stmt::StmtClass::DeclStmtClass,
 };
 
 bool needSemiComma(Stmt* stmt)
 {
 	auto const kind = stmt->getStmtClass();
-	if(kind == Stmt::StmtClass::DeclStmtClass)
-	{
-		auto declStmt = static_cast<DeclStmt*>(stmt);
-		if(declStmt->isSingleDecl() == false)
-			return false;
-		else
-			return noSemiCommaDeclKind.count(declStmt->getSingleDecl()->getKind()) == 0;
-	}
-	else
-		return noSemiCommaStmtKind.count(kind) == 0;
+	return noSemiCommaStmtKind.count(kind) == 0;
 }
 
 bool needSemiComma(Decl* decl)
@@ -2234,16 +2226,33 @@ bool DPrinter::TraverseDeclStmt(DeclStmt* Stmt)
 		TraverseDecl(Stmt->getSingleDecl());
 	else
 	{
-		bool first = true;
-		for(auto d : Stmt->decls())
+		if(splitMultiLineDecl)
+		{ 
+			size_t count = 0;
+			size_t const declCount = Stmt->decl_end() - Stmt->decl_begin();
+			for (auto d : Stmt->decls())
+			{
+				TraverseDecl(d);
+				++count;
+				if (count != declCount)
+					out() << ";\n" << indent_str();
+			}
+		}
+		else
 		{
-			if(first)
-				first = false;
-			else
-				out() << indent_str();
-			TraverseDecl(d);
-			out() << ";";
-			out() << std::endl;
+			Spliter split(", ");
+			for (auto d : Stmt->decls())
+			{
+				doPrintType = split.first;
+				split.split();
+				TraverseDecl(d);
+				if (isa<RecordDecl>(d))
+				{
+					out() << "\n" << indent_str();
+					split.first = true;
+				}
+				doPrintType = true;
+			}
 		}
 	}
 	return true;
@@ -2374,6 +2383,8 @@ void DPrinter::TraverseCompoundStmtOrNot(Stmt* Stmt)  //Impl
 	{
 		++indent;
 		out() << indent_str();
+		if(isa<NullStmt>(Stmt))
+			out() << "{}";
 		TraverseStmt(Stmt);
 		if(needSemiComma(Stmt))
 			out() << ";";
@@ -2418,7 +2429,9 @@ bool DPrinter::TraverseForStmt(ForStmt* Stmt)
 {
 	if(pass_stmt(Stmt)) return false;
 	out() << "for(";
+	splitMultiLineDecl = false;
 	TraverseStmt(Stmt->getInit());
+	splitMultiLineDecl = true;
 	out() << "; ";
 	TraverseStmt(Stmt->getCond());
 	out() << "; ";
@@ -3246,16 +3259,18 @@ void DPrinter::TraverseVarDeclImpl(VarDecl* Decl)
 		return;
 	else if(Decl->getOutOfLineDefinition())
 		Decl = Decl->getOutOfLineDefinition();
-
-	if(Decl->isStaticDataMember() || Decl->isStaticLocal())
-		out() << "static ";
 	QualType varType = Decl->getType();
-	PrintType(varType);
-	out() << " ";
-	if(!Decl->isOutOfLine())
+	if(doPrintType)
 	{
-		if(auto qualifier = Decl->getQualifier())
-			TraverseNestedNameSpecifier(qualifier);
+		if(Decl->isStaticDataMember() || Decl->isStaticLocal())
+			out() << "static ";
+		if(!Decl->isOutOfLine())
+		{
+			if(auto qualifier = Decl->getQualifier())
+				TraverseNestedNameSpecifier(qualifier);
+		}
+		PrintType(varType);
+		out() << " ";
 	}
 	out() << mangleName(Decl->getNameAsString());
 	bool const in_foreach_decl = inForRangeInit;

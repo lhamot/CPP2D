@@ -78,3 +78,11 @@ void check_exception();
 
 void check_exception2();
 
+void check_for_loop();
+
+void check_while_loop();
+
+void check_dowhile_loop();
+
+void check_multidecl_line();
+

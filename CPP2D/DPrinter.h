@@ -449,4 +449,6 @@ private:
 	bool refAccepted = false;
 	bool inFuncArgs = false;
 	bool inForRangeInit = false;
+	bool doPrintType = true;
+	bool splitMultiLineDecl = true;
 };

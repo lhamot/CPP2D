@@ -79,6 +79,14 @@ int main()
 
 	check_exception2();
 
+	check_for_loop();
+
+	check_while_loop();
+
+	check_dowhile_loop();
+
+	check_multidecl_line();
+
 	print_results();
 
 	return 0;

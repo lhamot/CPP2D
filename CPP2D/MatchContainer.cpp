@@ -118,8 +118,8 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 	finder.addMatcher(recordType(hasDeclaration(namedDecl(hasName("std::runtime_error")))).bind("std::runtime_error"), this);
 	typePrinters.emplace("std::runtime_error", [this](DPrinter & pr, Type*) {pr.stream() << "Exception";});
 
-	finder.addMatcher(cxxMemberCallExpr(thisPointerType(namedDecl(hasName("std::exception")))).bind("std::runtime_error::what"), this); //namedDecl(hasName("std::runtime_error"))
-	stmtPrinters.emplace("std::runtime_error::what", [this](DPrinter & pr, Stmt * s)
+	finder.addMatcher(cxxMemberCallExpr(thisPointerType(namedDecl(hasName("std::exception")))).bind("std::exception::what"), this); //namedDecl(hasName("std::runtime_error"))
+	stmtPrinters.emplace("std::exception::what", [this](DPrinter & pr, Stmt * s)
 	{
 		if(auto* memCall = dyn_cast<CXXMemberCallExpr>(s))
 		{

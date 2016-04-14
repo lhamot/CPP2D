@@ -1867,3 +1867,59 @@ catch (std::exception&)
 	CHECK(false);
 
 }
+
+void check_for_loop()
+{
+	for (int x = 0, y = 3; x != y; ++x);
+	size_t count = 0;
+	for (int i = 0; i < 3; ++i)
+		++count;
+	CHECK(count == 3);
+	count = 0;
+	int i;
+	for (i = 0; i < 3; ++i)
+		++count;
+	CHECK(count == 3);
+	count = 0;
+	for (int x = 0, y = 3; x != y; ++x)
+		++count;
+	CHECK(count == 3);
+}
+
+void check_while_loop()
+{
+	int count = 3;
+	while (count != 0) --count;
+	CHECK(count == 0);
+	count = 3;
+	while (--count);
+	CHECK(count == 0);
+}
+
+void check_dowhile_loop()
+{
+	int count = 3;
+	do
+	{
+		--count;
+	}
+	while (count != 0);
+	CHECK(count == 0);
+	count = 3;
+	do
+	{
+
+	}
+	while (--count);
+	CHECK(count == 0);
+}
+
+
+void check_multidecl_line()
+{
+	int i = 2, *u = new int[18], z[12];
+	CHECK(i == 2);
+	CHECK(sizeof(z) / sizeof(int) == 12);
+	u[17] = 78;
+	CHECK(u[17] == 78);
+}
