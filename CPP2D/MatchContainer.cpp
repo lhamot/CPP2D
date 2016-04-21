@@ -110,15 +110,15 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 
 	// std::exception
 	finder.addMatcher(recordType(hasDeclaration(namedDecl(hasName("std::exception")))).bind("std::exception"), this);
-	typePrinters.emplace("std::exception", [this](DPrinter & pr, Type*) {pr.stream() << "Throwable";});
+	typePrinters.emplace("std::exception", [this](DPrinter & pr, Type*) {pr.stream() << "Throwable"; pr.addExternInclude("object"); });
 
 	finder.addMatcher(recordType(hasDeclaration(namedDecl(hasName("std::logic_error")))).bind("std::logic_error"), this);
-	typePrinters.emplace("std::logic_error", [this](DPrinter & pr, Type*) {pr.stream() << "Error";});
+	typePrinters.emplace("std::logic_error", [this](DPrinter & pr, Type*) {pr.stream() << "Error"; pr.addExternInclude("object"); });
 
 	finder.addMatcher(recordType(hasDeclaration(namedDecl(hasName("std::runtime_error")))).bind("std::runtime_error"), this);
-	typePrinters.emplace("std::runtime_error", [this](DPrinter & pr, Type*) {pr.stream() << "Exception";});
+	typePrinters.emplace("std::runtime_error", [this](DPrinter & pr, Type*) {pr.stream() << "Exception"; pr.addExternInclude("object"); });
 
-	finder.addMatcher(cxxMemberCallExpr(thisPointerType(namedDecl(hasName("std::exception")))).bind("std::exception::what"), this); //namedDecl(hasName("std::runtime_error"))
+	finder.addMatcher(cxxMemberCallExpr(thisPointerType(namedDecl(hasName("std::exception")))).bind("std::exception::what"), this);
 	stmtPrinters.emplace("std::exception::what", [this](DPrinter & pr, Stmt * s)
 	{
 		if(auto* memCall = dyn_cast<CXXMemberCallExpr>(s))
@@ -132,6 +132,148 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 			}
 		}
 	});
+
+	//********************** Containers array and vector ******************************************
+	std::string const containers = "^::(boost|std)::(vector|array|set|map|multiset|multimap"
+	                               "|unordered_set|unordered_map|unordered_multiset|unordered_multimap|queue|stack|list"
+	                               "|forcard_list)";
+
+	finder.addMatcher(templateSpecializationType(hasDeclaration(namedDecl(hasName("std::map")))).bind("std::map"), this);
+	typePrinters.emplace("std::map", [this](DPrinter & printer, Type * Type)
+	{
+		auto* TSType = dyn_cast<TemplateSpecializationType>(Type);
+		printer.addExternInclude("cpp_std");
+		printer.stream() << "cpp_std.map!(";
+		printer.PrintTemplateArgument(TSType->getArg(0));
+		printer.stream() << ", ";
+		printer.PrintTemplateArgument(TSType->getArg(1));
+		printer.stream() << ")";
+	});
+
+	finder.addMatcher(callExpr(
+	                    anyOf(
+	                      callee(functionDecl(matchesName(containers + "\\<.*\\>::size$"))),
+	                      callee(memberExpr(
+	                               member(matchesName("::size$")),
+	                               hasObjectExpression(hasType(namedDecl(matchesName(containers))))))
+	                    )
+	                  ).bind("std::vector::size"), this);
+	stmtPrinters.emplace("std::vector::size", [this](DPrinter & pr, Stmt * s)
+	{
+		if(auto* memCall = dyn_cast<CallExpr>(s))
+		{
+			if(auto* memExpr = dyn_cast<MemberExpr>(memCall->getCallee()))
+			{
+				pr.TraverseStmt(memExpr->isImplicitAccess() ? nullptr : memExpr->getBase());
+				pr.stream() << ".length";
+			}
+			else if(auto* impCast = dyn_cast<ImplicitCastExpr>(memCall->getCallee()))
+			{
+				if(auto* memExpr2 = dyn_cast<MemberExpr>(impCast->getSubExpr()))
+				{
+					pr.TraverseStmt(memExpr2->isImplicitAccess() ? nullptr : memExpr2->getBase());
+					pr.stream() << ".length";
+				}
+			}
+		}
+	});
+
+	finder.addMatcher(cxxMemberCallExpr(
+	                    anyOf(
+	                      callee(cxxMethodDecl(matchesName(containers + "\\<.*\\>::fill$"))),
+	                      callee(cxxMethodDecl(matchesName(containers + "\\<.*\\>::assign")))
+	                    )).bind("std::array::fill"), this);
+	stmtPrinters.emplace("std::array::fill", [this](DPrinter & pr, Stmt * s)
+	{
+		if(auto* memCall = dyn_cast<CXXMemberCallExpr>(s))
+		{
+			if(auto* memExpr = dyn_cast<MemberExpr>(memCall->getCallee()))
+			{
+				pr.TraverseStmt(memExpr->isImplicitAccess() ? nullptr : memExpr->getBase());
+				pr.stream() << "[] = ";
+				pr.TraverseStmt(*memCall->arg_begin());
+			}
+		}
+	});
+
+	finder.addMatcher(cxxMemberCallExpr(callee(cxxMethodDecl(matchesName(containers + "\\<.*\\>::swap$")))
+	                                   ).bind("std::vector::swap"), this);
+	stmtPrinters.emplace("std::vector::swap", [this](DPrinter & pr, Stmt * s)
+	{
+		if(auto* memCall = dyn_cast<CXXMemberCallExpr>(s))
+		{
+			if(auto* memExpr = dyn_cast<MemberExpr>(memCall->getCallee()))
+			{
+				pr.stream() << "std.algorithm.swap(";
+				pr.TraverseStmt(memExpr->isImplicitAccess() ? nullptr : memExpr->getBase());
+				pr.stream() << ", ";
+				pr.TraverseStmt(*memCall->arg_begin());
+				pr.stream() << ')';
+				pr.addExternInclude("std.algorithm");
+			}
+		}
+	});
+
+	// std::option
+	finder.addMatcher(cxxMemberCallExpr(callee(cxxMethodDecl(matchesName("^::(std|boost)::optional\\<.*\\>::operator bool")))
+	                                   ).bind("std::optional::operator bool"), this);
+	stmtPrinters.emplace("std::optional::operator bool", [this](DPrinter & pr, Stmt * s)
+	{
+		if(auto* memCall = dyn_cast<CXXMemberCallExpr>(s))
+		{
+			if(auto* memExpr = dyn_cast<MemberExpr>(memCall->getCallee()))
+			{
+				pr.stream() << '!';
+				pr.TraverseStmt(memExpr->isImplicitAccess() ? nullptr : memExpr->getBase());
+				pr.stream() << ".isNull";
+			}
+		}
+	});
+
+
+	// <utils>
+	finder.addMatcher(callExpr(callee(functionDecl(matchesName("^::std::swap$"), parameterCountIs(2)))).bind("std::swap"), this);
+	stmtPrinters.emplace("std::swap", [this](DPrinter & pr, Stmt * s)
+	{
+		if(auto* memCall = dyn_cast<CallExpr>(s))
+		{
+			pr.stream() << "std.algorithm.swap(";
+			pr.TraverseStmt(memCall->getArg(0));
+			pr.stream() << ", ";
+			pr.TraverseStmt(memCall->getArg(1));
+			pr.stream() << ")";
+			pr.addExternInclude("std.algorithm");
+		}
+	});
+
+	// <ctime>
+	finder.addMatcher(callExpr(callee(functionDecl(matchesName("^(::std)?::time$")))).bind("std::time"), this);
+	stmtPrinters.emplace("std::time", [this](DPrinter & pr, Stmt * s)
+	{
+		if(auto* memCall = dyn_cast<CallExpr>(s))
+		{
+			pr.stream() << "core.stdc.time.time(";
+			pr.TraverseStmt(memCall->getArg(0));
+			pr.stream() << ")";
+			pr.addExternInclude("core.stdc.time");
+		}
+	});
+
+	//BOOST_THROW_EXCEPTION
+	finder.addMatcher(callExpr(callee(functionDecl(matchesName("^::boost::exception_detail::throw_exception_$")))).bind("throw_exception_"), this);
+	stmtPrinters.emplace("throw_exception_", [this](DPrinter & pr, Stmt * s)
+	{
+		if(auto* memCall = dyn_cast<CallExpr>(s))
+		{
+			pr.stream() << "throw ";
+			pr.TraverseStmt(*memCall->arg_begin());
+		}
+	});
+
+	//boost::serialisation
+	finder.addMatcher(recordType(hasDeclaration(namedDecl(hasName("boost::serialization::access")))).bind("boost::serialization::access"), this);
+	typePrinters.emplace("boost::serialization::access", [this](DPrinter & pr, Type*) {pr.stream() << "int"; });
+
 
 	return finder;
 }

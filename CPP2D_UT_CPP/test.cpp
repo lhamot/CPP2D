@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <utility>
 #include <stdexcept>
+#include <array>
 
 #define CHECK(COND) check(COND, #COND, __LINE__) //if(!(COND)) error(#COND)
 
@@ -242,6 +243,29 @@ struct Toto3
 
 short Toto3::u = 36;
 
+struct MultiplArgsCtorStruct
+{
+	int a;
+	float b; //!< comment b
+	bool c;
+	MultiplArgsCtorStruct(int a_,
+		float b_,
+		bool c_ //!< comment c
+		)
+		: a(a_)
+		, b(b_)
+		, c(c_)
+	{
+	}
+};
+
+template<typename T>
+struct Toto4
+{
+	T tutu;
+	Toto4(int a) :tutu(a, 3.3f, true) {}
+};
+
 
 void check_struct()
 {
@@ -308,6 +332,17 @@ void check_struct()
 	Toto3 t5 = t3;
 	CHECK(&t5 != &t3);  // Pointer compatison
 	CHECK(t5 == t3);   //Content comparison
+
+	Toto4<MultiplArgsCtorStruct> tt4(1);
+	CHECK(tt4.tutu.b == 3.3f);
+
+	struct Toto5
+	{
+		Toto2 tutu;
+		Toto5(int a) :tutu(a, 3.3f, true) {}
+	};
+	Toto5 tt5(1);
+	CHECK(tt5.tutu.b == 3.3f);
 };
 
 // Template type
@@ -1733,7 +1768,7 @@ struct Struct781
 {
 	int i = 0;
 	Struct781() = default;
-	Struct781(int u):i(u) {};
+	Struct781(int u) :i(u) {};
 };
 
 struct Struct782
@@ -1741,7 +1776,8 @@ struct Struct782
 	Struct781 toto;
 
 	Struct782() = default;
-	Struct782(int i) : toto(i){};
+	Struct782(int i) : toto(i) {};
+	Struct782(double) {};
 };
 
 int take_struct(Struct781 const& s)
@@ -1755,6 +1791,8 @@ void check_struct_ctor_call()
 	CHECK(tutu.toto.i == 0);
 	Struct782 tutu2(5);
 	CHECK(tutu2.toto.i == 5);
+	Struct782 tutu22(5.5);
+	CHECK(tutu22.toto.i == 0);
 	Struct782 tutu3 = 6;
 	CHECK(tutu3.toto.i == 6);
 	CHECK(take_struct(Struct781(57)) == 57);
@@ -1773,11 +1811,14 @@ class Class782
 {
 public:
 	Class781 toto;
-	Class781* toto2;
+	Class781* toto2 = nullptr;
 
 	//Class782():toto2(new Class781()) {};
 	Class782() = default;
 	Class782(int i) : toto(i), toto2(new Class781(i)) {};
+	Class782(double) : toto2(new Class781(19)) {};
+
+	~Class782() { delete toto2; }
 };
 
 Class781 const& take_class(Class781 const& s)
@@ -1796,6 +1837,8 @@ void check_class_ctor_call()
 	CHECK(tutu.toto.i == 0);
 	Class782 tutu2(5);
 	CHECK(tutu2.toto.i == 5);
+	Class782 tutu22(5.5);
+	CHECK(tutu22.toto2->i == 19);
 	Class782 tutu3 = 6;
 	CHECK(tutu3.toto.i == 6);
 	CHECK(take_class(Class781(57)).i == 57);
@@ -1920,6 +1963,58 @@ void check_multidecl_line()
 	int i = 2, *u = new int[18], z[12];
 	CHECK(i == 2);
 	CHECK(sizeof(z) / sizeof(int) == 12);
+	z[3] = 77;
+	CHECK(z[3] == 77);
 	u[17] = 78;
 	CHECK(u[17] == 78);
+}
+
+struct ArrayStruct
+{
+	std::array<int, 3> tab = { 0, 0, 0 };
+
+	ArrayStruct(int a, int b, int c)
+	{
+		tab[0] = a; tab[1] = b; tab[2] = c;
+	}
+};
+
+
+struct ArrayArrayStruct
+{
+	ArrayStruct tab2 = ArrayStruct(0, 0, 0);
+};
+
+void check_std_array()
+{
+	ArrayStruct tab2(0, 0, 0);
+	ArrayArrayStruct toto;
+	CHECK(toto.tab2.tab[0] == 0);
+}
+
+
+struct ImplCtorStruct
+{
+	int i;
+
+	ImplCtorStruct(int u) : i(u) {}
+};
+
+class ImplCtorClass
+{
+public:
+	int i;
+	ImplCtorClass(int u) : i(u) {}
+};
+
+void check_implicit_ctor()
+{
+	ImplCtorStruct a = 2;
+	CHECK(a.i == 2);
+	ImplCtorStruct t[3] = {1, 2, 3};
+	CHECK(t[2].i == 3);
+	ImplCtorClass b = 18;
+	CHECK(b.i == 18);
+	ImplCtorClass y[3] = { 1, 2, 3 };
+	CHECK(y[2].i == 3);
 }

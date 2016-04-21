@@ -399,6 +399,8 @@ public:
 
 	bool TraverseImplicitValueInitExpr(clang::ImplicitValueInitExpr* expr);
 
+	bool TraverseParenListExpr(clang::ParenListExpr* Expr);
+
 	void TraverseVarDeclImpl(clang::VarDecl* Decl);
 
 	bool TraverseVarDecl(clang::VarDecl* Decl);

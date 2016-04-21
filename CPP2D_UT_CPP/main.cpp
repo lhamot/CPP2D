@@ -87,6 +87,10 @@ int main()
 
 	check_multidecl_line();
 
+	check_std_array();
+
+	check_implicit_ctor();
+
 	print_results();
 
 	return 0;

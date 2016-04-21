@@ -86,3 +86,7 @@ void check_dowhile_loop();
 
 void check_multidecl_line();
 
+void check_std_array();
+
+void check_implicit_ctor();
+
