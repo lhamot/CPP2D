@@ -2235,3 +2235,31 @@ void check_struct_containing_scooped_class()
 		CHECK(c2.m1.i == 6);
 	}
 }
+
+class CopyDisableClass
+{
+public:
+	int i = 3;
+	CopyDisableClass(){}
+
+	CopyDisableClass(CopyDisableClass const&) = delete;
+	CopyDisableClass& operator=(CopyDisableClass const&) = delete;
+};
+
+class CopyDisableClass2
+{
+	CopyDisableClass2(CopyDisableClass2 const&);
+	CopyDisableClass2& operator=(CopyDisableClass2 const&);
+
+public:
+	int i = 3;
+	CopyDisableClass2() {}
+};
+
+void check_not_copyable_class()
+{
+	CopyDisableClass a;
+	CHECK(a.i == 3);
+	CopyDisableClass2 b;
+	CHECK(b.i == 3);
+}

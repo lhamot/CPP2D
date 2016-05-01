@@ -93,3 +93,8 @@ void check_implicit_ctor();
 void check_extern_methode();
 
 void check_std_unordered_map();
+
+void check_struct_containing_scooped_class();
+
+void check_not_copyable_class();
+

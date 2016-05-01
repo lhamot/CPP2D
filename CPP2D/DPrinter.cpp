@@ -1821,6 +1821,10 @@ bool DPrinter::TraverseFunctionDeclImpl(
   D* Decl,
   int arg_become_this)
 {
+	if (Decl->getAccess() == AccessSpecifier::AS_private && Decl->getBody() == nullptr)
+		return false;
+	if (Decl->isDeleted())
+		return true;
 	if(Decl->isImplicit() && Decl->getBody() == nullptr)
 		return true;
 

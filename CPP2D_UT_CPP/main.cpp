@@ -95,6 +95,10 @@ int main()
 
 	check_std_unordered_map();
 
+	check_struct_containing_scooped_class();
+
+	check_not_copyable_class();
+
 	print_results();
 
 	return 0;
