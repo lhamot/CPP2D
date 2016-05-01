@@ -2156,6 +2156,82 @@ void check_std_unordered_map()
 		c1.m1[15] = 7;
 		CHECK(c2.m1[15] == 6);
 	}
-
 }
 
+class SimpleClass
+{
+public:
+	int i;
+
+	SimpleClass() = default;
+	SimpleClass(SimpleClass const&) = default;
+	SimpleClass* dup()
+	{
+		return new SimpleClass(*this);
+	}
+};
+
+struct ContainScopedClass
+{
+	SimpleClass m1;
+};
+
+struct ContainScopedClass2
+{
+	SimpleClass m1;
+
+	ContainScopedClass2() = default;
+
+	ContainScopedClass2(ContainScopedClass2 const& other)
+		: m1(other.m1)
+	{
+	}
+};
+
+struct ContainScopedClass3
+{
+	SimpleClass m1;
+
+	ContainScopedClass3() = default;
+
+	ContainScopedClass3(ContainScopedClass3 const& other)
+	{
+		m1 = other.m1;
+	}
+};
+
+void check_struct_containing_scooped_class()
+{
+	{
+		ContainScopedClass c1;
+		c1.m1.i = 98;
+		auto c2 = c1;
+		c1.m1.i = 6;
+		CHECK(c2.m1.i == 98);
+		c2 = c1;
+		c1.m1.i = 7;
+		CHECK(c2.m1.i == 6);
+	}
+
+	{
+		ContainScopedClass2 c1;
+		c1.m1.i = 98;
+		auto c2 = c1;
+		c1.m1.i = 6;
+		CHECK(c2.m1.i == 98);
+		c2 = c1;
+		c1.m1.i = 7;
+		CHECK(c2.m1.i == 6);
+	}
+
+	{
+		ContainScopedClass3 c1;
+		c1.m1.i = 98;
+		auto c2 = c1;
+		c1.m1.i = 6;
+		CHECK(c2.m1.i == 98);
+		c2 = c1;
+		c1.m1.i = 7;
+		CHECK(c2.m1.i == 6);
+	}
+}

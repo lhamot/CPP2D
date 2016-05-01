@@ -830,6 +830,18 @@ void DPrinter::printBasesClass(CXXRecordDecl* decl)
 bool DPrinter::TraverseCXXRecordDecl(CXXRecordDecl* decl)
 {
 	if(pass_decl(decl)) return true;
+	if(decl->isClass())
+	{
+		for(auto* ctor : decl->ctors())
+		{
+			if(ctor->isImplicit() && (ctor->isCopyConstructor() || ctor->isCopyConstructor()))
+			{
+				llvm::errs() << "error : class " << decl->getNameAsString() <<
+				             " is copy constructible which is not dlang compatible.\n";
+				break;
+			}
+		}
+	}
 	return TraverseCXXRecordDeclImpl(decl, [] {}, [this, decl] {printBasesClass(decl); });
 }
 
@@ -1510,9 +1522,7 @@ bool DPrinter::TraverseConstructorInitializer(CXXCtorInitializer* Init)
 					QualType fieldType = fieldDecl->getType().getCanonicalType();
 					initType.removeLocalConst();
 					fieldType.removeLocalConst();
-					LangOptions lo;
-					PrintingPolicy pp(lo);
-					if(fieldType == initType)
+					if(fieldType == initType && getSemantic(initType) == Semantic::AssocArray)
 					{
 						TraverseStmt(Init->getInit());
 						out() << ".dup()";
@@ -2503,18 +2513,20 @@ bool DPrinter::TraverseCXXOperatorCallExpr(CXXOperatorCallExpr* Stmt)
 		Semantic const ro_sem = getSemantic(ro->getType());
 
 		bool const dup = //both operands will be transformed to pointer
-		  (ro_ptr == false && ro_sem != Value) &&
-		  (lo_ptr == false && lo_sem != Value);
+		  (ro_ptr == false && ro_sem != Semantic::Value) &&
+		  (lo_ptr == false && lo_sem != Semantic::Value);
 
 		if(dup)
 		{
+			// Always use dup, because
+			//  - It is OK on hashmap
+			//  - opAssign is not possible on classes
+			//  - copy ctor is possible but can cause slicing
 			TraverseStmt(lo);
-			//out() << ".opAssign(";
 			out() << " = ";
 			TraverseStmt(ro);
 			out() << ".dup()";
 			isThisFunctionUsefull = true;
-			//out() << ")";
 		}
 		else
 		{
