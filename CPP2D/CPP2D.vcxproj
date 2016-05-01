@@ -171,6 +171,7 @@
     <ClCompile Include="CPP2DConsumer.cpp" />
     <ClCompile Include="CPP2DFrontendAction.cpp" />
     <ClCompile Include="CPP2DPPHandling.cpp" />
+    <ClCompile Include="CPP2DTools.cpp" />
     <ClCompile Include="MatchContainer.cpp" />
     <ClCompile Include="DPrinter.cpp" />
   </ItemGroup>
@@ -178,6 +179,7 @@
     <ClInclude Include="CPP2DConsumer.h" />
     <ClInclude Include="CPP2DFrontendAction.h" />
     <ClInclude Include="CPP2DPPHandling.h" />
+    <ClInclude Include="CPP2DTools.h" />
     <ClInclude Include="MatchContainer.h" />
     <ClInclude Include="DPrinter.h" />
   </ItemGroup>

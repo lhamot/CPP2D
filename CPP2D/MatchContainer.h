@@ -27,11 +27,11 @@ public:
 	std::function<void(DPrinter& printer, clang::Decl*)> getPrinter(clang::Decl const*) const;
 	std::function<void(DPrinter& printer, clang::Type*)> getPrinter(clang::Type const*) const;
 
-private:
 	std::unordered_multimap<clang::Stmt const*, std::string> stmtTags;
 	std::unordered_multimap<clang::Decl const*, std::string> declTags;
 	std::unordered_multimap<clang::Type const*, std::string> typeTags;
 
+private:
 	std::unordered_map<std::string, std::function<void(DPrinter& printer, clang::Type*)>> typePrinters;
 	std::unordered_map<std::string, std::function<void(DPrinter& printer, clang::Stmt*)>> stmtPrinters;
 	std::unordered_map<std::string, std::function<void(DPrinter& printer, clang::Decl*)>> declPrinters;

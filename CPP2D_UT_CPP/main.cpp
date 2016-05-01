@@ -91,6 +91,10 @@ int main()
 
 	check_implicit_ctor();
 
+	check_extern_methode();
+
+	check_std_unordered_map();
+
 	print_results();
 
 	return 0;

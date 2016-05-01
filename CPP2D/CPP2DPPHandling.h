@@ -4,10 +4,15 @@
 #include <llvm/ADT/StringRef.h>
 #pragma warning(pop)
 
+namespace clang
+{
+class ASTContext;
+}
+
 class CPP2DPPHandling : public clang::PPCallbacks
 {
 public:
-	CPP2DPPHandling(clang::Preprocessor& pp, llvm::StringRef inFile);
+	CPP2DPPHandling(clang::SourceManager& sourceManager, clang::Preprocessor& pp, llvm::StringRef inFile);
 
 	void InclusionDirective(
 	  clang::SourceLocation,		//hash_loc,
@@ -31,24 +36,29 @@ public:
 	std::set<std::string> const& getInsertedBeforeDecls() const;
 
 private:
-	void CPP2DPPHandling::inject_macro(
+	void inject_macro(
 	  clang::MacroDirective const* MD,
 	  std::string const& name,
 	  std::string const& new_macro);
+	struct MacroInfo
+	{
+		std::string name;
+		std::string argType;
+		std::string cppReplace;
+	};
 	void TransformMacroExpr(clang::Token const& MacroNameTok,
 	                        clang::MacroDirective const* MD,
-	                        std::string const& name,
-	                        std::string const& args);
+	                        CPP2DPPHandling::MacroInfo const& args);
 	void TransformMacroStmt(clang::Token const& MacroNameTok,
 	                        clang::MacroDirective const* MD,
-	                        std::string const& name,
-	                        std::string const& args);
+	                        CPP2DPPHandling::MacroInfo const& args);
 
+	clang::SourceManager& sourceManager_;
 	clang::Preprocessor& pp_;
 	llvm::StringRef inFile_;
 	llvm::StringRef modulename_;
-	std::map<std::string, std::string> macro_expr;
-	std::map<std::string, std::string> macro_stmt;
+	std::map<std::string, MacroInfo> macro_expr;
+	std::map<std::string, MacroInfo> macro_stmt;
 
 	std::set<std::string> includes_in_file;
 	std::set<std::string> add_before_decl;

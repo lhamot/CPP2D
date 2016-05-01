@@ -21,6 +21,7 @@
 #pragma warning(pop)
 
 #include "MatchContainer.h"
+#include "CPP2DTools.h"
 
 //using namespace clang::tooling;
 using namespace llvm;
@@ -118,8 +119,6 @@ bool needSemiComma(Stmt* stmt)
 
 bool needSemiComma(Decl* decl)
 {
-	if(decl->isImplicit())
-		return false;
 	auto const kind = decl->getKind();
 	if(kind == Decl::Kind::CXXRecord)
 	{
@@ -179,8 +178,10 @@ void DPrinter::setIncludes(std::set<std::string> const& includes)
 	includes_in_file = includes;
 }
 
-void DPrinter::include_file(std::string const& decl_inc)
+void DPrinter::include_file(std::string const& decl_inc, std::string const& typeName)
 {
+	if(isInMacro)
+		return;
 	for(std::string include : includes_in_file)
 	{
 		auto const pos = decl_inc.find(include);
@@ -197,7 +198,7 @@ void DPrinter::include_file(std::string const& decl_inc)
 			               tolower);
 			std::replace(std::begin(include), std::end(include), '/', '.');
 			std::replace(std::begin(include), std::end(include), '\\', '.');
-			extern_includes.insert(include);
+			extern_includes[include].insert(typeName);
 			break;
 		}
 	}
@@ -228,21 +229,33 @@ std::string DPrinter::mangleType(NamedDecl const* decl)
 		                    std::string() :
 		                    d_qual_type.substr(0, dot_pos);
 		if(not module.empty())  //Need an import
-			extern_includes.insert(module);
+			extern_includes[module].insert(qual_name);
 		return d_qual_type.substr(dot_pos + 1);
 	}
 	else
 	{
-		include_file(getFile(can_decl ? can_decl : decl));
+		include_file(CPP2DTools::getFile(Context->getSourceManager(), can_decl ? can_decl : decl), qual_name);
 		return mangleName(name);
 	}
 }
 
+std::string getName(DeclarationName const& dn)
+{
+	std::string name = dn.getAsString();
+	if(name.empty())
+	{
+		std::stringstream ss;
+		ss << "var" << dn.getAsOpaqueInteger();
+		name = ss.str();
+	}
+	return name;
+}
+
 std::string DPrinter::mangleVar(DeclRefExpr* expr)
 {
-	std::string name = expr->getNameInfo().getName().getAsString();
-	if(char const* filename = getFile(expr->getDecl()))
-		include_file(filename);
+	std::string name = getName(expr->getNameInfo().getName());
+	if(char const* filename = CPP2DTools::getFile(Context->getSourceManager(), expr->getDecl()))
+		include_file(filename, name);
 	return mangleName(name);
 }
 
@@ -459,7 +472,7 @@ bool DPrinter::TraverseTranslationUnitDecl(TranslationUnitDecl* Decl)
 
 	for(auto c : Decl->decls())
 	{
-		if(checkFilename(c))
+		if(CPP2DTools::checkFilename(Context->getSourceManager(), modulename, c))
 		{
 			pushStream();
 			TraverseDecl(c);
@@ -526,7 +539,7 @@ bool DPrinter::TraverseFieldDecl(FieldDecl* Decl)
 		out() << ", \"" << mangleName(varName) << "\", ";
 		TraverseStmt(Decl->getBitWidth());
 		out() << ',';
-		extern_includes.insert("std.bitmanip");
+		extern_includes["std.bitmanip"].insert("bitfields");
 	}
 	else
 	{
@@ -802,7 +815,7 @@ void DPrinter::printBasesClass(CXXRecordDecl* decl)
 			if(as != AccessSpecifier::AS_public)
 			{
 				llvm::errs()
-				    << "use of base class protection private and protected is no supported\n";
+				    << "error : class " << decl->getNameAsString() << " use of base class protection private and protected is no supported\n";
 				out() << "/*" << AccessSpecifierStr[as] << "*/ ";
 			}
 			PrintType(base.getType());
@@ -832,6 +845,8 @@ bool DPrinter::TraverseCXXRecordDeclImpl(
   TmpSpecFunc traverseTmpSpecs,
   PrintBasesClass printBasesClass)
 {
+	if(decl->isImplicit())
+		return true;
 	if(decl->isCompleteDefinition() == false && decl->getDefinition() != nullptr)
 		return true;
 
@@ -972,7 +987,10 @@ bool DPrinter::TraverseCXXRecordDeclImpl(
 			{
 				out() << indent_str() << "int opCmp(ref in ";
 				PrintType(type->getPointeeType());
-				out() << " other) const\n";
+				out() << " other)";
+				if(portConst)
+					out() << " const";
+				out() << "\n";
 				out() << indent_str() << "{\n";
 				++indent;
 				out() << indent_str() << "return _opLess(other) ? -1: ((this == other)? 0: 1);\n";
@@ -983,7 +1001,10 @@ bool DPrinter::TraverseCXXRecordDeclImpl(
 
 		if(classInfo.hasOpExclaim and not classInfo.hasBoolConv)
 		{
-			out() << indent_str() << "bool opCast(T : bool)() const\n";
+			out() << indent_str() << "bool opCast(T : bool)()";
+			if(portConst)
+				out() << " const";
+			out() << "\n";
 			out() << indent_str() << "{\n";
 			++indent;
 			out() << indent_str() << "return !_opExclaim();\n";
@@ -1252,7 +1273,15 @@ bool DPrinter::TraverseCXXForRangeStmt(CXXForRangeStmt*  Stmt)
 	inForRangeInit = false;
 	refAccepted = false;
 	out() << "; ";
-	TraverseStmt(Stmt->getRangeInit());
+	Expr* rangeInit = Stmt->getRangeInit();
+	TraverseStmt(rangeInit);
+	if(TagDecl* rangeInitDecl = rangeInit->getType()->getAsTagDecl())
+	{
+		std::string const name = rangeInitDecl->getQualifiedNameAsString();
+		if(name.find("std::unordered_map") != std::string::npos)
+			out() << ".byKeyValue";
+	}
+
 	out() << ")" << std::endl;
 	TraverseCompoundStmtOrNot(Stmt->getBody());
 	return true;
@@ -1377,9 +1406,11 @@ void DPrinter::PrintCXXConstructExprParams(CXXConstructExpr* Init)
 	out() << '(';
 	Spliter spliter(", ");
 	size_t counter = 0;
+	Semantic const sem = getSemantic(Init->getType());
 	for(auto arg : Init->arguments())
 	{
-		if(arg->getStmtClass() == Stmt::StmtClass::CXXDefaultArgExprClass && (counter != 0))
+		if(arg->getStmtClass() == Stmt::StmtClass::CXXDefaultArgExprClass
+		   && ((counter != 0) || sem != Semantic::Value))
 			break;
 		spliter.split();
 		TraverseStmt(arg);
@@ -1415,16 +1446,17 @@ void DPrinter::PrintType(QualType const& type)
 {
 	if(type.getTypePtr()->getTypeClass() == Type::TypeClass::Auto)
 	{
-		if(type.isConstQualified())
+		if(type.isConstQualified() && portConst)
 			out() << "const ";
 		TraverseType(type);
 	}
 	else
 	{
-		if(type.isConstQualified())
+		bool printConst = portConst || isa<BuiltinType>(type->getCanonicalTypeUnqualified());
+		if(type.isConstQualified() && printConst)
 			out() << "const(";
 		TraverseType(type);
-		if(type.isConstQualified())
+		if(type.isConstQualified() && printConst)
 			out() << ')';
 	}
 }
@@ -1470,6 +1502,27 @@ bool DPrinter::TraverseConstructorInitializer(CXXCtorInitializer* Init)
 		}
 		else
 		{
+			if(auto* ctorExpr = dyn_cast<CXXConstructExpr>(Init->getInit()))
+			{
+				if(ctorExpr->getNumArgs() == 1)
+				{
+					QualType initType = ctorExpr->getArg(0)->getType().getCanonicalType();
+					QualType fieldType = fieldDecl->getType().getCanonicalType();
+					initType.removeLocalConst();
+					fieldType.removeLocalConst();
+					LangOptions lo;
+					PrintingPolicy pp(lo);
+					if(fieldType == initType)
+					{
+						TraverseStmt(Init->getInit());
+						out() << ".dup()";
+						isThisFunctionUsefull = true;
+						return true;
+					}
+				}
+				else if(ctorExpr->getNumArgs() == 0 && sem == Semantic::AssocArray)
+					return true;
+			}
 			out() << "new ";
 			PrintType(fieldDecl->getType());
 			out() << '(';
@@ -1498,13 +1551,14 @@ void DPrinter::startCtorBody(CXXConstructorDecl* Decl)
 			pushStream();
 			TraverseConstructorInitializer(init);
 			std::string const initStr = popStream();
-			if(initStr.empty() == false 
-               && initStr.substr(initStr.size() - 2) != "= " // Nothing to print. Default init is enought
-               )
+			if(initStr.empty() == false)
 			{
 				out() << std::endl << indent_str();
-				out() << initStr;
-				out() << ";";
+				if(initStr.substr(initStr.size() - 2) != "= ")  // Nothing to print. Default init is enought
+				{
+					out() << initStr;
+					out() << ";";
+				}
 			}
 		}
 	}
@@ -1512,7 +1566,7 @@ void DPrinter::startCtorBody(CXXConstructorDecl* Decl)
 
 void DPrinter::printFuncEnd(CXXMethodDecl* Decl)
 {
-	if(Decl->isConst())
+	if(Decl->isConst() && portConst)
 		out() << " const";
 }
 
@@ -1553,6 +1607,10 @@ void DPrinter::printSpecialMethodAttribute(CXXMethodDecl* Decl)
 
 bool DPrinter::printFuncBegin(CXXMethodDecl* Decl, std::string& tmpParams, int arg_become_this)
 {
+	if(Decl->isImplicit())
+		return false;
+	if(Decl->isMoveAssignmentOperator())
+		return false;
 	if(Decl->isOverloadedOperator()
 	   && Decl->getOverloadedOperator() == OverloadedOperatorKind::OO_ExclaimEqual)
 		return false;
@@ -1563,6 +1621,8 @@ bool DPrinter::printFuncBegin(CXXMethodDecl* Decl, std::string& tmpParams, int a
 
 bool DPrinter::printFuncBegin(FunctionDecl* Decl, std::string& tmpParams, int arg_become_this)
 {
+	if(Decl->isImplicit())
+		return false;
 	if(Decl->isOverloadedOperator()
 	   && Decl->getOverloadedOperator() == OverloadedOperatorKind::OO_ExclaimEqual)
 		return false;
@@ -1689,29 +1749,42 @@ bool DPrinter::printFuncBegin(CXXConversionDecl* Decl, std::string& tmpParams, i
 
 bool DPrinter::printFuncBegin(CXXConstructorDecl* Decl,
                               std::string&,	//tmpParams
-                              int				//arg_become_this = -1
+                              int			//arg_become_this = -1
                              )
 {
-	auto record = Decl->getParent();
-	if(record->isStruct() && Decl->getNumParams() == 0)
+	if(Decl->isMoveConstructor())
+		return false;
+
+	CXXRecordDecl* record = Decl->getParent();
+	if(record->isStruct() || record->isUnion())
 	{
-		if(Decl->isDefaulted() == false)
+		if(Decl->isDefaultConstructor() && Decl->getNumParams() == 0)
 		{
-			llvm::errs() << "error : " << Decl->getNameAsString() << " struct has an explicit default ctor.\n";
-			llvm::errs() << "\tThis is illegal in D language.\n";
-			llvm::errs() << "\tRemove it, default it or replace it by a factory method.\n";
+			if(Decl->isExplicit() && Decl->isDefaulted() == false)
+			{
+				llvm::errs() << "error : " << Decl->getNameAsString() << " struct has an explicit default ctor.\n";
+				llvm::errs() << "\tThis is illegal in D language.\n";
+				llvm::errs() << "\tRemove it, default it or replace it by a factory method.\n";
+			}
+			return false; //If default struct ctor : don't print
 		}
-		return false; //If default struct ctor : don't print
+	}
+	else
+	{
+		if(Decl->isImplicit() && !Decl->isDefaultConstructor())
+			return false;
 	}
 	out() << "this";
 	return true;
 }
 
-bool DPrinter::printFuncBegin(CXXDestructorDecl*,
+bool DPrinter::printFuncBegin(CXXDestructorDecl* decl,
                               std::string&,	//tmpParams,
                               int				//arg_become_this = -1
                              )
 {
+	if(decl->isImplicit())
+		return false;
 	//if(Decl->isPure() && !Decl->hasBody())
 	//	return false; //ctor and dtor can't be abstract
 	//else
@@ -1719,20 +1792,40 @@ bool DPrinter::printFuncBegin(CXXDestructorDecl*,
 	return true;
 }
 
+template<typename Decl>
+DPrinter::Semantic getThisSemantic(Decl* decl, ASTContext& context)
+{
+	if(decl->isStatic())
+		return DPrinter::Semantic::Reference;
+	auto* recordPtrType = dyn_cast<PointerType>(decl->getThisType(context));
+	return DPrinter::getSemantic(recordPtrType->getPointeeType());
+}
+
+DPrinter::Semantic getThisSemantic(FunctionDecl*, ASTContext&)
+{
+	return DPrinter::Semantic::Reference;
+}
 
 template<typename D>
 bool DPrinter::TraverseFunctionDeclImpl(
   D* Decl,
   int arg_become_this)
 {
-	if(Decl->doesThisDeclarationHaveABody() == false && Decl->hasBody())
-		return false;
+	if(Decl->isImplicit() && Decl->getBody() == nullptr)
+		return true;
 
+	if(Decl != Decl->getCanonicalDecl() &&
+	   not(Decl->getTemplatedKind() == FunctionDecl::TK_FunctionTemplateSpecialization
+	       && Decl->isThisDeclarationADefinition()))
+		return true;
+
+	pushStream();
 	refAccepted = true;
 	std::string tmplParamsStr;
 	if(printFuncBegin(Decl, tmplParamsStr, arg_become_this) == false)
 	{
 		refAccepted = false;
+		popStream();
 		return true;
 	}
 	bool tmplPrinted = false;
@@ -1766,17 +1859,23 @@ bool DPrinter::TraverseFunctionDeclImpl(
 	out() << "(";
 	inFuncArgs = true;
 	bool isConstMethod = false;
+	auto* ctorDecl = dyn_cast<CXXConstructorDecl>(Decl);
+	bool const isCopyCtor = ctorDecl && ctorDecl->isCopyConstructor();
+	Semantic const sem = getThisSemantic(Decl, *Context);
 	if(Decl->getNumParams() != 0)
 	{
 		TypeSourceInfo* declSourceInfo = Decl->getTypeSourceInfo();
-		TypeLoc declTypeLoc = declSourceInfo->getTypeLoc();
 		FunctionTypeLoc funcTypeLoc;
 		SourceLocation locStart;
-		TypeLoc::TypeLocClass tlClass = declTypeLoc.getTypeLocClass();
-		if(tlClass == TypeLoc::TypeLocClass::FunctionProto)
+		if(declSourceInfo)
 		{
-			funcTypeLoc = declTypeLoc.castAs<FunctionTypeLoc>();
-			locStart = funcTypeLoc.getLParenLoc().getLocWithOffset(1);
+			TypeLoc declTypeLoc = declSourceInfo->getTypeLoc();
+			TypeLoc::TypeLocClass tlClass = declTypeLoc.getTypeLocClass();
+			if(tlClass == TypeLoc::TypeLocClass::FunctionProto)
+			{
+				funcTypeLoc = declTypeLoc.castAs<FunctionTypeLoc>();
+				locStart = funcTypeLoc.getLParenLoc().getLocWithOffset(1);
+			}
 		}
 
 		auto isConst = [](QualType type)
@@ -1806,7 +1905,17 @@ bool DPrinter::TraverseFunctionDeclImpl(
 					                 decl->getLocEnd().getLocWithOffset(1));
 					out() << indent_str();
 				}
-				TraverseDecl(decl);
+				if(isCopyCtor && sem == Semantic::Value)
+					out() << "this";
+				else
+				{
+					if(index == 0
+					   && sem == Semantic::Value
+					   && (ctorDecl != nullptr))
+						printDefaultValue = false;
+					TraverseDecl(decl);
+					printDefaultValue = true;
+				}
 				if(index < numParam - 1)
 					out() << ',';
 			}
@@ -1827,22 +1936,25 @@ bool DPrinter::TraverseFunctionDeclImpl(
 			out() << comment << indent_str();
 	}
 	out() << ")";
-	if(isConstMethod)
+	if(isConstMethod && portConst)
 		out() << " const";
 	printFuncEnd(Decl);
 	refAccepted = false;
 	inFuncArgs = false;
+	isThisFunctionUsefull = false;
 	if(Stmt* body = Decl->getBody())
 	{
 		//Stmt* body = Decl->getBody();
 		out() << std::endl << std::flush;
+		if(isCopyCtor && sem == Semantic::Value)
+			arg_become_this = 0;
 		auto alias_this = [Decl, arg_become_this, this]
 		{
 			if(arg_become_this >= 0)
 			{
 				ParmVarDecl* param = *(Decl->param_begin() + arg_become_this);
 				out() << std::endl;
-				std::string const this_name = param->getNameAsString();
+				std::string const this_name = getName(param->getDeclName()); //param->getNameAsString();
 				if(this_name.empty() == false)
 					out() << indent_str() << "alias " << this_name << " = this;";
 			}
@@ -1853,7 +1965,7 @@ bool DPrinter::TraverseFunctionDeclImpl(
 			++indent;
 			out() << indent_str();
 			TraverseCXXTryStmtImpl(static_cast<CXXTryStmt*>(body),
-			                       [&] {startCtorBody(Decl); alias_this(); });
+			                       [&] {alias_this(); startCtorBody(Decl); });
 			out() << std::endl;
 			--indent;
 			out() << indent_str() << '}';
@@ -1863,12 +1975,14 @@ bool DPrinter::TraverseFunctionDeclImpl(
 			out() << indent_str();
 			assert(body->getStmtClass() == Stmt::CompoundStmtClass);
 			TraverseCompoundStmtImpl(static_cast<CompoundStmt*>(body),
-			                         [&] {startCtorBody(Decl); alias_this(); });
+			                         [&] {alias_this(); startCtorBody(Decl); });
 		}
 	}
 	else
 		out() << ";";
-
+	std::string printedFunction = popStream();
+	if(not Decl->isImplicit() || isThisFunctionUsefull)
+		out() << printedFunction;
 	return true;
 }
 
@@ -2005,6 +2119,14 @@ DPrinter::Semantic DPrinter::getSemantic(QualType qt)
 		return Value;
 	if(name.find("class boost::property_tree::basic_ptree<") == 0)
 		return Value;
+	if(name.find("class std::vector<") == 0)
+		return Value;
+	if(name.find("class std::shared_ptr<") == 0)
+		return Value;
+	if(name.find("class std::scoped_ptr<") == 0)
+		return Value;
+	if(name.find("class std::unordered_map<") == 0)
+		return AssocArray;
 	Type::TypeClass const cla = type->getTypeClass();
 	return
 	  cla == Type::TypeClass::Auto ? Value :
@@ -2166,16 +2288,20 @@ bool DPrinter::TraverseParmVarDecl(ParmVarDecl* Decl)
 {
 	if(pass_decl(Decl)) return true;
 	PrintType(Decl->getType());
-	std::string const name = Decl->getNameAsString();
+	std::string const name = getName(Decl->getDeclName());//getNameAsString();
 	if(name.empty() == false)
 		out() <<  " " << mangleName(name);
 	if(Decl->hasDefaultArg())
 	{
+		if(not printDefaultValue)
+			out() << "/*";
 		out() << " = ";
 		TraverseStmt(
 		  Decl->hasUninstantiatedDefaultArg() ?
 		  Decl->getUninstantiatedDefaultArg() :
 		  Decl->getDefaultArg());
+		if(not printDefaultValue)
+			out() << "*/";
 	}
 	return true;
 }
@@ -2377,15 +2503,18 @@ bool DPrinter::TraverseCXXOperatorCallExpr(CXXOperatorCallExpr* Stmt)
 		Semantic const ro_sem = getSemantic(ro->getType());
 
 		bool const dup = //both operands will be transformed to pointer
-		  (ro_ptr == false && ro_sem == Reference) &&
-		  (lo_ptr == false && lo_sem == Reference);
+		  (ro_ptr == false && ro_sem != Value) &&
+		  (lo_ptr == false && lo_sem != Value);
 
 		if(dup)
 		{
 			TraverseStmt(lo);
-			out() << ".opAssign(";
+			//out() << ".opAssign(";
+			out() << " = ";
 			TraverseStmt(ro);
-			out() << ")";
+			out() << ".dup()";
+			isThisFunctionUsefull = true;
+			//out() << ")";
 		}
 		else
 		{
@@ -2736,7 +2865,7 @@ bool DPrinter::TraverseLambdaExpr(LambdaExpr* Node)
 
 	if(hasAuto)
 	{
-		extern_includes.insert("cpp_std");
+		extern_includes["cpp_std"].insert("toFunctor");
 		out() << "toFunctor!(";
 	}
 
@@ -2874,26 +3003,31 @@ bool DPrinter::TraverseMemberExpr(MemberExpr* Stmt)
 template<typename ME>
 bool DPrinter::TraverseMemberExprImpl(ME* Stmt)
 {
-	if(Stmt->getQualifier())
-		TraverseNestedNameSpecifier(Stmt->getQualifier());
 	DeclarationName const declName = Stmt->getMemberNameInfo().getName();
 	auto const kind = declName.getNameKind();
-	std::string const memberName = Stmt->getMemberNameInfo().getAsString();
+	std::string const memberName = Stmt->getMemberNameInfo().getName().getAsString();
 	Expr* base = Stmt->isImplicitAccess() ? nullptr : Stmt->getBase();
-	if(base && base->getStmtClass() != Stmt::StmtClass::CXXThisExprClass)
-	{
+	bool const isThis = not(base && base->getStmtClass() != Stmt::StmtClass::CXXThisExprClass);
+	if(not isThis)
 		TraverseStmt(base);
-		if(memberName.empty() == false)
-			out() << '.';
-	}
 	if(kind == DeclarationName::NameKind::CXXConversionFunctionName)
 	{
+		if(memberName.empty() == false && not isThis)
+			out() << '.';
 		out() << "opCast!(";
 		PrintType(declName.getCXXNameType());
 		out() << ')';
 	}
+	else if(kind == DeclarationName::NameKind::CXXOperatorName)
+	{
+		out() << " " << memberName.substr(8) << " "; //8 is size of "operator"
+	}
 	else
+	{
+		if(memberName.empty() == false && not isThis)
+			out() << '.';
 		out() << memberName;
+	}
 	auto TAL = Stmt->getTemplateArgs();
 	auto const tmpArgCount = Stmt->getNumTemplateArgs();
 	Spliter spliter(", ");
@@ -2966,7 +3100,7 @@ bool DPrinter::TraverseBinAddAssign(CompoundAssignOperator* expr)
 		out() << ".popFrontN(";
 		TraverseStmt(expr->getRHS());
 		out() << ')';
-		extern_includes.insert("std.range.primitives");
+		extern_includes["std.range.primitives"].insert("popFrontN");
 		return true;
 	}
 	else
@@ -3050,7 +3184,7 @@ bool DPrinter::TraverseUnaryOperator(UnaryOperator* Stmt)
 		{
 			TraverseStmt(Stmt->getSubExpr());
 			out() << ".popFront";
-			extern_includes.insert("std.range.primitives");
+			extern_includes["std.range.primitives"].insert("popFront");
 			return true;
 		}
 	}
@@ -3092,7 +3226,7 @@ bool DPrinter::TraverseUnaryOperator(UnaryOperator* Stmt)
 		  getSemantic(exprType->getPointeeType()) :
 		  getSemantic(exprType);
 
-		if(operSem == Reference)
+		if(operSem != Value)
 		{
 			if(Stmt->getOpcode() == UnaryOperatorKind::UO_AddrOf
 			   || Stmt->getOpcode() == UnaryOperatorKind::UO_Deref)
@@ -3372,7 +3506,7 @@ void DPrinter::TraverseVarDeclImpl(VarDecl* Decl)
 		{
 			if(auto* constr = dyn_cast<CXXConstructExpr>(init))
 			{
-				if(getSemantic(varType) == Value)
+				if(getSemantic(varType) != Reference)
 				{
 					if(constr->getNumArgs() != 0)
 					{
@@ -3425,76 +3559,9 @@ bool DPrinter::VisitType(Type* Type)
 	return true;
 }
 
-const char* DPrinter::getFile(Stmt const* d)
+void DPrinter::addExternInclude(std::string const& include, std::string const& typeName)
 {
-	/*Module* module = d->getLocalOwningModule();
-	if (clang::FileEntry const* f = module->getASTFile())
-	return f->getName();
-	else
-	return nullptr;*/
-	clang::SourceLocation sl = d->getLocStart();
-	if(sl.isValid() == false)
-		return "";
-	clang::FullSourceLoc fsl = Context->getFullLoc(sl).getExpansionLoc();
-	auto& mgr = fsl.getManager();
-	if(clang::FileEntry const* f = mgr.getFileEntryForID(fsl.getFileID()))
-		return f->getName();
-	else
-		return nullptr;
-}
-
-const char* DPrinter::getFile(Decl const* d)
-{
-	/*Module* module = d->getLocalOwningModule();
-	if (clang::FileEntry const* f = module->getASTFile())
-		return f->getName();
-	else
-		return nullptr;*/
-	clang::SourceLocation sl = d->getLocation();
-	if(sl.isValid() == false)
-		return "";
-	clang::FullSourceLoc fsl = Context->getFullLoc(sl).getExpansionLoc();
-	auto& mgr = fsl.getManager();
-	if(clang::FileEntry const* f = mgr.getFileEntryForID(fsl.getFileID()))
-		return f->getName();
-	else
-		return nullptr;
-}
-
-bool DPrinter::checkFilename(Decl const* d)
-{
-	char const* filepath_str = getFile(d);
-	if(filepath_str == nullptr)
-		return false;
-	std::string filepath = filepath_str;
-	if(filepath.size() < 12)
-		return false;
-	else
-	{
-		std::string exts[] =
-		{
-			std::string(".h"),
-			std::string(".hpp"),
-			std::string(".cpp"),
-			std::string(".cxx"),
-			std::string(".c"),
-		};
-		for(auto& ext : exts)
-		{
-			auto modulenameext = modulename + ext;
-			if(modulenameext.size() > filepath.size())
-				continue;
-			StringRef filename = llvm::sys::path::filename(filepath);
-			if(filename == modulenameext)
-				return true;
-		}
-		return false;
-	}
-}
-
-void DPrinter::addExternInclude(std::string include)
-{
-	extern_includes.emplace(std::move(include));
+	extern_includes[include].insert(typeName + " 6");
 }
 
 std::ostream& DPrinter::stream()
@@ -3502,7 +3569,7 @@ std::ostream& DPrinter::stream()
 	return out();
 }
 
-std::set<std::string> const& DPrinter::getExternIncludes() const
+std::map<std::string, std::set<std::string> > const& DPrinter::getExternIncludes() const
 {
 	return extern_includes;
 }
@@ -3513,3 +3580,7 @@ std::string DPrinter::getDCode() const
 	return out().str();
 }
 
+bool DPrinter::shouldVisitImplicitCode() const
+{
+	return true;
+}

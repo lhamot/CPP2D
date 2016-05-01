@@ -6,9 +6,12 @@
 #include <llvm/Support/CommandLine.h>
 #include <clang/Lex/MacroInfo.h>
 #include <clang/Lex/Preprocessor.h>
+#include <clang/Lex/PreprocessorOptions.h>
+#include <clang/AST/ASTContext.h>
 #pragma warning(pop)
 
 #include <sstream>
+#include "CPP2DTools.h"
 
 using namespace clang;
 using namespace llvm;
@@ -20,31 +23,40 @@ std::set<std::string> new_macros_name;
 extern cl::list<std::string> MacroAsExpr;
 extern cl::list<std::string> MacroAsStmt;
 
-CPP2DPPHandling::CPP2DPPHandling(Preprocessor& pp, StringRef inFile)
-	: pp_(pp)
+CPP2DPPHandling::CPP2DPPHandling(clang::SourceManager& sourceManager, Preprocessor& pp, StringRef inFile)
+	: sourceManager_(sourceManager)
+	, pp_(pp)
 	, inFile_(inFile)
 	, modulename_(llvm::sys::path::stem(inFile))
 {
 	auto split = [](std::string name)
 	{
-		std::string args;
-		size_t const arg_pos = name.find("/");
+		std::string args, cppReplace;
+		size_t arg_pos = name.find("/");
 		if(arg_pos != std::string::npos)
 		{
 			args = name.substr(arg_pos + 1);
 			name = name.substr(0, arg_pos);
 		}
-		return std::make_pair(name, args);
+		arg_pos = args.find("/");
+		if(arg_pos != std::string::npos)
+		{
+			cppReplace = args.substr(arg_pos + 1);
+			args = args.substr(0, arg_pos);
+		}
+		return std::make_tuple(name, args, cppReplace);
 	};
-	for(std::string name : MacroAsExpr)
+	for(std::string const& macro_options : MacroAsExpr)
 	{
-		auto name_args = split(name);
-		macro_expr.emplace(name_args.first, name_args.second);
+		std::string name, args, cppReplace;
+		std::tie(name, args, cppReplace) = split(macro_options);
+		macro_expr.emplace(name, MacroInfo{ name, args, cppReplace });
 	}
-	for(std::string name : MacroAsStmt)
+	for(std::string const& macro_options : MacroAsStmt)
 	{
-		auto name_args = split(name);
-		macro_stmt.emplace(name_args.first, name_args.second);
+		std::string name, args, cppReplace;
+		std::tie(name, args, cppReplace) = split(macro_options);
+		macro_stmt.emplace(name, MacroInfo{ name, args, cppReplace });
 	}
 
 	// TODO : Find a better way if it exists
@@ -219,60 +231,67 @@ void CPP2DPPHandling::inject_macro(
 	auto iter_inserted = new_macros.insert(new_macro);
 	std::unique_ptr<MemoryBuffer> membuf =
 	  MemoryBuffer::getMemBuffer(*iter_inserted.first, "<" + name + "_macro_override>");
-	FileID fileID = pp_.getSourceManager().createFileID(std::move(membuf));
+	assert(membuf);
+	FileID fileID = pp_.getSourceManager().createFileID(
+	                  std::move(membuf), clang::SrcMgr::C_User, 0, 0, MD->getLocation());
+
 	pp_.EnterSourceFile(fileID, pp_.GetCurDirLookup(), MD->getMacroInfo()->getDefinitionEndLoc());
 
-	add_before_decl.insert(make_d_macro(MD->getMacroInfo(), name));
+	if(CPP2DTools::checkFilename(modulename_, CPP2DTools::getFile(sourceManager_, MD->getLocation())))
+		add_before_decl.insert(make_d_macro(MD->getMacroInfo(), name));
 }
 
 void CPP2DPPHandling::TransformMacroExpr(
   Token const& MacroNameTok,
   MacroDirective const* MD,
-  std::string const& name,
-  std::string const& args)
+  CPP2DPPHandling::MacroInfo const& macro_options)
 {
-	MacroInfo const* MI = MD->getMacroInfo();
+	clang::MacroInfo const* MI = MD->getMacroInfo();
 
 	pp_.appendMacroDirective(MacroNameTok.getIdentifierInfo(),
 	                         new UndefMacroDirective(MacroNameTok.getLocation()));
 
-	new_macros_name.insert(name);
+	new_macros_name.insert(macro_options.name);
 	std::stringstream new_macro;
-	new_macro << "\n#define " + name;
+	new_macro << "\n#define " + macro_options.name;
 
 	if(MI->isFunctionLike())
 		print_macro_args(MI, new_macro);
-	new_macro << " (\"CPP2D_MACRO_EXPR\", ((\"" + name + "\", cpp2d_dummy_variadic";
+	new_macro << " (\"CPP2D_MACRO_EXPR\", ((\"" + macro_options.name + "\", cpp2d_dummy_variadic";
 	if(MI->isFunctionLike())
-		print_macro_args_expand(MI, new_macro, args);
+		print_macro_args_expand(MI, new_macro, macro_options.argType);
 	else
 		new_macro << "()";
-	new_macro << "), " + expand_macro(MI) + "))\n";
+	new_macro << "), ";
+	if(macro_options.cppReplace.empty())
+		new_macro << expand_macro(MI);
+	else
+		new_macro << macro_options.cppReplace;
+	new_macro << + "))\n";
 
-	inject_macro(MD, name, new_macro.str());
+	inject_macro(MD, macro_options.name, new_macro.str());
 }
 
 void CPP2DPPHandling::TransformMacroStmt(
   Token const& MacroNameTok,
   MacroDirective const* MD,
-  std::string const& name,
-  std::string const& args)
+  CPP2DPPHandling::MacroInfo const& macro_options)
 {
-	MacroInfo const* MI = MD->getMacroInfo();
+	clang:: MacroInfo const* MI = MD->getMacroInfo();
 
 	pp_.appendMacroDirective(MacroNameTok.getIdentifierInfo(),
 	                         new UndefMacroDirective(MacroNameTok.getLocation()));
 
-	new_macros_name.insert(name);
+	new_macros_name.insert(macro_options.name);
 	std::stringstream new_macro;
-	new_macro << "\n#define " + name;
+	new_macro << "\n#define " + macro_options.name;
 
 	if(MI->isFunctionLike())
 		print_macro_args(MI, new_macro);
 	new_macro << " int CPP2D_ADD(CPP2D_MACRO_STMT, __COUNTER__) = (\""
-	          << name << "\", cpp2d_dummy_variadic";
+	          << macro_options.name << "\", cpp2d_dummy_variadic";
 	if(MI->isFunctionLike())
-		print_macro_args_expand(MI, new_macro, args);
+		print_macro_args_expand(MI, new_macro, macro_options.argType);
 	else
 		new_macro << "()";
 	new_macro << ");\\\n";
@@ -280,23 +299,23 @@ void CPP2DPPHandling::TransformMacroStmt(
 	new_macro << expand_macro(MI) << "\\\n";
 	new_macro << "int CPP2D_ADD(CPP2D_MACRO_STMT_END, __COUNTER__);";
 
-	inject_macro(MD, name, new_macro.str());
+	inject_macro(MD, macro_options.name, new_macro.str());
 }
 
 
 void CPP2DPPHandling::MacroDefined(const Token& MacroNameTok, const MacroDirective* MD)
 {
 	std::string const& name = MacroNameTok.getIdentifierInfo()->getName();
-	MacroInfo const* MI = MD->getMacroInfo();
+	clang::MacroInfo const* MI = MD->getMacroInfo();
 	if(new_macros_name.count(name) || MI->isBuiltinMacro())
 		return;
 	auto macro_expr_iter = macro_expr.find(name);
 	auto macro_stmt_iter = macro_stmt.find(name);
 	std::string new_macro;
 	if(macro_expr_iter != macro_expr.end())
-		TransformMacroExpr(MacroNameTok, MD, name, macro_expr_iter->second);
+		TransformMacroExpr(MacroNameTok, MD, macro_expr_iter->second);
 	else if(macro_stmt_iter != macro_stmt.end())
-		TransformMacroStmt(MacroNameTok, MD, name, macro_stmt_iter->second);
+		TransformMacroStmt(MacroNameTok, MD, macro_stmt_iter->second);
 }
 
 void CPP2DPPHandling::MacroExpands(

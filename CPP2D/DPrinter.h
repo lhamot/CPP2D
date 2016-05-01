@@ -12,7 +12,7 @@ class DPrinter : public clang::RecursiveASTVisitor<DPrinter>
 {
 	typedef RecursiveASTVisitor<DPrinter> Base;
 
-	void include_file(std::string const& decl_inc);
+	void include_file(std::string const& decl_inc, std::string const& typeName);
 
 	std::string mangleType(clang::NamedDecl const* decl);
 
@@ -233,8 +233,9 @@ public:
 	{
 		Value,
 		Reference,
+		AssocArray,  // Create without new, but reference semantics
 	};
-	Semantic getSemantic(clang::QualType qt);
+	static Semantic getSemantic(clang::QualType qt);
 
 	template<typename PType>
 	bool TraversePointerTypeImpl(PType* Type);
@@ -411,15 +412,17 @@ public:
 
 	bool VisitType(clang::Type* Type);
 
-	std::set<std::string> const& getExternIncludes() const;
+	std::map<std::string, std::set<std::string>> const& getExternIncludes() const;
 
 	std::string getDCode() const;
 
 	std::ostream& stream();
 
-	void addExternInclude(std::string include);
+	void addExternInclude(std::string const& include, std::string const& typeName);
 
 	void printCallExprArgument(clang::CallExpr* Stmt);
+
+	bool shouldVisitImplicitCode() const;
 
 private:
 	bool pass_decl(clang::Decl* decl);
@@ -428,15 +431,9 @@ private:
 
 	bool pass_type(clang::Type* type);
 
-	const char* getFile(clang::Stmt const* d);
-
-	const char* getFile(clang::Decl const* d);
-
-	bool checkFilename(clang::Decl const* d);
-
 	std::set<std::string> includes_in_file;
 	std::set<clang::Expr*> dont_take_ptr;
-	std::set<std::string> extern_includes;
+	std::map<std::string, std::set<std::string> > extern_includes;
 	std::string modulename;
 
 	MatchContainer const& receiver;
@@ -453,4 +450,7 @@ private:
 	bool inForRangeInit = false;
 	bool doPrintType = true;
 	bool splitMultiLineDecl = true;
+	bool portConst = false;
+	bool printDefaultValue = true;
+	bool isThisFunctionUsefull = false;
 };

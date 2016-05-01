@@ -5,6 +5,7 @@
 #include <utility>
 #include <stdexcept>
 #include <array>
+#include <unordered_map>
 
 #define CHECK(COND) check(COND, #COND, __LINE__) //if(!(COND)) error(#COND)
 
@@ -615,11 +616,30 @@ bool is_int<int>()
 	return true;
 }
 
+template<typename A>
+bool is_float();
+
+template<typename A>
+bool is_float()
+{
+	return false;
+}
+
+template<>
+bool is_float<float>();
+
+template<>
+bool is_float<float>()
+{
+	return true;
+}
+
 void check_tmpl_func_spec()
 {
 	struct Blip {};
 	CHECK(is_int<Blip>() == false);
 	CHECK(is_int<int>() == true);
+	CHECK(is_float<float>() == true);
 }
 
 void var_func(char* buffer, const char* fmt, ...)
@@ -1821,7 +1841,7 @@ public:
 	~Class782() { delete toto2; }
 };
 
-Class781 const& take_class(Class781 const& s)
+Class781 const& take_class_(Class781 const& s)
 {
 	return s;
 }
@@ -1841,7 +1861,7 @@ void check_class_ctor_call()
 	CHECK(tutu22.toto2->i == 19);
 	Class782 tutu3 = 6;
 	CHECK(tutu3.toto.i == 6);
-	CHECK(take_class(Class781(57)).i == 57);
+	CHECK(take_class_(Class781(57)).i == 57);
 
 	Class782* tutu4 = new Class782();
 	CHECK(tutu4->toto.i == 0);
@@ -1849,7 +1869,7 @@ void check_class_ctor_call()
 	Class782* tutu5 = new Class782(5);
 	CHECK(tutu5->toto.i == 5);
 	delete tutu5;
-	CHECK(take_class(Class781(57)).i == 57);
+	CHECK(take_class_(Class781(57)).i == 57);
 
 	Class781* tutu6 = take_class(new Class781(58));
 	CHECK(tutu6->i == 58);
@@ -2018,3 +2038,124 @@ void check_implicit_ctor()
 	ImplCtorClass y[3] = { 1, 2, 3 };
 	CHECK(y[2].i == 3);
 }
+
+class WithExternBody
+{
+public:
+	
+	int give42();
+
+	int give43()
+	{
+		return 43;
+	}
+};
+
+int WithExternBody::give42()
+{
+	return 42;
+}
+
+int give42();
+
+int give42()
+{
+	return 42;
+}
+
+
+int give43()
+{
+	return 43;
+}
+
+void check_extern_methode()
+{
+	WithExternBody toto;
+	CHECK(toto.give42() == 42);
+	CHECK(give42() == 42);
+	CHECK(toto.give43() == 43);
+	CHECK(give43() == 43);
+}
+
+struct ContainHashMap
+{
+	std::unordered_map<int, int> m1;
+};
+
+struct ContainHashMap2
+{
+	std::unordered_map<int, int> m1;
+
+	ContainHashMap2() = default;
+
+	ContainHashMap2(ContainHashMap2 const& other)
+		: m1(other.m1)
+	{
+	}
+};
+
+struct ContainHashMap3
+{
+	std::unordered_map<int, int> m1;
+
+	ContainHashMap3() = default;
+
+	ContainHashMap3(ContainHashMap3 const& other)
+	{
+		m1 = other.m1;
+	}
+};
+
+
+void check_std_unordered_map()
+{
+	std::unordered_map<int, int> m1;
+	m1[36] = 78;
+	CHECK(m1[36] == 78);
+
+	std::vector<int> v1;
+	std::vector<int> v2;
+	for (auto i : m1)
+	{
+		v1.push_back(i.first);
+		v2.push_back(i.second);
+	}
+	CHECK(v1[0] == 36);
+	CHECK(v2[0] == 78);
+
+	{
+		ContainHashMap c1;
+		c1.m1[15] = 98;
+		auto c2 = c1;
+		c1.m1[15] = 6;
+		CHECK(c2.m1[15] == 98);
+		c2 = c1;
+		c1.m1[15] = 7;
+		CHECK(c2.m1[15] == 6);
+	}
+
+	{
+		ContainHashMap2 c1;
+		c1.m1[15] = 98;
+		auto c2 = c1;
+		c1.m1[15] = 6;
+		CHECK(c2.m1[15] == 98);
+		c2 = c1;
+		c1.m1[15] = 7;
+		CHECK(c2.m1[15] == 6);
+	}
+
+	{
+		ContainHashMap3 c1;
+		c1.m1[15] = 98;
+		auto c2 = c1;
+		c1.m1[15] = 6;
+		CHECK(c2.m1[15] == 98);
+		c2 = c1;
+		c1.m1[15] = 7;
+		CHECK(c2.m1[15] == 6);
+	}
+
+}
+

@@ -40,7 +40,12 @@ void VisitorToDConsumer::HandleTranslationUnit(clang::ASTContext& Context)
 	if(new_modulename != modulename)  // When filename has some illegal characters
 		file << "module " << new_modulename << ';';
 	for(auto const& import : Visitor.getExternIncludes())
-		file << "import " << import << ";" << std::endl;
+	{
+		file << "import " << import.first << "; //";
+		for(auto const& type : import.second)
+			file << type << " ";
+		file << std::endl;
+	}
 	file << "\n\n";
 	for(auto const& code : ppcallback.getInsertedBeforeDecls())
 		file << code << '\n';

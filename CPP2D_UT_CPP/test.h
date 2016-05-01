@@ -90,3 +90,6 @@ void check_std_array();
 
 void check_implicit_ctor();
 
+void check_extern_methode();
+
+void check_std_unordered_map();
