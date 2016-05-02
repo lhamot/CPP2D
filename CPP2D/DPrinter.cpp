@@ -551,6 +551,11 @@ bool DPrinter::TraverseFieldDecl(FieldDecl* Decl)
 		out() << " = ";
 		TraverseStmt(Decl->getInClassInitializer());
 	}
+	else if(getSemantic(Decl->getType()) == Reference)
+	{
+		out() << " = new ";
+		PrintType(Decl->getType());
+	}
 	return true;
 }
 
@@ -1514,6 +1519,7 @@ bool DPrinter::TraverseConstructorInitializer(CXXCtorInitializer* Init)
 		}
 		else
 		{
+			isThisFunctionUsefull = true;
 			if(auto* ctorExpr = dyn_cast<CXXConstructExpr>(Init->getInit()))
 			{
 				if(ctorExpr->getNumArgs() == 1)
@@ -1522,11 +1528,10 @@ bool DPrinter::TraverseConstructorInitializer(CXXCtorInitializer* Init)
 					QualType fieldType = fieldDecl->getType().getCanonicalType();
 					initType.removeLocalConst();
 					fieldType.removeLocalConst();
-					if(fieldType == initType && getSemantic(initType) == Semantic::AssocArray)
+					if(fieldType == initType)
 					{
 						TraverseStmt(Init->getInit());
 						out() << ".dup()";
-						isThisFunctionUsefull = true;
 						return true;
 					}
 				}
