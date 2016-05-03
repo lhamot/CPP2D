@@ -20,8 +20,8 @@ public:
 	void run(clang::ast_matchers::MatchFinder::MatchResult const& Result) override;
 
 	std::unordered_map<std::string, clang::CXXMethodDecl const*> hash_traits;
-	std::unordered_multimap<std::string, clang::FunctionDecl const*> free_operator;  //left operand will become this
-	std::unordered_multimap<std::string, clang::FunctionDecl const*> free_operator_right; //right operand will become this
+	std::unordered_multimap<std::string, clang::FunctionDecl const*> free_operator;  // left operand will become this
+	std::unordered_multimap<std::string, clang::FunctionDecl const*> free_operator_right; // right operand will become this
 
 	std::function<void(DPrinter& printer, clang::Stmt*)> getPrinter(clang::Stmt const*) const;
 	std::function<void(DPrinter& printer, clang::Decl*)> getPrinter(clang::Decl const*) const;

@@ -170,24 +170,26 @@ static char const* AccessSpecifierStr[] =
 	"public",
 	"protected",
 	"private",
-	"private"  // ...the special value "none" which means different things in different contexts. (from the clang doxy)
+	"private" // ...the special value "none" which means different things in different contexts.
+	//  (from the clang doxy)
 };
 
 void DPrinter::setIncludes(std::set<std::string> const& includes)
 {
-	includes_in_file = includes;
+	includesInFile = includes;
 }
 
-void DPrinter::include_file(std::string const& decl_inc, std::string const& typeName)
+void DPrinter::includeFile(std::string const& declInc, std::string const& typeName)
 {
 	if(isInMacro)
 		return;
-	for(std::string include : includes_in_file)
+	for(std::string include : includesInFile)
 	{
-		auto const pos = decl_inc.find(include);
+		auto const pos = declInc.find(include);
+		// TODO : Use llvm::path
 		if(pos != std::string::npos &&
-		   pos == (decl_inc.size() - include.size()) &&
-		   (pos == 0 || decl_inc[pos - 1] == '/' || decl_inc[pos - 1] == '\\'))
+		   pos == (declInc.size() - include.size()) &&
+		   (pos == 0 || declInc[pos - 1] == '/' || declInc[pos - 1] == '\\'))
 		{
 			if(include.find(".h") == include.size() - 2)
 				include = include.substr(0, include.size() - 2);
@@ -198,7 +200,7 @@ void DPrinter::include_file(std::string const& decl_inc, std::string const& type
 			               tolower);
 			std::replace(std::begin(include), std::end(include), '/', '.');
 			std::replace(std::begin(include), std::end(include), '\\', '.');
-			extern_includes[include].insert(typeName);
+			externIncludes[include].insert(typeName);
 			break;
 		}
 	}
@@ -206,35 +208,36 @@ void DPrinter::include_file(std::string const& decl_inc, std::string const& type
 
 std::string DPrinter::mangleType(NamedDecl const* decl)
 {
-	NamedDecl const* can_decl = nullptr;
+	NamedDecl const* canDecl = nullptr;
 	std::string const& name = decl->getNameAsString();
-	std::string qual_name = name;
-	if(Decl const* can_decl_notype = decl->getCanonicalDecl())
+	std::string qualName = name;
+	if(Decl const* canDeclNotype = decl->getCanonicalDecl())
 	{
-		auto const kind = can_decl_notype->getKind();
+		auto const kind = canDeclNotype->getKind();
 		if(Decl::Kind::firstNamed <= kind && kind <= Decl::Kind::lastNamed)
 		{
-			can_decl = static_cast<NamedDecl const*>(can_decl_notype);
-			qual_name = can_decl->getQualifiedNameAsString();
+			canDecl = static_cast<NamedDecl const*>(canDeclNotype);
+			qualName = canDecl->getQualifiedNameAsString();
 		}
 	}
 
-	auto qual_type_to_d = type2type.find(qual_name);
-	if(qual_type_to_d != type2type.end())
+	auto qualTypeToD = type2type.find(qualName);
+	if(qualTypeToD != type2type.end())
 	{
 		//There is a convertion to D
-		auto const& d_qual_type = qual_type_to_d->second;
-		auto const dot_pos = d_qual_type.find_last_of('.');
-		auto const module = dot_pos == std::string::npos ?
+		auto const& dQualType = qualTypeToD->second;
+		auto const dotPos = dQualType.find_last_of('.');
+		auto const module = dotPos == std::string::npos ?
 		                    std::string() :
-		                    d_qual_type.substr(0, dot_pos);
+		                    dQualType.substr(0, dotPos);
 		if(not module.empty())  //Need an import
-			extern_includes[module].insert(qual_name);
-		return d_qual_type.substr(dot_pos + 1);
+			externIncludes[module].insert(qualName);
+		return dQualType.substr(dotPos + 1);
 	}
 	else
 	{
-		include_file(CPP2DTools::getFile(Context->getSourceManager(), can_decl ? can_decl : decl), qual_name);
+		NamedDecl const* usedDecl = canDecl ? canDecl : decl;
+		includeFile(CPP2DTools::getFile(Context->getSourceManager(), usedDecl), qualName);
 		return mangleName(name);
 	}
 }
@@ -255,7 +258,7 @@ std::string DPrinter::mangleVar(DeclRefExpr* expr)
 {
 	std::string name = getName(expr->getNameInfo().getName());
 	if(char const* filename = CPP2DTools::getFile(Context->getSourceManager(), expr->getDecl()))
-		include_file(filename, name);
+		includeFile(filename, name);
 	return mangleName(name);
 }
 
@@ -280,18 +283,16 @@ std::string DPrinter::replace(std::string str, std::string const& in, std::strin
 void DPrinter::printCommentBefore(Decl* t)
 {
 	SourceManager& sm = Context->getSourceManager();
-	std::stringstream line_return;
-	line_return << std::endl;
 	const RawComment* rc = Context->getRawCommentForDeclNoCache(t);
 	if(rc && not rc->isTrailingComment())
 	{
 		using namespace std;
-		out() << std::endl << indent_str();
+		out() << std::endl << indentStr();
 		string const comment = rc->getRawText(sm).str();
-		out() << replace(comment, "\r\n", line_return.str()) << std::endl << indent_str();
+		out() << replace(comment, "\r\n", "\n") << std::endl << indentStr();
 	}
 	else
-		out() << std::endl << indent_str();
+		out() << std::endl << indentStr();
 }
 
 void DPrinter::printCommentAfter(Decl* t)
@@ -347,7 +348,7 @@ void DPrinter::printStmtComment(SourceLocation& locStart,
 	std::vector<std::string> comments = split(comment);
 	//if (comments.back() == std::string())
 	comments.pop_back();
-	Spliter split(indent_str());
+	Spliter split(indentStr());
 	if(comments.empty())
 		out() << std::endl;
 	if(not comments.empty())
@@ -384,7 +385,7 @@ void DPrinter::printStmtComment(SourceLocation& locStart,
 	locStart = nextStart;
 }
 
-void DPrinter::PrintMacroArgs(CallExpr* macro_args)
+void DPrinter::printMacroArgs(CallExpr* macro_args)
 {
 	Spliter split(", ");
 	for(Expr* arg : macro_args->arguments())
@@ -423,7 +424,7 @@ void DPrinter::PrintMacroArgs(CallExpr* macro_args)
 	}
 }
 
-void DPrinter::PrintStmtMacro(std::string const& varName, Expr* init)
+void DPrinter::printStmtMacro(std::string const& varName, Expr* init)
 {
 	if(varName.find("CPP2D_MACRO_STMT_END") == 0)
 		--isInMacro;
@@ -433,11 +434,11 @@ void DPrinter::PrintStmtMacro(std::string const& varName, Expr* init)
 		{
 			return dyn_cast<BinaryOperator>(dyn_cast<ParenExpr>(paren)->getSubExpr());
 		};
-		BinaryOperator* name_and_args = get_binop(init); // Decl->getInClassInitializer());
+		BinaryOperator* name_and_args = get_binop(init);
 		auto* macro_name = dyn_cast<StringLiteral>(name_and_args->getLHS());
 		auto* macro_args = dyn_cast<CallExpr>(name_and_args->getRHS());
 		out() << "mixin(" << macro_name->getString().str() << "!(";
-		PrintMacroArgs(macro_args);
+		printMacroArgs(macro_args);
 		out() << "))";
 		++isInMacro;
 	}
@@ -453,22 +454,17 @@ DPrinter::DPrinter(
 {
 }
 
-std::string DPrinter::indent_str() const
+std::string DPrinter::indentStr() const
 {
 	return std::string(indent * 4, ' ');
 }
 
 bool DPrinter::TraverseTranslationUnitDecl(TranslationUnitDecl* Decl)
 {
-	if(pass_decl(Decl)) return true;
+	if(passDecl(Decl)) return true;
 
 	outStack.clear();
 	outStack.emplace_back(std::make_unique<std::stringstream>());
-
-	//SourceManager& sm = Context->getSourceManager();
-	//SourceLocation prevDeclEnd;
-	//for(auto c: Context->Comments.getComments())
-	//	out() << c->getRawText(sm).str() << std::endl;
 
 	for(auto c : Decl->decls())
 	{
@@ -480,7 +476,7 @@ bool DPrinter::TraverseTranslationUnitDecl(TranslationUnitDecl* Decl)
 			if(not decl.empty())
 			{
 				printCommentBefore(c);
-				out() << indent_str() << decl;
+				out() << indentStr() << decl;
 				if(needSemiComma(c))
 					out() << ';';
 				printCommentAfter(c);
@@ -495,55 +491,55 @@ bool DPrinter::TraverseTranslationUnitDecl(TranslationUnitDecl* Decl)
 
 bool DPrinter::TraverseTypedefDecl(TypedefDecl* Decl)
 {
-	if(pass_decl(Decl)) return true;
+	if(passDecl(Decl)) return true;
 	out() << "alias " << mangleName(Decl->getNameAsString()) << " = ";
-	PrintType(Decl->getUnderlyingType());
+	printType(Decl->getUnderlyingType());
 	return true;
 }
 
 bool DPrinter::TraverseTypeAliasDecl(TypeAliasDecl* Decl)
 {
-	if(pass_decl(Decl)) return true;
+	if(passDecl(Decl)) return true;
 	out() << "alias " << mangleName(Decl->getNameAsString()) << " = ";
-	PrintType(Decl->getUnderlyingType());
+	printType(Decl->getUnderlyingType());
 	return true;
 }
 
 bool DPrinter::TraverseTypeAliasTemplateDecl(TypeAliasTemplateDecl* Decl)
 {
-	if(pass_decl(Decl)) return true;
+	if(passDecl(Decl)) return true;
 	out() << "alias " << mangleName(Decl->getNameAsString());
-	PrintTemplateParameterList(Decl->getTemplateParameters(), "");
+	printTemplateParameterList(Decl->getTemplateParameters(), "");
 	out() << " = ";
-	PrintType(Decl->getTemplatedDecl()->getUnderlyingType());
+	printType(Decl->getTemplatedDecl()->getUnderlyingType());
 	return true;
 }
 
 bool DPrinter::TraverseFieldDecl(FieldDecl* Decl)
 {
-	if(pass_decl(Decl)) return true;
+	if(passDecl(Decl)) return true;
 	std::string const varName = Decl->getNameAsString();
 	if(varName.find("CPP2D_MACRO_STMT") == 0)
 	{
-		PrintStmtMacro(varName, Decl->getInClassInitializer());
+		printStmtMacro(varName, Decl->getInClassInitializer());
 		return true;
 	}
 
-	if(pass_decl(Decl)) return true;
+	if(passDecl(Decl)) return true;
 	if(Decl->isMutable())
 		out() << "/*mutable*/";
 	if(Decl->isBitField())
 	{
 		out() << "\t";
-		PrintType(Decl->getType());
+		printType(Decl->getType());
 		out() << ", \"" << mangleName(varName) << "\", ";
 		TraverseStmt(Decl->getBitWidth());
 		out() << ',';
-		extern_includes["std.bitmanip"].insert("bitfields");
+		externIncludes["std.bitmanip"].insert("bitfields");
 	}
 	else
 	{
-		PrintType(Decl->getType());
+		printType(Decl->getType());
 		out() << " " << mangleName(Decl->getNameAsString());
 	}
 	if(Decl->hasInClassInitializer())
@@ -554,14 +550,14 @@ bool DPrinter::TraverseFieldDecl(FieldDecl* Decl)
 	else if(getSemantic(Decl->getType()) == Reference)
 	{
 		out() << " = new ";
-		PrintType(Decl->getType());
+		printType(Decl->getType());
 	}
 	return true;
 }
 
 bool DPrinter::TraverseDependentNameType(DependentNameType* Type)
 {
-	if(pass_type(Type)) return false;
+	if(passType(Type)) return false;
 	TraverseNestedNameSpecifier(Type->getQualifier());
 	out() << Type->getIdentifier()->getName().str();
 	return true;
@@ -569,37 +565,37 @@ bool DPrinter::TraverseDependentNameType(DependentNameType* Type)
 
 bool DPrinter::TraverseAttributedType(AttributedType* Type)
 {
-	if(pass_type(Type)) return false;
-	PrintType(Type->getEquivalentType());
+	if(passType(Type)) return false;
+	printType(Type->getEquivalentType());
 	return true;
 }
 
 bool DPrinter::TraverseDecayedType(DecayedType* Type)
 {
-	if(pass_type(Type)) return false;
-	PrintType(Type->getOriginalType());
+	if(passType(Type)) return false;
+	printType(Type->getOriginalType());
 	return true;
 }
 
 bool DPrinter::TraverseElaboratedType(ElaboratedType* Type)
 {
-	if(pass_type(Type)) return false;
+	if(passType(Type)) return false;
 	if(Type->getQualifier())
 		TraverseNestedNameSpecifier(Type->getQualifier());
-	PrintType(Type->getNamedType());
+	printType(Type->getNamedType());
 	return true;
 }
 
 bool DPrinter::TraverseInjectedClassNameType(InjectedClassNameType* Type)
 {
-	if(pass_type(Type)) return false;
-	PrintType(Type->getInjectedSpecializationType());
+	if(passType(Type)) return false;
+	printType(Type->getInjectedSpecializationType());
 	return true;
 }
 
 bool DPrinter::TraverseSubstTemplateTypeParmType(SubstTemplateTypeParmType* Type)
 {
-	if(pass_type(Type)) return false;
+	if(passType(Type)) return false;
 	return true;
 }
 
@@ -617,7 +613,7 @@ bool DPrinter::TraverseNestedNameSpecifier(NestedNameSpecifier* NNS)
 	//case NestedNameSpecifier::Super:
 	case NestedNameSpecifier::TypeSpec:
 	case NestedNameSpecifier::TypeSpecWithTemplate:
-		PrintType(QualType(NNS->getAsType(), 0));
+		printType(QualType(NNS->getAsType(), 0));
 		out() << ".";
 		break;
 	case NestedNameSpecifier::Identifier:
@@ -635,20 +631,20 @@ void DPrinter::printTmpArgList(std::string const& tmpArgListStr)
 
 bool DPrinter::TraverseTemplateSpecializationType(TemplateSpecializationType* Type)
 {
-	if(pass_type(Type)) return false;
+	if(passType(Type)) return false;
 	if(isStdArray(Type->desugar()))
 	{
-		PrintTemplateArgument(Type->getArg(0));
+		printTemplateArgument(Type->getArg(0));
 		out() << '[';
-		PrintTemplateArgument(Type->getArg(1));
+		printTemplateArgument(Type->getArg(1));
 		out() << ']';
 		return true;
 	}
 	else if(isStdUnorderedMap(Type->desugar()))
 	{
-		PrintTemplateArgument(Type->getArg(1));
+		printTemplateArgument(Type->getArg(1));
 		out() << '[';
-		PrintTemplateArgument(Type->getArg(0));
+		printTemplateArgument(Type->getArg(0));
 		out() << ']';
 		return true;
 	}
@@ -659,7 +655,7 @@ bool DPrinter::TraverseTemplateSpecializationType(TemplateSpecializationType* Ty
 	for(unsigned int i = 0; i < argNum; ++i)
 	{
 		spliter.split();
-		PrintTemplateArgument(Type->getArg(i));
+		printTemplateArgument(Type->getArg(i));
 	}
 	printTmpArgList(popStream());
 	return true;
@@ -667,13 +663,13 @@ bool DPrinter::TraverseTemplateSpecializationType(TemplateSpecializationType* Ty
 
 bool DPrinter::TraverseTypedefType(TypedefType* Type)
 {
-	if(pass_type(Type)) return false;
+	if(passType(Type)) return false;
 	out() << mangleType(Type->getDecl());
 	return true;
 }
 
 template<typename InitList>
-bool DPrinter::TraverseCompoundStmtImpl(CompoundStmt* Stmt, InitList initList)
+bool DPrinter::traverseCompoundStmtImpl(CompoundStmt* Stmt, InitList initList)
 {
 	SourceLocation locStart = Stmt->getLBracLoc().getLocWithOffset(1);
 	out() << "{";
@@ -684,7 +680,7 @@ bool DPrinter::TraverseCompoundStmtImpl(CompoundStmt* Stmt, InitList initList)
 		printStmtComment(locStart,
 		                 child->getLocStart().getLocWithOffset(-1),
 		                 child->getLocEnd());
-		out() << indent_str();
+		out() << indentStr();
 		TraverseStmt(child);
 		if(needSemiComma(child))
 			out() << ";";
@@ -692,27 +688,27 @@ bool DPrinter::TraverseCompoundStmtImpl(CompoundStmt* Stmt, InitList initList)
 	}
 	printStmtComment(locStart, Stmt->getRBracLoc().getLocWithOffset(-1));
 	--indent;
-	out() << indent_str();
+	out() << indentStr();
 	out() << "}";
 	return true;
 }
 
 bool DPrinter::TraverseCompoundStmt(CompoundStmt* Stmt)
 {
-	if(pass_stmt(Stmt)) return false;
-	return TraverseCompoundStmtImpl(Stmt, [] {});
+	if(passStmt(Stmt)) return false;
+	return traverseCompoundStmtImpl(Stmt, [] {});
 }
 
 template<typename InitList>
-bool DPrinter::TraverseCXXTryStmtImpl(CXXTryStmt* Stmt, InitList initList)
+bool DPrinter::traverseCXXTryStmtImpl(CXXTryStmt* Stmt, InitList initList)
 {
-	out() << "try" << std::endl << indent_str();
+	out() << "try" << std::endl << indentStr();
 	auto tryBlock = Stmt->getTryBlock();
-	TraverseCompoundStmtImpl(tryBlock, initList);
+	traverseCompoundStmtImpl(tryBlock, initList);
 	auto handlerCount = Stmt->getNumHandlers();
 	for(decltype(handlerCount) i = 0; i < handlerCount; ++i)
 	{
-		out() << std::endl << indent_str();
+		out() << std::endl << indentStr();
 		TraverseStmt(Stmt->getHandler(i));
 	}
 	return true;
@@ -720,11 +716,11 @@ bool DPrinter::TraverseCXXTryStmtImpl(CXXTryStmt* Stmt, InitList initList)
 
 bool DPrinter::TraverseCXXTryStmt(CXXTryStmt* Stmt)
 {
-	if(pass_stmt(Stmt)) return false;
-	return TraverseCXXTryStmtImpl(Stmt, [] {});
+	if(passStmt(Stmt)) return false;
+	return traverseCXXTryStmtImpl(Stmt, [] {});
 }
 
-bool DPrinter::pass_decl(Decl* decl)
+bool DPrinter::passDecl(Decl* decl)
 {
 	auto printer = receiver.getPrinter(decl);
 	if(printer)
@@ -736,7 +732,7 @@ bool DPrinter::pass_decl(Decl* decl)
 		return false;
 }
 
-bool DPrinter::pass_stmt(Stmt* stmt)
+bool DPrinter::passStmt(Stmt* stmt)
 {
 	auto printer = receiver.getPrinter(stmt);
 	if(printer)
@@ -748,7 +744,7 @@ bool DPrinter::pass_stmt(Stmt* stmt)
 		return false;
 }
 
-bool DPrinter::pass_type(Type* type)
+bool DPrinter::passType(Type* type)
 {
 	auto printer = receiver.getPrinter(type);
 	if(printer)
@@ -763,7 +759,7 @@ bool DPrinter::pass_type(Type* type)
 
 bool DPrinter::TraverseNamespaceDecl(NamespaceDecl* Decl)
 {
-	if(pass_decl(Decl)) return true;
+	if(passDecl(Decl)) return true;
 	out() << "// -> module " << mangleName(Decl->getNameAsString()) << ';' << std::endl;
 	for(auto decl : Decl->decls())
 	{
@@ -773,7 +769,7 @@ bool DPrinter::TraverseNamespaceDecl(NamespaceDecl* Decl)
 		if(not declstr.empty())
 		{
 			printCommentBefore(decl);
-			out() << indent_str() << declstr;
+			out() << indentStr() << declstr;
 			if(needSemiComma(decl))
 				out() << ';';
 			printCommentAfter(decl);
@@ -787,23 +783,23 @@ bool DPrinter::TraverseNamespaceDecl(NamespaceDecl* Decl)
 
 bool DPrinter::TraverseCXXCatchStmt(CXXCatchStmt* Stmt)
 {
-	if(pass_stmt(Stmt)) return false;
+	if(passStmt(Stmt)) return false;
 	out() << "catch";
 	if(Stmt->getExceptionDecl())
 	{
 		out() << '(';
-		TraverseVarDeclImpl(Stmt->getExceptionDecl());
+		traverseVarDeclImpl(Stmt->getExceptionDecl());
 		out() << ')';
 	}
 	out() << std::endl;
-	out() << indent_str();
+	out() << indentStr();
 	TraverseStmt(Stmt->getHandlerBlock());
 	return true;
 }
 
 bool DPrinter::TraverseAccessSpecDecl(AccessSpecDecl* Decl)
 {
-	if(pass_decl(Decl)) return true;
+	if(passDecl(Decl)) return true;
 	return true;
 }
 
@@ -820,10 +816,11 @@ void DPrinter::printBasesClass(CXXRecordDecl* decl)
 			if(as != AccessSpecifier::AS_public)
 			{
 				llvm::errs()
-				    << "error : class " << decl->getNameAsString() << " use of base class protection private and protected is no supported\n";
+				    << "error : class " << decl->getNameAsString()
+				    << " use of base class protection private and protected is no supported\n";
 				out() << "/*" << AccessSpecifierStr[as] << "*/ ";
 			}
-			PrintType(base.getType());
+			printType(base.getType());
 		};
 		for(CXXBaseSpecifier& base : decl->bases())
 			printBaseSpec(base);
@@ -834,7 +831,7 @@ void DPrinter::printBasesClass(CXXRecordDecl* decl)
 
 bool DPrinter::TraverseCXXRecordDecl(CXXRecordDecl* decl)
 {
-	if(pass_decl(decl)) return true;
+	if(passDecl(decl)) return true;
 	if(decl->isClass())
 	{
 		for(auto* ctor : decl->ctors())
@@ -847,17 +844,17 @@ bool DPrinter::TraverseCXXRecordDecl(CXXRecordDecl* decl)
 			}
 		}
 	}
-	return TraverseCXXRecordDeclImpl(decl, [] {}, [this, decl] {printBasesClass(decl); });
+	return traverseCXXRecordDeclImpl(decl, [] {}, [this, decl] {printBasesClass(decl); });
 }
 
 bool DPrinter::TraverseRecordDecl(RecordDecl* Decl)
 {
-	if(pass_decl(Decl)) return true;
-	return TraverseCXXRecordDeclImpl(Decl, [] {}, [] {});
+	if(passDecl(Decl)) return true;
+	return traverseCXXRecordDeclImpl(Decl, [] {}, [] {});
 }
 
 template<typename TmpSpecFunc, typename PrintBasesClass>
-bool DPrinter::TraverseCXXRecordDeclImpl(
+bool DPrinter::traverseCXXRecordDeclImpl(
   RecordDecl* decl,
   TmpSpecFunc traverseTmpSpecs,
   PrintBasesClass printBasesClass)
@@ -867,41 +864,17 @@ bool DPrinter::TraverseCXXRecordDeclImpl(
 	if(decl->isCompleteDefinition() == false && decl->getDefinition() != nullptr)
 		return true;
 
-	const bool isClass = decl->isClass();// || decl->isPolymorphic();
+	const bool isClass = decl->isClass();
 	char const* struct_class =
 	  decl->isClass() ? "class" :
 	  decl->isUnion() ? "union" :
 	  "struct";
-	/*if(decl->isCompleteDefinition())
-	{
-		size_t field_count = std::distance(decl->field_begin(), decl->field_end());
-		if(field_count == 0
-		   && decl->getKind() == Decl::Kind::CXXRecord)
-		{
-			CXXRecordDecl* cppRecord = static_cast<CXXRecordDecl*>(decl);
-
-			if(cppRecord->hasUserDeclaredConstructor() == false)
-			{
-				bool hasBody = false;
-				for(CXXMethodDecl* method : cppRecord->methods())
-				{
-					if(method->isUserProvided() && method->isPure() == false)
-					{
-						hasBody = true;
-						break;
-					}
-				}
-				if(hasBody == false)
-					struct_class = "interface";
-			}
-		}
-	}*/
 	out() << struct_class << " " << mangleName(decl->getNameAsString());
 	traverseTmpSpecs();
 	if(decl->isCompleteDefinition() == false)
 		return true;
 	printBasesClass();
-	out() << std::endl << indent_str() << "{";
+	out() << std::endl << indentStr() << "{";
 	++indent;
 
 	auto isBitField = [this](Decl * decl2) -> int
@@ -927,7 +900,6 @@ bool DPrinter::TraverseCXXRecordDeclImpl(
 		  64;
 	};
 
-	//Base::TraverseCXXRecordDecl(decl);
 	int bit_count = 0;
 	bool inBitField = false;
 	AccessSpecifier access = isClass ?
@@ -941,7 +913,8 @@ bool DPrinter::TraverseCXXRecordDeclImpl(
 		if(nextIsBitField)
 			bit_count += bc;
 		else if(bit_count != 0)
-			out() << "\tuint, \"\", " << (roundPow2(bit_count) - bit_count) << "));\n" << indent_str();
+			out() << "\tuint, \"\", " << (roundPow2(bit_count) - bit_count) << "));\n"
+			      << indentStr();
 		TraverseDecl(decl2);
 		std::string const declstr = popStream();
 		if(not declstr.empty())
@@ -952,13 +925,13 @@ bool DPrinter::TraverseCXXRecordDeclImpl(
 			if(newAccess != access && (isInMacro == 0))
 			{
 				--indent;
-				out() << std::endl << indent_str() << AccessSpecifierStr[newAccess] << ":";
+				out() << std::endl << indentStr() << AccessSpecifierStr[newAccess] << ":";
 				++indent;
 				access = newAccess;
 			}
 			printCommentBefore(decl2);
 			if(inBitField == false && nextIsBitField && (isInMacro == 0))
-				out() << "mixin(bitfields!(\n" << indent_str();
+				out() << "mixin(bitfields!(\n" << indentStr();
 			out() << declstr;
 			if(needSemiComma(decl2) && nextIsBitField == false)
 				out() << ";";
@@ -970,7 +943,8 @@ bool DPrinter::TraverseCXXRecordDeclImpl(
 		output_enabled = (isInMacro == 0);
 	}
 	if(inBitField)
-		out() << "\n" << indent_str() << "\tuint, \"\", " << (roundPow2(bit_count) - bit_count) << "));";
+		out() << "\n" << indentStr() << "\tuint, \"\", "
+		      << (roundPow2(bit_count) - bit_count) << "));";
 	out() << std::endl;
 
 	//Print all free operator inside the class scope
@@ -979,16 +953,16 @@ bool DPrinter::TraverseCXXRecordDeclImpl(
 	    rng.first != rng.second;
 	    ++rng.first)
 	{
-		out() << indent_str();
-		TraverseFunctionDeclImpl(const_cast<FunctionDecl*>(rng.first->second), 0);
+		out() << indentStr();
+		traverseFunctionDeclImpl(const_cast<FunctionDecl*>(rng.first->second), 0);
 		out() << std::endl;
 	}
 	for(auto rng = receiver.free_operator_right.equal_range(record_name);
 	    rng.first != rng.second;
 	    ++rng.first)
 	{
-		out() << indent_str();
-		TraverseFunctionDeclImpl(const_cast<FunctionDecl*>(rng.first->second), 1);
+		out() << indentStr();
+		traverseFunctionDeclImpl(const_cast<FunctionDecl*>(rng.first->second), 1);
 		out() << std::endl;
 	}
 
@@ -1002,41 +976,42 @@ bool DPrinter::TraverseCXXRecordDeclImpl(
 			RelationInfo& info = type_info.second;
 			if(info.hasOpLess and info.hasOpEqual)
 			{
-				out() << indent_str() << "int opCmp(ref in ";
-				PrintType(type->getPointeeType());
+				out() << indentStr() << "int opCmp(ref in ";
+				printType(type->getPointeeType());
 				out() << " other)";
 				if(portConst)
 					out() << " const";
 				out() << "\n";
-				out() << indent_str() << "{\n";
+				out() << indentStr() << "{\n";
 				++indent;
-				out() << indent_str() << "return _opLess(other) ? -1: ((this == other)? 0: 1);\n";
+				out() << indentStr() << "return _opLess(other) ? -1: ((this == other)? 0: 1);\n";
 				--indent;
-				out() << indent_str() << "}\n";
+				out() << indentStr() << "}\n";
 			}
 		}
 
 		if(classInfo.hasOpExclaim and not classInfo.hasBoolConv)
 		{
-			out() << indent_str() << "bool opCast(T : bool)()";
+			out() << indentStr() << "bool opCast(T : bool)()";
 			if(portConst)
 				out() << " const";
 			out() << "\n";
-			out() << indent_str() << "{\n";
+			out() << indentStr() << "{\n";
 			++indent;
-			out() << indent_str() << "return !_opExclaim();\n";
+			out() << indentStr() << "return !_opExclaim();\n";
 			--indent;
-			out() << indent_str() << "}\n";
+			out() << indentStr() << "}\n";
 		}
 	}
 
 	--indent;
-	out() << indent_str() << "}";
+	out() << indentStr() << "}";
 
 	return true;
 }
 
-void DPrinter::PrintTemplateParameterList(TemplateParameterList* tmpParams, std::string const& prevTmplParmsStr)
+void DPrinter::printTemplateParameterList(TemplateParameterList* tmpParams,
+    std::string const& prevTmplParmsStr)
 {
 	out() << "(";
 	Spliter spliter1(", ");
@@ -1056,7 +1031,7 @@ void DPrinter::PrintTemplateParameterList(TemplateParameterList* tmpParams, std:
 			if(FTTP->hasDefaultArgument())
 			{
 				out() << " = ";
-				PrintType(FTTP->getDefaultArgument());
+				printType(FTTP->getDefaultArgument());
 			}
 		}
 		else if(auto* FNTTP = dyn_cast<NonTypeTemplateParmDecl>(param))
@@ -1072,7 +1047,7 @@ void DPrinter::PrintTemplateParameterList(TemplateParameterList* tmpParams, std:
 			if(FTTTP->hasDefaultArgument())
 			{
 				out() << " = ";
-				PrintTemplateArgument(FTTTP->getDefaultArgument().getArgument());
+				printTemplateArgument(FTTTP->getDefaultArgument().getArgument());
 			}
 		}
 	}
@@ -1081,10 +1056,10 @@ void DPrinter::PrintTemplateParameterList(TemplateParameterList* tmpParams, std:
 
 bool DPrinter::TraverseClassTemplateDecl(ClassTemplateDecl* Decl)
 {
-	if(pass_decl(Decl)) return true;
-	TraverseCXXRecordDeclImpl(Decl->getTemplatedDecl(), [Decl, this]
+	if(passDecl(Decl)) return true;
+	traverseCXXRecordDeclImpl(Decl->getTemplatedDecl(), [Decl, this]
 	{
-		PrintTemplateParameterList(Decl->getTemplateParameters(), "");
+		printTemplateParameterList(Decl->getTemplateParameters(), "");
 	},
 	[this, Decl] {printBasesClass(Decl->getTemplatedDecl()); });
 	return true;
@@ -1095,7 +1070,8 @@ TemplateParameterList* DPrinter::getTemplateParameters(ClassTemplateSpecializati
 	return nullptr;
 }
 
-TemplateParameterList* DPrinter::getTemplateParameters(ClassTemplatePartialSpecializationDecl* Decl)
+TemplateParameterList* DPrinter::getTemplateParameters(
+  ClassTemplatePartialSpecializationDecl* Decl)
 {
 	return Decl->getTemplateParameters();
 }
@@ -1103,17 +1079,17 @@ TemplateParameterList* DPrinter::getTemplateParameters(ClassTemplatePartialSpeci
 bool DPrinter::TraverseClassTemplatePartialSpecializationDecl(
   ClassTemplatePartialSpecializationDecl* Decl)
 {
-	if(pass_decl(Decl)) return true;
-	return TraverseClassTemplateSpecializationDeclImpl(Decl);
+	if(passDecl(Decl)) return true;
+	return traverseClassTemplateSpecializationDeclImpl(Decl);
 }
 
 bool DPrinter::TraverseClassTemplateSpecializationDecl(ClassTemplateSpecializationDecl* Decl)
 {
-	if(pass_decl(Decl)) return true;
-	return TraverseClassTemplateSpecializationDeclImpl(Decl);
+	if(passDecl(Decl)) return true;
+	return traverseClassTemplateSpecializationDeclImpl(Decl);
 }
 
-void DPrinter::PrintTemplateArgument(TemplateArgument const& ta)
+void DPrinter::printTemplateArgument(TemplateArgument const& ta)
 {
 	switch(ta.getKind())
 	{
@@ -1121,12 +1097,12 @@ void DPrinter::PrintTemplateArgument(TemplateArgument const& ta)
 	case TemplateArgument::Declaration: TraverseDecl(ta.getAsDecl()); break;
 	case TemplateArgument::Integral: out() << ta.getAsIntegral().toString(10); break;
 	case TemplateArgument::NullPtr: out() << "null"; break;
-	case TemplateArgument::Type: PrintType(ta.getAsType()); break;
+	case TemplateArgument::Type: printType(ta.getAsType()); break;
 	default: TraverseTemplateArgument(ta);
 	}
 }
 
-void DPrinter::PrintTemplateSpec_TmpArgsAndParms(
+void DPrinter::printTemplateSpec_TmpArgsAndParms(
   TemplateParameterList& primaryTmpParams,
   TemplateArgumentList const& tmpArgs,
   TemplateParameterList* newTmpParams,
@@ -1159,7 +1135,7 @@ void DPrinter::PrintTemplateSpec_TmpArgsAndParms(
 		TraverseDecl(primaryTmpParams.getParam(i));
 		renameIdentifiers = true;
 		out() << " : ";
-		PrintTemplateArgument(tmpArgs.get(i));
+		printTemplateArgument(tmpArgs.get(i));
 	}
 	if(newTmpParams)
 	{
@@ -1173,78 +1149,79 @@ void DPrinter::PrintTemplateSpec_TmpArgsAndParms(
 }
 
 template<typename D>
-bool DPrinter::TraverseClassTemplateSpecializationDeclImpl(D* Decl)
+bool DPrinter::traverseClassTemplateSpecializationDeclImpl(D* Decl)
 {
-	if(pass_decl(Decl)) return true;
+	if(passDecl(Decl)) return true;
 	if(Decl->getSpecializationKind() == TSK_ExplicitInstantiationDeclaration
 	   || Decl->getSpecializationKind() == TSK_ExplicitInstantiationDefinition
 	   || Decl->getSpecializationKind() == TSK_ImplicitInstantiation)
 		return true;
 
-	template_args_stack.emplace_back();
+	templateArgsStack.emplace_back();
 	TemplateParameterList* tmpParams = getTemplateParameters(Decl);
 	if(tmpParams)
 	{
-		auto& template_args = template_args_stack.back();
+		auto& template_args = templateArgsStack.back();
 		for(decltype(tmpParams->size()) i = 0, size = tmpParams->size(); i != size; ++i)
 			template_args.push_back(tmpParams->getParam(i));
 	}
-	TemplateParameterList& specializedTmpParams = *Decl->getSpecializedTemplate()->getTemplateParameters();
+	TemplateParameterList& specializedTmpParams =
+	  *Decl->getSpecializedTemplate()->getTemplateParameters();
 	TemplateArgumentList const& tmpArgs = Decl->getTemplateArgs();
-	TraverseCXXRecordDeclImpl(Decl, [&]
+	traverseCXXRecordDeclImpl(Decl, [&]
 	{
-		PrintTemplateSpec_TmpArgsAndParms(specializedTmpParams, tmpArgs, tmpParams, "");
+		printTemplateSpec_TmpArgsAndParms(specializedTmpParams, tmpArgs, tmpParams, "");
 	},
 	[this, Decl] {printBasesClass(Decl); });
-	template_args_stack.pop_back();
+	templateArgsStack.pop_back();
 	return true;
 }
 
 bool DPrinter::TraverseCXXConversionDecl(CXXConversionDecl* Decl)
 {
-	if(pass_decl(Decl)) return true;
-	return TraverseFunctionDeclImpl(Decl);
+	if(passDecl(Decl)) return true;
+	return traverseFunctionDeclImpl(Decl);
 }
 
 bool DPrinter::TraverseCXXConstructorDecl(CXXConstructorDecl* Decl)
 {
-	if(pass_decl(Decl)) return true;
-	return TraverseFunctionDeclImpl(Decl);
+	if(passDecl(Decl)) return true;
+	return traverseFunctionDeclImpl(Decl);
 }
 
 bool DPrinter::TraverseCXXDestructorDecl(CXXDestructorDecl* Decl)
 {
-	if(pass_decl(Decl)) return true;
-	return TraverseFunctionDeclImpl(Decl);
+	if(passDecl(Decl)) return true;
+	return traverseFunctionDeclImpl(Decl);
 }
 
 bool DPrinter::TraverseCXXMethodDecl(CXXMethodDecl* Decl)
 {
-	if(pass_decl(Decl)) return true;
+	if(passDecl(Decl)) return true;
 	if(Decl->getLexicalParent() == Decl->getParent())
-		return TraverseFunctionDeclImpl(Decl);
+		return traverseFunctionDeclImpl(Decl);
 	else
 		return true;
 }
 
 bool DPrinter::TraversePredefinedExpr(PredefinedExpr* expr)
 {
-	if(pass_stmt(expr)) return true;
+	if(passStmt(expr)) return true;
 	out() << "__PRETTY_FUNCTION__";
 	return true;
 }
 
 bool DPrinter::TraverseCXXDefaultArgExpr(CXXDefaultArgExpr* expr)
 {
-	if(pass_stmt(expr)) return true;
+	if(passStmt(expr)) return true;
 	TraverseStmt(expr->getExpr());
 	return true;
 }
 
 bool DPrinter::TraverseCXXUnresolvedConstructExpr(CXXUnresolvedConstructExpr*  Expr)
 {
-	if(pass_stmt(Expr)) return true;
-	PrintType(Expr->getTypeAsWritten());
+	if(passStmt(Expr)) return true;
+	printType(Expr->getTypeAsWritten());
 	Spliter spliter(", ");
 	out() << "(";
 	for(decltype(Expr->arg_size()) i = 0; i < Expr->arg_size(); ++i)
@@ -1262,7 +1239,7 @@ bool DPrinter::TraverseCXXUnresolvedConstructExpr(CXXUnresolvedConstructExpr*  E
 
 bool DPrinter::TraverseUnresolvedLookupExpr(UnresolvedLookupExpr*  Expr)
 {
-	if(pass_stmt(Expr)) return true;
+	if(passStmt(Expr)) return true;
 	out() << mangleName(Expr->getName().getAsString());
 	if(Expr->hasExplicitTemplateArgs())
 	{
@@ -1273,7 +1250,7 @@ bool DPrinter::TraverseUnresolvedLookupExpr(UnresolvedLookupExpr*  Expr)
 		{
 			spliter.split();
 			auto tmpArg = Expr->getTemplateArgs()[i];
-			PrintTemplateArgument(tmpArg.getArgument());
+			printTemplateArgument(tmpArg.getArgument());
 		}
 		printTmpArgList(popStream());
 	}
@@ -1282,11 +1259,11 @@ bool DPrinter::TraverseUnresolvedLookupExpr(UnresolvedLookupExpr*  Expr)
 
 bool DPrinter::TraverseCXXForRangeStmt(CXXForRangeStmt*  Stmt)
 {
-	if(pass_stmt(Stmt)) return false;
+	if(passStmt(Stmt)) return false;
 	out() << "foreach(";
 	refAccepted = true;
 	inForRangeInit = true;
-	TraverseVarDeclImpl(dyn_cast<VarDecl>(Stmt->getLoopVarStmt()->getSingleDecl()));
+	traverseVarDeclImpl(dyn_cast<VarDecl>(Stmt->getLoopVarStmt()->getSingleDecl()));
 	inForRangeInit = false;
 	refAccepted = false;
 	out() << "; ";
@@ -1306,7 +1283,7 @@ bool DPrinter::TraverseCXXForRangeStmt(CXXForRangeStmt*  Stmt)
 
 bool DPrinter::TraverseDoStmt(DoStmt*  Stmt)
 {
-	if(pass_stmt(Stmt)) return false;
+	if(passStmt(Stmt)) return false;
 	out() << "do" << std::endl;
 	TraverseCompoundStmtOrNot(Stmt->getBody());
 	out() << "while(";
@@ -1317,22 +1294,22 @@ bool DPrinter::TraverseDoStmt(DoStmt*  Stmt)
 
 bool DPrinter::TraverseSwitchStmt(SwitchStmt* Stmt)
 {
-	if(pass_stmt(Stmt)) return false;
+	if(passStmt(Stmt)) return false;
 	out() << "switch(";
 	TraverseStmt(Stmt->getCond());
-	out() << ")" << std::endl << indent_str();
+	out() << ")" << std::endl << indentStr();
 	TraverseStmt(Stmt->getBody());
 	return true;
 }
 
 bool DPrinter::TraverseCaseStmt(CaseStmt* Stmt)
 {
-	if(pass_stmt(Stmt)) return false;
+	if(passStmt(Stmt)) return false;
 	out() << "case ";
 	TraverseStmt(Stmt->getLHS());
 	out() << ":" << std::endl;
 	++indent;
-	out() << indent_str();
+	out() << indentStr();
 	TraverseStmt(Stmt->getSubStmt());
 	--indent;
 	return true;
@@ -1340,14 +1317,14 @@ bool DPrinter::TraverseCaseStmt(CaseStmt* Stmt)
 
 bool DPrinter::TraverseBreakStmt(BreakStmt* Stmt)
 {
-	if(pass_stmt(Stmt)) return false;
+	if(passStmt(Stmt)) return false;
 	out() << "break";
 	return true;
 }
 
 bool DPrinter::TraverseStaticAssertDecl(StaticAssertDecl* Decl)
 {
-	if(pass_decl(Decl)) return true;
+	if(passDecl(Decl)) return true;
 	out() << "static assert(";
 	TraverseStmt(Decl->getAssertExpr());
 	out() << ", ";
@@ -1358,10 +1335,10 @@ bool DPrinter::TraverseStaticAssertDecl(StaticAssertDecl* Decl)
 
 bool DPrinter::TraverseDefaultStmt(DefaultStmt* Stmt)
 {
-	if(pass_stmt(Stmt)) return false;
+	if(passStmt(Stmt)) return false;
 	out() << "default:" << std::endl;
 	++indent;
-	out() << indent_str();
+	out() << indentStr();
 	TraverseStmt(Stmt->getSubStmt());
 	--indent;
 	return true;
@@ -1369,7 +1346,7 @@ bool DPrinter::TraverseDefaultStmt(DefaultStmt* Stmt)
 
 bool DPrinter::TraverseCXXDeleteExpr(CXXDeleteExpr* Expr)
 {
-	if(pass_stmt(Expr)) return true;
+	if(passStmt(Expr)) return true;
 	TraverseStmt(Expr->getArgument());
 	out() << " = null";
 	return true;
@@ -1377,11 +1354,11 @@ bool DPrinter::TraverseCXXDeleteExpr(CXXDeleteExpr* Expr)
 
 bool DPrinter::TraverseCXXNewExpr(CXXNewExpr* Expr)
 {
-	if(pass_stmt(Expr)) return true;
+	if(passStmt(Expr)) return true;
 	out() << "new ";
 	if(Expr->isArray())
 	{
-		PrintType(Expr->getAllocatedType());
+		printType(Expr->getAllocatedType());
 		out() << '[';
 		TraverseStmt(Expr->getArraySize());
 		out() << ']';
@@ -1391,10 +1368,10 @@ bool DPrinter::TraverseCXXNewExpr(CXXNewExpr* Expr)
 		switch(Expr->getInitializationStyle())
 		{
 		case CXXNewExpr::NoInit:
-			PrintType(Expr->getAllocatedType());
+			printType(Expr->getAllocatedType());
 			break;
 		case CXXNewExpr::CallInit:
-			PrintType(Expr->getAllocatedType());
+			printType(Expr->getAllocatedType());
 			out() << '(';
 			TraverseStmt(const_cast<CXXConstructExpr*>(Expr->getConstructExpr()));
 			out() << ')';
@@ -1407,7 +1384,7 @@ bool DPrinter::TraverseCXXNewExpr(CXXNewExpr* Expr)
 	return true;
 }
 
-void DPrinter::PrintCXXConstructExprParams(CXXConstructExpr* Init)
+void DPrinter::printCXXConstructExprParams(CXXConstructExpr* Init)
 {
 	if(Init->getNumArgs() == 1)   //Handle Copy ctor
 	{
@@ -1419,7 +1396,7 @@ void DPrinter::PrintCXXConstructExprParams(CXXConstructExpr* Init)
 			return;
 		}
 	}
-	PrintType(Init->getType());
+	printType(Init->getType());
 	out() << '(';
 	Spliter spliter(", ");
 	size_t counter = 0;
@@ -1438,7 +1415,7 @@ void DPrinter::PrintCXXConstructExprParams(CXXConstructExpr* Init)
 
 bool DPrinter::TraverseCXXConstructExpr(CXXConstructExpr* Init)
 {
-	if(pass_stmt(Init)) return true;
+	if(passStmt(Init)) return true;
 	if(Init->isListInitialization() && !Init->isStdInitListInitialization())
 		out() << '{';
 
@@ -1459,7 +1436,7 @@ bool DPrinter::TraverseCXXConstructExpr(CXXConstructExpr* Init)
 	return true;
 }
 
-void DPrinter::PrintType(QualType const& type)
+void DPrinter::printType(QualType const& type)
 {
 	if(type.getTypePtr()->getTypeClass() == Type::TypeClass::Auto)
 	{
@@ -1496,7 +1473,7 @@ bool DPrinter::TraverseConstructorInitializer(CXXCtorInitializer* Init)
 			{
 				if(parenListExpr->getNumExprs() > 1)
 				{
-					PrintType(fieldDecl->getType());
+					printType(fieldDecl->getType());
 					out() << '(';
 				}
 				TraverseStmt(Init->getInit());
@@ -1507,7 +1484,7 @@ bool DPrinter::TraverseConstructorInitializer(CXXCtorInitializer* Init)
 			{
 				if(ctorExpr->getNumArgs() > 1)
 				{
-					PrintType(fieldDecl->getType());
+					printType(fieldDecl->getType());
 					out() << '(';
 				}
 				TraverseStmt(Init->getInit());
@@ -1539,7 +1516,7 @@ bool DPrinter::TraverseConstructorInitializer(CXXCtorInitializer* Init)
 					return true;
 			}
 			out() << "new ";
-			PrintType(fieldDecl->getType());
+			printType(fieldDecl->getType());
 			out() << '(';
 			TraverseStmt(Init->getInit());
 			out() << ')';
@@ -1568,8 +1545,9 @@ void DPrinter::startCtorBody(CXXConstructorDecl* Decl)
 			std::string const initStr = popStream();
 			if(initStr.empty() == false)
 			{
-				out() << std::endl << indent_str();
-				if(initStr.substr(initStr.size() - 2) != "= ")  // Nothing to print. Default init is enought
+				out() << std::endl << indentStr();
+				// If nothing to print, default init is enought.
+				if(initStr.substr(initStr.size() - 2) != "= ")
 				{
 					out() << initStr;
 					out() << ";";
@@ -1644,7 +1622,7 @@ bool DPrinter::printFuncBegin(FunctionDecl* Decl, std::string& tmpParams, int ar
 	std::string const name = Decl->getNameAsString();
 	if(name == "cpp2d_dummy_variadic")
 		return false;
-	PrintType(Decl->getReturnType());
+	printType(Decl->getReturnType());
 	out() << " ";
 	if(Decl->isOverloadedOperator())
 	{
@@ -1751,13 +1729,13 @@ bool DPrinter::printFuncBegin(FunctionDecl* Decl, std::string& tmpParams, int ar
 bool DPrinter::printFuncBegin(CXXConversionDecl* Decl, std::string& tmpParams, int)
 {
 	printSpecialMethodAttribute(Decl);
-	PrintType(Decl->getConversionType());
+	printType(Decl->getConversionType());
 	out() << " opCast";
 	pushStream();
 	out() << "T : ";
 	if(Decl->getConversionType().getAsString() == "bool")
 		classInfoMap[Decl->getParent()].hasBoolConv = true;
-	PrintType(Decl->getConversionType());
+	printType(Decl->getConversionType());
 	tmpParams = popStream();
 	return true;
 }
@@ -1777,7 +1755,8 @@ bool DPrinter::printFuncBegin(CXXConstructorDecl* Decl,
 		{
 			if(Decl->isExplicit() && Decl->isDefaulted() == false)
 			{
-				llvm::errs() << "error : " << Decl->getNameAsString() << " struct has an explicit default ctor.\n";
+				llvm::errs() << "error : " << Decl->getNameAsString()
+				             << " struct has an explicit default ctor.\n";
 				llvm::errs() << "\tThis is illegal in D language.\n";
 				llvm::errs() << "\tRemove it, default it or replace it by a factory method.\n";
 			}
@@ -1822,13 +1801,13 @@ DPrinter::Semantic getThisSemantic(FunctionDecl*, ASTContext&)
 }
 
 template<typename D>
-bool DPrinter::TraverseFunctionDeclImpl(
+bool DPrinter::traverseFunctionDeclImpl(
   D* Decl,
   int arg_become_this)
 {
-	if (Decl->getAccess() == AccessSpecifier::AS_private && Decl->getBody() == nullptr)
+	if(Decl->getAccess() == AccessSpecifier::AS_private && Decl->getBody() == nullptr)
 		return false;
-	if (Decl->isDeleted())
+	if(Decl->isDeleted())
 		return true;
 	if(Decl->isImplicit() && Decl->getBody() == nullptr)
 		return true;
@@ -1856,7 +1835,7 @@ bool DPrinter::TraverseFunctionDeclImpl(
 	case FunctionDecl::TK_FunctionTemplate:
 		if(FunctionTemplateDecl* tDecl = Decl->getDescribedFunctionTemplate())
 		{
-			PrintTemplateParameterList(tDecl->getTemplateParameters(), tmplParamsStr);
+			printTemplateParameterList(tDecl->getTemplateParameters(), tmplParamsStr);
 			tmplPrinted = true;
 		}
 		break;
@@ -1867,7 +1846,7 @@ bool DPrinter::TraverseFunctionDeclImpl(
 			TemplateParameterList* primaryTmpParams = tDecl->getTemplateParameters();
 			TemplateArgumentList const* tmpArgs = Decl->getTemplateSpecializationArgs();
 			assert(primaryTmpParams && tmpArgs);
-			PrintTemplateSpec_TmpArgsAndParms(*primaryTmpParams, *tmpArgs, nullptr, tmplParamsStr);
+			printTemplateSpec_TmpArgsAndParms(*primaryTmpParams, *tmpArgs, nullptr, tmplParamsStr);
 			tmplPrinted = true;
 		}
 		break;
@@ -1922,7 +1901,7 @@ bool DPrinter::TraverseFunctionDeclImpl(
 					printStmtComment(locStart,
 					                 decl->getLocStart().getLocWithOffset(-1),
 					                 decl->getLocEnd().getLocWithOffset(1));
-					out() << indent_str();
+					out() << indentStr();
 				}
 				if(isCopyCtor && sem == Semantic::Value)
 					out() << "this";
@@ -1943,7 +1922,7 @@ bool DPrinter::TraverseFunctionDeclImpl(
 		if(Decl->isVariadic())
 		{
 			if(numParam != 1)
-				out() << "\n" << indent_str();
+				out() << "\n" << indentStr();
 			out() << "...";
 		}
 		pushStream();
@@ -1952,7 +1931,7 @@ bool DPrinter::TraverseFunctionDeclImpl(
 		std::string const comment = popStream();
 		--indent;
 		if(comment.size() > 2)
-			out() << comment << indent_str();
+			out() << comment << indentStr();
 	}
 	out() << ")";
 	if(isConstMethod && portConst)
@@ -1973,27 +1952,27 @@ bool DPrinter::TraverseFunctionDeclImpl(
 			{
 				ParmVarDecl* param = *(Decl->param_begin() + arg_become_this);
 				out() << std::endl;
-				std::string const this_name = getName(param->getDeclName()); //param->getNameAsString();
+				std::string const this_name = getName(param->getDeclName());
 				if(this_name.empty() == false)
-					out() << indent_str() << "alias " << this_name << " = this;";
+					out() << indentStr() << "alias " << this_name << " = this;";
 			}
 		};
 		if(body->getStmtClass() == Stmt::CXXTryStmtClass)
 		{
-			out() << indent_str() << '{' << std::endl;
+			out() << indentStr() << '{' << std::endl;
 			++indent;
-			out() << indent_str();
-			TraverseCXXTryStmtImpl(static_cast<CXXTryStmt*>(body),
+			out() << indentStr();
+			traverseCXXTryStmtImpl(static_cast<CXXTryStmt*>(body),
 			                       [&] {alias_this(); startCtorBody(Decl); });
 			out() << std::endl;
 			--indent;
-			out() << indent_str() << '}';
+			out() << indentStr() << '}';
 		}
 		else
 		{
-			out() << indent_str();
+			out() << indentStr();
 			assert(body->getStmtClass() == Stmt::CompoundStmtClass);
-			TraverseCompoundStmtImpl(static_cast<CompoundStmt*>(body),
+			traverseCompoundStmtImpl(static_cast<CompoundStmt*>(body),
 			                         [&] {alias_this(); startCtorBody(Decl); });
 		}
 	}
@@ -2007,40 +1986,40 @@ bool DPrinter::TraverseFunctionDeclImpl(
 
 bool DPrinter::TraverseUsingDecl(UsingDecl* Decl)
 {
-	if(pass_decl(Decl)) return true;
+	if(passDecl(Decl)) return true;
 	out() << "//using " << Decl->getNameAsString();
 	return true;
 }
 
 bool DPrinter::TraverseFunctionDecl(FunctionDecl* Decl)
 {
-	if(pass_decl(Decl)) return true;
-	return TraverseFunctionDeclImpl(Decl);
+	if(passDecl(Decl)) return true;
+	return traverseFunctionDeclImpl(Decl);
 }
 
 bool DPrinter::TraverseUsingDirectiveDecl(UsingDirectiveDecl* Decl)
 {
-	if(pass_decl(Decl)) return true;
+	if(passDecl(Decl)) return true;
 	return true;
 }
 
 
 bool DPrinter::TraverseFunctionTemplateDecl(FunctionTemplateDecl* Decl)
 {
-	if(pass_decl(Decl)) return true;
+	if(passDecl(Decl)) return true;
 	FunctionDecl* FDecl = Decl->getTemplatedDecl();
 	switch(FDecl->getKind())
 	{
 	case Decl::Function:
-		return TraverseFunctionDeclImpl(FDecl);
+		return traverseFunctionDeclImpl(FDecl);
 	case Decl::CXXMethod:
-		return TraverseFunctionDeclImpl(llvm::cast<CXXMethodDecl>(FDecl));
+		return traverseFunctionDeclImpl(llvm::cast<CXXMethodDecl>(FDecl));
 	case Decl::CXXConstructor:
-		return TraverseFunctionDeclImpl(llvm::cast<CXXConstructorDecl>(FDecl));
+		return traverseFunctionDeclImpl(llvm::cast<CXXConstructorDecl>(FDecl));
 	case Decl::CXXConversion:
-		return TraverseFunctionDeclImpl(llvm::cast<CXXConversionDecl>(FDecl));
+		return traverseFunctionDeclImpl(llvm::cast<CXXConversionDecl>(FDecl));
 	case Decl::CXXDestructor:
-		return TraverseFunctionDeclImpl(llvm::cast<CXXDestructorDecl>(FDecl));
+		return traverseFunctionDeclImpl(llvm::cast<CXXDestructorDecl>(FDecl));
 	default: assert(false && "Inconsistent FunctionDecl kind in FunctionTemplateDecl");
 		return true;
 	}
@@ -2048,10 +2027,7 @@ bool DPrinter::TraverseFunctionTemplateDecl(FunctionTemplateDecl* Decl)
 
 bool DPrinter::TraverseBuiltinType(BuiltinType* Type)
 {
-	if(pass_type(Type)) return false;
-	//PrintingPolicy pp = LangOptions();
-	//pp.Bool = 1;
-	//out() << Type->getNameAsCString(pp);
+	if(passType(Type)) return false;
 	out() << [Type]
 	{
 		BuiltinType::Kind k = Type->getKind();
@@ -2154,7 +2130,7 @@ DPrinter::Semantic DPrinter::getSemantic(QualType qt)
 }
 
 template<typename PType>
-bool DPrinter::TraversePointerTypeImpl(PType* Type)
+bool DPrinter::traversePointerTypeImpl(PType* Type)
 {
 	QualType const pointee = Type->getPointeeType();
 	Type::TypeClass const tc = pointee->getTypeClass();
@@ -2164,32 +2140,32 @@ bool DPrinter::TraversePointerTypeImpl(PType* Type)
 		if(innerType->getTypeClass() == Type::FunctionProto)
 			return TraverseType(innerType);
 	}
-	PrintType(pointee);
+	printType(pointee);
 	out() << ((getSemantic(pointee) == Value) ? "[]" : ""); //'*';
 	return true;
 }
 
 bool DPrinter::TraverseMemberPointerType(MemberPointerType* Type)
 {
-	if(pass_type(Type)) return false;
-	return TraversePointerTypeImpl(Type);
+	if(passType(Type)) return false;
+	return traversePointerTypeImpl(Type);
 }
 bool DPrinter::TraversePointerType(PointerType* Type)
 {
-	if(pass_type(Type)) return false;
-	return TraversePointerTypeImpl(Type);
+	if(passType(Type)) return false;
+	return traversePointerTypeImpl(Type);
 }
 
 bool DPrinter::TraverseCXXNullPtrLiteralExpr(CXXNullPtrLiteralExpr* Expr)
 {
-	if(pass_stmt(Expr)) return true;
+	if(passStmt(Expr)) return true;
 	out() << "null";
 	return true;
 }
 
 bool DPrinter::TraverseEnumConstantDecl(EnumConstantDecl* Decl)
 {
-	if(pass_decl(Decl)) return true;
+	if(passDecl(Decl)) return true;
 	out() << mangleName(Decl->getNameAsString());
 	if(Decl->getInitExpr())
 	{
@@ -2201,47 +2177,47 @@ bool DPrinter::TraverseEnumConstantDecl(EnumConstantDecl* Decl)
 
 bool DPrinter::TraverseEnumDecl(EnumDecl* Decl)
 {
-	if(pass_decl(Decl)) return true;
+	if(passDecl(Decl)) return true;
 	out() << "enum " << mangleName(Decl->getNameAsString());
 	if(Decl->isFixed())
 	{
 		out() << " : ";
 		TraverseType(Decl->getIntegerType());
 	}
-	out() << std::endl << indent_str() << "{" << std::endl;
+	out() << std::endl << indentStr() << "{" << std::endl;
 	++indent;
 	size_t count = 0;
 	for(auto e : Decl->enumerators())
 	{
 		++count;
-		out() << indent_str();
+		out() << indentStr();
 		TraverseDecl(e);
 		out() << "," << std::endl;
 	}
 	if(count == 0)
-		out() << indent_str() << "Default" << std::endl;
+		out() << indentStr() << "Default" << std::endl;
 	--indent;
-	out() << indent_str() << "}";
+	out() << indentStr() << "}";
 	return true;
 }
 
 bool DPrinter::TraverseEnumType(EnumType* Type)
 {
-	if(pass_type(Type)) return false;
+	if(passType(Type)) return false;
 	out() << mangleName(Type->getDecl()->getNameAsString());
 	return true;
 }
 
 bool DPrinter::TraverseIntegerLiteral(IntegerLiteral* Stmt)
 {
-	if(pass_stmt(Stmt)) return true;
+	if(passStmt(Stmt)) return true;
 	out() << Stmt->getValue().toString(10, true);
 	return true;
 }
 
 bool DPrinter::TraverseDecltypeType(DecltypeType* Type)
 {
-	if(pass_type(Type)) return false;
+	if(passType(Type)) return false;
 	out() << "typeof(";
 	TraverseStmt(Type->getUnderlyingExpr());
 	out() << ')';
@@ -2250,21 +2226,15 @@ bool DPrinter::TraverseDecltypeType(DecltypeType* Type)
 
 bool DPrinter::TraverseAutoType(AutoType* Type)
 {
-	if(pass_type(Type)) return false;
+	if(passType(Type)) return false;
 	if(not inForRangeInit)
 		out() << "auto";
 	return true;
 }
 
-/*bool DPrinter::TraverseMemberPointerType(MemberPointerType *Type)
-{
-//out() << Type->getTypeClassName();
-return true;
-}*/
-
 bool DPrinter::TraverseLinkageSpecDecl(LinkageSpecDecl* Decl)
 {
-	if(pass_decl(Decl)) return true;
+	if(passDecl(Decl)) return true;
 	switch(Decl->getLanguage())
 	{
 	case LinkageSpecDecl::LanguageIDs::lang_c: out() << "extern (C) "; break;
@@ -2274,18 +2244,18 @@ bool DPrinter::TraverseLinkageSpecDecl(LinkageSpecDecl* Decl)
 	DeclContext* declContext = LinkageSpecDecl::castToDeclContext(Decl);;
 	if(Decl->hasBraces())
 	{
-		out() << "\n" << indent_str() << "{\n";
+		out() << "\n" << indentStr() << "{\n";
 		++indent;
 		for(auto* decl : declContext->decls())
 		{
-			out() << indent_str();
+			out() << indentStr();
 			TraverseDecl(decl);
 			if(needSemiComma(decl))
 				out() << ";";
 			out() << "\n";
 		}
 		--indent;
-		out() << indent_str() << "}";
+		out() << indentStr() << "}";
 	}
 	else
 		TraverseDecl(*declContext->decls_begin());
@@ -2294,7 +2264,7 @@ bool DPrinter::TraverseLinkageSpecDecl(LinkageSpecDecl* Decl)
 
 bool DPrinter::TraverseFriendDecl(FriendDecl* Decl)
 {
-	if(pass_decl(Decl)) return true;
+	if(passDecl(Decl)) return true;
 	out() << "//friend ";
 	if(Decl->getFriendType())
 		TraverseType(Decl->getFriendType()->getType());
@@ -2305,8 +2275,8 @@ bool DPrinter::TraverseFriendDecl(FriendDecl* Decl)
 
 bool DPrinter::TraverseParmVarDecl(ParmVarDecl* Decl)
 {
-	if(pass_decl(Decl)) return true;
-	PrintType(Decl->getType());
+	if(passDecl(Decl)) return true;
+	printType(Decl->getType());
 	std::string const name = getName(Decl->getDeclName());//getNameAsString();
 	if(name.empty() == false)
 		out() <<  " " << mangleName(name);
@@ -2327,15 +2297,15 @@ bool DPrinter::TraverseParmVarDecl(ParmVarDecl* Decl)
 
 bool DPrinter::TraverseRValueReferenceType(RValueReferenceType* Type)
 {
-	if(pass_type(Type)) return false;
-	PrintType(Type->getPointeeType());
+	if(passType(Type)) return false;
+	printType(Type->getPointeeType());
 	out() << "/*&&*/";
 	return true;
 }
 
 bool DPrinter::TraverseLValueReferenceType(LValueReferenceType* Type)
 {
-	if(pass_type(Type)) return false;
+	if(passType(Type)) return false;
 	if(refAccepted)
 	{
 		if(getSemantic(Type->getPointeeType()) == Value)
@@ -2350,11 +2320,11 @@ bool DPrinter::TraverseLValueReferenceType(LValueReferenceType* Type)
 			else
 				out() << "ref ";
 		}
-		PrintType(Type->getPointeeType());
+		printType(Type->getPointeeType());
 	}
 	else
 	{
-		PrintType(Type->getPointeeType());
+		printType(Type->getPointeeType());
 		if(getSemantic(Type->getPointeeType()) == Value)
 			out() << "[]";
 	}
@@ -2363,7 +2333,7 @@ bool DPrinter::TraverseLValueReferenceType(LValueReferenceType* Type)
 
 bool DPrinter::TraverseTemplateTypeParmType(TemplateTypeParmType* Type)
 {
-	if(pass_type(Type)) return false;
+	if(passType(Type)) return false;
 	if(Type->getDecl())
 		TraverseDecl(Type->getDecl());
 	else
@@ -2371,13 +2341,13 @@ bool DPrinter::TraverseTemplateTypeParmType(TemplateTypeParmType* Type)
 		IdentifierInfo* identifier = Type->getIdentifier();
 		if(identifier == nullptr)
 		{
-			if(Type->getDepth() >= template_args_stack.size())
+			if(Type->getDepth() >= templateArgsStack.size())
 				out() << "/* getDepth : " << Type->getDepth() << "*/";
-			else if(Type->getIndex() >= template_args_stack[Type->getDepth()].size())
+			else if(Type->getIndex() >= templateArgsStack[Type->getDepth()].size())
 				out() << "/* getIndex : " << Type->getIndex() << "*/";
 			else
 			{
-				auto param = template_args_stack[Type->getDepth()][Type->getIndex()];
+				auto param = templateArgsStack[Type->getDepth()][Type->getIndex()];
 				identifier = param->getIdentifier();
 				if(identifier == nullptr)
 					TraverseDecl(param);
@@ -2396,7 +2366,7 @@ bool DPrinter::TraverseTemplateTypeParmType(TemplateTypeParmType* Type)
 
 bool DPrinter::TraverseTemplateTypeParmDecl(TemplateTypeParmDecl* Decl)
 {
-	if(pass_decl(Decl)) return true;
+	if(passDecl(Decl)) return true;
 	IdentifierInfo* identifier = Decl->getIdentifier();
 	if(identifier)
 	{
@@ -2413,8 +2383,8 @@ bool DPrinter::TraverseTemplateTypeParmDecl(TemplateTypeParmDecl* Decl)
 
 bool DPrinter::TraverseNonTypeTemplateParmDecl(NonTypeTemplateParmDecl* Decl)
 {
-	if(pass_decl(Decl)) return true;
-	PrintType(Decl->getType());
+	if(passDecl(Decl)) return true;
+	printType(Decl->getType());
 	out() << " ";
 	IdentifierInfo* identifier = Decl->getIdentifier();
 	if(identifier)
@@ -2424,7 +2394,7 @@ bool DPrinter::TraverseNonTypeTemplateParmDecl(NonTypeTemplateParmDecl* Decl)
 
 bool DPrinter::TraverseDeclStmt(DeclStmt* Stmt)
 {
-	if(pass_stmt(Stmt)) return false;
+	if(passStmt(Stmt)) return false;
 	if(Stmt->isSingleDecl()) //May be in for or catch
 		TraverseDecl(Stmt->getSingleDecl());
 	else
@@ -2438,7 +2408,7 @@ bool DPrinter::TraverseDeclStmt(DeclStmt* Stmt)
 				TraverseDecl(d);
 				++count;
 				if(count != declCount)
-					out() << ";\n" << indent_str();
+					out() << ";\n" << indentStr();
 			}
 		}
 		else
@@ -2451,7 +2421,7 @@ bool DPrinter::TraverseDeclStmt(DeclStmt* Stmt)
 				TraverseDecl(d);
 				if(isa<RecordDecl>(d))
 				{
-					out() << "\n" << indent_str();
+					out() << "\n" << indentStr();
 					split.first = true;
 				}
 				doPrintType = true;
@@ -2463,13 +2433,13 @@ bool DPrinter::TraverseDeclStmt(DeclStmt* Stmt)
 
 bool DPrinter::TraverseNamespaceAliasDecl(NamespaceAliasDecl* Decl)
 {
-	if(pass_decl(Decl)) return true;
+	if(passDecl(Decl)) return true;
 	return true;
 }
 
 bool DPrinter::TraverseReturnStmt(ReturnStmt* Stmt)
 {
-	if(pass_stmt(Stmt)) return false;
+	if(passStmt(Stmt)) return false;
 	out() << "return";
 	if(Stmt->getRetValue())
 	{
@@ -2488,7 +2458,7 @@ bool DPrinter::TraverseReturnStmt(ReturnStmt* Stmt)
 
 bool DPrinter::TraverseCXXOperatorCallExpr(CXXOperatorCallExpr* Stmt)
 {
-	if(pass_stmt(Stmt)) return true;
+	if(passStmt(Stmt)) return true;
 	auto const numArgs = Stmt->getNumArgs();
 	const OverloadedOperatorKind kind = Stmt->getOperator();
 	char const* opStr = getOperatorSpelling(kind);
@@ -2544,7 +2514,8 @@ bool DPrinter::TraverseCXXOperatorCallExpr(CXXOperatorCallExpr* Stmt)
 			TraverseStmt(ro);
 		}
 	}
-	else if(kind == OverloadedOperatorKind::OO_PlusPlus || kind == OverloadedOperatorKind::OO_MinusMinus)
+	else if(kind == OverloadedOperatorKind::OO_PlusPlus ||
+	        kind == OverloadedOperatorKind::OO_MinusMinus)
 	{
 		if(numArgs == 2)
 		{
@@ -2556,7 +2527,6 @@ bool DPrinter::TraverseCXXOperatorCallExpr(CXXOperatorCallExpr* Stmt)
 			out() << opStr;
 			TraverseStmt(*Stmt->arg_begin());
 		}
-		return true;
 	}
 	else
 	{
@@ -2575,7 +2545,7 @@ bool DPrinter::TraverseCXXOperatorCallExpr(CXXOperatorCallExpr* Stmt)
 
 bool DPrinter::TraverseExprWithCleanups(ExprWithCleanups* Stmt)
 {
-	if(pass_stmt(Stmt)) return true;
+	if(passStmt(Stmt)) return true;
 	TraverseStmt(Stmt->getSubExpr());
 	return true;
 }
@@ -2584,13 +2554,13 @@ void DPrinter::TraverseCompoundStmtOrNot(Stmt* Stmt)  //Impl
 {
 	if(Stmt->getStmtClass() == Stmt::StmtClass::CompoundStmtClass)
 	{
-		out() << indent_str();
+		out() << indentStr();
 		TraverseStmt(Stmt);
 	}
 	else
 	{
 		++indent;
-		out() << indent_str();
+		out() << indentStr();
 		if(isa<NullStmt>(Stmt))
 			out() << "{}";
 		TraverseStmt(Stmt);
@@ -2602,7 +2572,7 @@ void DPrinter::TraverseCompoundStmtOrNot(Stmt* Stmt)  //Impl
 
 bool DPrinter::TraverseArraySubscriptExpr(ArraySubscriptExpr* Expr)
 {
-	if(pass_stmt(Expr)) return true;
+	if(passStmt(Expr)) return true;
 	TraverseStmt(Expr->getLHS());
 	out() << '[';
 	TraverseStmt(Expr->getRHS());
@@ -2612,7 +2582,7 @@ bool DPrinter::TraverseArraySubscriptExpr(ArraySubscriptExpr* Expr)
 
 bool DPrinter::TraverseFloatingLiteral(FloatingLiteral* Expr)
 {
-	if(pass_stmt(Expr)) return true;
+	if(passStmt(Expr)) return true;
 	const llvm::fltSemantics& sem = Expr->getSemantics();
 	llvm::SmallString<1000> str;
 	if(APFloat::semanticsSizeInBits(sem) < 64)
@@ -2635,7 +2605,7 @@ bool DPrinter::TraverseFloatingLiteral(FloatingLiteral* Expr)
 
 bool DPrinter::TraverseForStmt(ForStmt* Stmt)
 {
-	if(pass_stmt(Stmt)) return false;
+	if(passStmt(Stmt)) return false;
 	out() << "for(";
 	splitMultiLineDecl = false;
 	TraverseStmt(Stmt->getInit());
@@ -2651,7 +2621,7 @@ bool DPrinter::TraverseForStmt(ForStmt* Stmt)
 
 bool DPrinter::TraverseWhileStmt(WhileStmt* Stmt)
 {
-	if(pass_stmt(Stmt)) return false;
+	if(passStmt(Stmt)) return false;
 	out() << "while(";
 	TraverseStmt(Stmt->getCond());
 	out() << ")" << std::endl;
@@ -2661,14 +2631,14 @@ bool DPrinter::TraverseWhileStmt(WhileStmt* Stmt)
 
 bool DPrinter::TraverseIfStmt(IfStmt* Stmt)
 {
-	if(pass_stmt(Stmt)) return false;
+	if(passStmt(Stmt)) return false;
 	out() << "if(";
 	TraverseStmt(Stmt->getCond());
 	out() << ")" << std::endl;
 	TraverseCompoundStmtOrNot(Stmt->getThen());
 	if(Stmt->getElse())
 	{
-		out() << std::endl << indent_str() << "else ";
+		out() << std::endl << indentStr() << "else ";
 		if(Stmt->getElse()->getStmtClass() == Stmt::IfStmtClass)
 			TraverseStmt(Stmt->getElse());
 		else
@@ -2682,14 +2652,14 @@ bool DPrinter::TraverseIfStmt(IfStmt* Stmt)
 
 bool DPrinter::TraverseCXXBindTemporaryExpr(CXXBindTemporaryExpr* Stmt)
 {
-	if(pass_stmt(Stmt)) return true;
+	if(passStmt(Stmt)) return true;
 	TraverseStmt(Stmt->getSubExpr());
 	return true;
 }
 
 bool DPrinter::TraverseCXXThrowExpr(CXXThrowExpr* Stmt)
 {
-	if(pass_stmt(Stmt)) return true;
+	if(passStmt(Stmt)) return true;
 	out() << "throw ";
 	TraverseStmt(Stmt->getSubExpr());
 	return true;
@@ -2697,18 +2667,18 @@ bool DPrinter::TraverseCXXThrowExpr(CXXThrowExpr* Stmt)
 
 bool DPrinter::TraverseMaterializeTemporaryExpr(MaterializeTemporaryExpr* Stmt)
 {
-	if(pass_stmt(Stmt)) return true;
+	if(passStmt(Stmt)) return true;
 	TraverseStmt(Stmt->GetTemporaryExpr());
 	return true;
 }
 
 bool DPrinter::TraverseCXXFunctionalCastExpr(CXXFunctionalCastExpr* Stmt)
 {
-	if(pass_stmt(Stmt)) return true;
+	if(passStmt(Stmt)) return true;
 	QualType qt = Stmt->getTypeInfoAsWritten()->getType();
 	if(getSemantic(qt) == Semantic::Reference)
 		out() << "new ";
-	PrintType(qt);
+	printType(qt);
 	out() << '(';
 	TraverseStmt(Stmt->getSubExpr());
 	out() << ')';
@@ -2717,22 +2687,22 @@ bool DPrinter::TraverseCXXFunctionalCastExpr(CXXFunctionalCastExpr* Stmt)
 
 bool DPrinter::TraverseParenType(ParenType* Type)
 {
-	if(pass_type(Type)) return false;
+	if(passType(Type)) return false;
 	// Parenthesis are useless (and illegal) on function types
-	PrintType(Type->getInnerType());
+	printType(Type->getInnerType());
 	return true;
 }
 
 bool DPrinter::TraverseFunctionProtoType(FunctionProtoType* Type)
 {
-	if(pass_type(Type)) return false;
-	PrintType(Type->getReturnType());
+	if(passType(Type)) return false;
+	printType(Type->getReturnType());
 	out() << " function(";
 	Spliter spliter(", ");
 	for(auto const& p : Type->getParamTypes())
 	{
 		spliter.split();
-		PrintType(p);
+		printType(p);
 	}
 	if(Type->isVariadic())
 	{
@@ -2745,8 +2715,8 @@ bool DPrinter::TraverseFunctionProtoType(FunctionProtoType* Type)
 
 bool DPrinter::TraverseCXXTemporaryObjectExpr(CXXTemporaryObjectExpr* Stmt)
 {
-	if(pass_stmt(Stmt)) return true;
-	PrintType(Stmt->getType());
+	if(passStmt(Stmt)) return true;
+	printType(Stmt->getType());
 	out() << '(';
 	TraverseCXXConstructExpr(Stmt);
 	out() << ')';
@@ -2755,13 +2725,13 @@ bool DPrinter::TraverseCXXTemporaryObjectExpr(CXXTemporaryObjectExpr* Stmt)
 
 bool DPrinter::TraverseNullStmt(NullStmt* Stmt)
 {
-	if(pass_stmt(Stmt)) return false;
+	if(passStmt(Stmt)) return false;
 	return true;
 }
 
 bool DPrinter::TraverseCharacterLiteral(CharacterLiteral* Stmt)
 {
-	if(pass_stmt(Stmt)) return true;
+	if(passStmt(Stmt)) return true;
 	out() << '\'';
 	int c = Stmt->getValue();
 	switch(c)
@@ -2778,7 +2748,7 @@ bool DPrinter::TraverseCharacterLiteral(CharacterLiteral* Stmt)
 
 bool DPrinter::TraverseStringLiteral(StringLiteral* Stmt)
 {
-	if(pass_stmt(Stmt)) return true;
+	if(passStmt(Stmt)) return true;
 	out() << "\"";
 	std::string literal;
 	auto str = Stmt->getString();
@@ -2826,48 +2796,38 @@ bool DPrinter::TraverseStringLiteral(StringLiteral* Stmt)
 
 bool DPrinter::TraverseCXXBoolLiteralExpr(CXXBoolLiteralExpr* Stmt)
 {
-	if(pass_stmt(Stmt)) return true;
+	if(passStmt(Stmt)) return true;
 	out() << (Stmt->getValue() ? "true" : "false");
 	return true;
 }
 
 bool DPrinter::TraverseUnaryExprOrTypeTraitExpr(UnaryExprOrTypeTraitExpr* Expr)
 {
-	if(pass_stmt(Expr)) return true;
-	//out() << '(';
+	if(passStmt(Expr)) return true;
 	if(Expr->isArgumentType())
-		PrintType(Expr->getArgumentType());
+		printType(Expr->getArgumentType());
 	else
 		TraverseStmt(Expr->getArgumentExpr());
-	//out() << ')';
-	switch(Expr->getKind())
-	{
-	case UnaryExprOrTypeTrait::UETT_AlignOf:
-		out() << ".alignof";
-		break;
-	case UnaryExprOrTypeTrait::UETT_SizeOf:
-		out() << ".sizeof";
-		break;
-	case UnaryExprOrTypeTrait::UETT_OpenMPRequiredSimdAlign:
-		out() << ".OpenMPRequiredSimdAlign";
-		break;
-	case UnaryExprOrTypeTrait::UETT_VecStep:
-		out() << ".VecStep";
-		break;
-	}
+	UnaryExprOrTypeTrait const kind = Expr->getKind();
+	out() << (
+	        kind == UETT_AlignOf					? ".alignof"					:
+	        kind == UETT_SizeOf						? ".sizeof"						:
+	        kind == UETT_OpenMPRequiredSimdAlign	? ".OpenMPRequiredSimdAlign"	:
+	        kind == UETT_VecStep					? ".VecStep"					:
+	        "");
 	return true;
 }
 
 bool DPrinter::TraverseEmptyDecl(EmptyDecl* Decl)
 {
-	if(pass_decl(Decl)) return true;
+	if(passDecl(Decl)) return true;
 	return true;
 }
 
 
 bool DPrinter::TraverseLambdaExpr(LambdaExpr* Node)
 {
-	if(pass_stmt(Node)) return true;
+	if(passStmt(Node)) return true;
 	CXXMethodDecl* Method = Node->getCallOperator();
 
 	// Has some auto type?
@@ -2886,7 +2846,7 @@ bool DPrinter::TraverseLambdaExpr(LambdaExpr* Node)
 
 	if(hasAuto)
 	{
-		extern_includes["cpp_std"].insert("toFunctor");
+		externIncludes["cpp_std"].insert("toFunctor");
 		out() << "toFunctor!(";
 	}
 
@@ -2895,7 +2855,7 @@ bool DPrinter::TraverseLambdaExpr(LambdaExpr* Node)
 	if(Node->hasExplicitResultType())
 	{
 		out() << "function ";
-		PrintType(Proto->getReturnType());
+		printType(Proto->getReturnType());
 	}
 
 	if(Node->hasExplicitParameters())
@@ -2920,7 +2880,7 @@ bool DPrinter::TraverseLambdaExpr(LambdaExpr* Node)
 	}
 
 	// Print the body.
-	out() << "\n" << indent_str();
+	out() << "\n" << indentStr();
 	CompoundStmt* Body = Node->getBody();
 	TraverseStmt(Body);
 	if(hasAuto)
@@ -2944,11 +2904,11 @@ void DPrinter::printCallExprArgument(CallExpr* Stmt)
 
 bool DPrinter::TraverseCallExpr(CallExpr* Stmt)
 {
-	if(pass_stmt(Stmt)) return true;
+	if(passStmt(Stmt)) return true;
 	Expr* func = Stmt->getCallee();
-	dont_take_ptr.insert(func);
+	dontTakePtr.insert(func);
 	TraverseStmt(func);
-	dont_take_ptr.erase(func);
+	dontTakePtr.erase(func);
 	// Are parentezis on zero argument needed?
 	//if (Stmt->getNumArgs() == 0)
 	//	return true;
@@ -2958,15 +2918,15 @@ bool DPrinter::TraverseCallExpr(CallExpr* Stmt)
 
 bool DPrinter::TraverseImplicitCastExpr(ImplicitCastExpr* Stmt)
 {
-	if(pass_stmt(Stmt)) return true;
-	if(Stmt->getCastKind() == CK_FunctionToPointerDecay && dont_take_ptr.count(Stmt) == 0)
+	if(passStmt(Stmt)) return true;
+	if(Stmt->getCastKind() == CK_FunctionToPointerDecay && dontTakePtr.count(Stmt) == 0)
 		out() << "&";
 	if(Stmt->getCastKind() == CK_ConstructorConversion)
 	{
 		QualType const type = Stmt->getType();
 		if(getSemantic(type) == Semantic::Reference)
 			out() << "new ";
-		PrintType(type);
+		printType(type);
 		out() << '(';
 	}
 	TraverseStmt(Stmt->getSubExpr());
@@ -2977,7 +2937,7 @@ bool DPrinter::TraverseImplicitCastExpr(ImplicitCastExpr* Stmt)
 
 bool DPrinter::TraverseCXXThisExpr(CXXThisExpr* expr)
 {
-	if(pass_stmt(expr)) return true;
+	if(passStmt(expr)) return true;
 	QualType pointee = expr->getType()->getPointeeType();
 	if(getSemantic(pointee) == Semantic::Value)
 		out() << "(&this)[0..1]";
@@ -3011,18 +2971,18 @@ bool DPrinter::isStdUnorderedMap(QualType const& type)
 
 bool DPrinter::TraverseCXXDependentScopeMemberExpr(CXXDependentScopeMemberExpr* expr)
 {
-	if(pass_stmt(expr)) return true;
-	return TraverseMemberExprImpl(expr);
+	if(passStmt(expr)) return true;
+	return traverseMemberExprImpl(expr);
 }
 
 bool DPrinter::TraverseMemberExpr(MemberExpr* Stmt)
 {
-	if(pass_stmt(Stmt)) return true;
-	return TraverseMemberExprImpl(Stmt);
+	if(passStmt(Stmt)) return true;
+	return traverseMemberExprImpl(Stmt);
 }
 
 template<typename ME>
-bool DPrinter::TraverseMemberExprImpl(ME* Stmt)
+bool DPrinter::traverseMemberExprImpl(ME* Stmt)
 {
 	DeclarationName const declName = Stmt->getMemberNameInfo().getName();
 	auto const kind = declName.getNameKind();
@@ -3036,7 +2996,7 @@ bool DPrinter::TraverseMemberExprImpl(ME* Stmt)
 		if(memberName.empty() == false && not isThis)
 			out() << '.';
 		out() << "opCast!(";
-		PrintType(declName.getCXXNameType());
+		printType(declName.getCXXNameType());
 		out() << ')';
 	}
 	else if(kind == DeclarationName::NameKind::CXXOperatorName)
@@ -3058,7 +3018,7 @@ bool DPrinter::TraverseMemberExprImpl(ME* Stmt)
 		for(unsigned I = 0; I < tmpArgCount; ++I)
 		{
 			spliter.split();
-			PrintTemplateArgument(TAL[I].getArgument());
+			printTemplateArgument(TAL[I].getArgument());
 		}
 		printTmpArgList(popStream());
 	}
@@ -3068,7 +3028,7 @@ bool DPrinter::TraverseMemberExprImpl(ME* Stmt)
 
 bool DPrinter::TraverseCXXMemberCallExpr(CXXMemberCallExpr* Stmt)
 {
-	if(pass_stmt(Stmt)) return true;
+	if(passStmt(Stmt)) return true;
 	TraverseStmt(Stmt->getCallee());
 	printCallExprArgument(Stmt);
 	return true;
@@ -3076,9 +3036,9 @@ bool DPrinter::TraverseCXXMemberCallExpr(CXXMemberCallExpr* Stmt)
 
 bool DPrinter::TraverseCXXStaticCastExpr(CXXStaticCastExpr* Stmt)
 {
-	if(pass_stmt(Stmt)) return true;
+	if(passStmt(Stmt)) return true;
 	out() << "cast(";
-	PrintType(Stmt->getTypeInfoAsWritten()->getType());
+	printType(Stmt->getTypeInfoAsWritten()->getType());
 	out() << ')';
 	TraverseStmt(Stmt->getSubExpr());
 	return true;
@@ -3086,9 +3046,9 @@ bool DPrinter::TraverseCXXStaticCastExpr(CXXStaticCastExpr* Stmt)
 
 bool DPrinter::TraverseCStyleCastExpr(CStyleCastExpr* Stmt)
 {
-	if(pass_stmt(Stmt)) return true;
+	if(passStmt(Stmt)) return true;
 	out() << "cast(";
-	PrintType(Stmt->getTypeInfoAsWritten()->getType());
+	printType(Stmt->getTypeInfoAsWritten()->getType());
 	out() << ')';
 	TraverseStmt(Stmt->getSubExpr());
 	return true;
@@ -3096,7 +3056,7 @@ bool DPrinter::TraverseCStyleCastExpr(CStyleCastExpr* Stmt)
 
 bool DPrinter::TraverseConditionalOperator(ConditionalOperator* op)
 {
-	if(pass_stmt(op)) return true;
+	if(passStmt(op)) return true;
 	TraverseStmt(op->getCond());
 	out() << "? ";
 	TraverseStmt(op->getTrueExpr());
@@ -3107,21 +3067,21 @@ bool DPrinter::TraverseConditionalOperator(ConditionalOperator* op)
 
 bool DPrinter::TraverseCompoundAssignOperator(CompoundAssignOperator* op)
 {
-	if(pass_stmt(op)) return true;
+	if(passStmt(op)) return true;
 	DPrinter::TraverseBinaryOperator(op);
 	return true;
 }
 
 bool DPrinter::TraverseBinAddAssign(CompoundAssignOperator* expr)
 {
-	if(pass_stmt(expr)) return true;
+	if(passStmt(expr)) return true;
 	if(expr->getLHS()->getType()->isPointerType())
 	{
 		TraverseStmt(expr->getLHS());
 		out() << ".popFrontN(";
 		TraverseStmt(expr->getRHS());
 		out() << ')';
-		extern_includes["std.range.primitives"].insert("popFrontN");
+		externIncludes["std.range.primitives"].insert("popFrontN");
 		return true;
 	}
 	else
@@ -3131,7 +3091,7 @@ bool DPrinter::TraverseBinAddAssign(CompoundAssignOperator* expr)
 
 #define OPERATOR(NAME)                                        \
 	bool DPrinter::TraverseBin##NAME##Assign(CompoundAssignOperator *S) \
-	{if (pass_stmt(S)) return true; return TraverseCompoundAssignOperator(S);}
+	{if (passStmt(S)) return true; return TraverseCompoundAssignOperator(S);}
 OPERATOR(Mul) OPERATOR(Div) OPERATOR(Rem) OPERATOR(Sub)
 OPERATOR(Shl) OPERATOR(Shr) OPERATOR(And) OPERATOR(Or) OPERATOR(Xor)
 #undef OPERATOR
@@ -3139,14 +3099,14 @@ OPERATOR(Shl) OPERATOR(Shr) OPERATOR(And) OPERATOR(Or) OPERATOR(Xor)
 
 bool DPrinter::TraverseSubstNonTypeTemplateParmExpr(SubstNonTypeTemplateParmExpr* Expr)
 {
-	if(pass_stmt(Expr)) return true;
+	if(passStmt(Expr)) return true;
 	TraverseStmt(Expr->getReplacement());
 	return true;
 }
 
 bool DPrinter::TraverseBinaryOperator(BinaryOperator* Stmt)
 {
-	if(pass_stmt(Stmt)) return true;
+	if(passStmt(Stmt)) return true;
 	Expr* lhs = Stmt->getLHS();
 	Expr* rhs = Stmt->getRHS();
 	Type const* typeL = lhs->getType().getTypePtr();
@@ -3173,7 +3133,7 @@ bool DPrinter::TraverseBinaryOperator(BinaryOperator* Stmt)
 
 bool DPrinter::TraverseBinAdd(BinaryOperator* expr)
 {
-	if(pass_stmt(expr)) return true;
+	if(passStmt(expr)) return true;
 	if(expr->getLHS()->getType()->isPointerType())
 	{
 		TraverseStmt(expr->getLHS());
@@ -3188,7 +3148,7 @@ bool DPrinter::TraverseBinAdd(BinaryOperator* expr)
 
 #define OPERATOR(NAME) \
 	bool DPrinter::TraverseBin##NAME(BinaryOperator* Stmt) \
-	{if (pass_stmt(Stmt)) return true; return TraverseBinaryOperator(Stmt);}
+	{if (passStmt(Stmt)) return true; return TraverseBinaryOperator(Stmt);}
 OPERATOR(PtrMemD) OPERATOR(PtrMemI) OPERATOR(Mul) OPERATOR(Div)
 OPERATOR(Rem) OPERATOR(Sub) OPERATOR(Shl) OPERATOR(Shr)
 OPERATOR(LT) OPERATOR(GT) OPERATOR(LE) OPERATOR(GE) OPERATOR(EQ)
@@ -3198,14 +3158,14 @@ OPERATOR(LOr) OPERATOR(Assign) OPERATOR(Comma)
 
 bool DPrinter::TraverseUnaryOperator(UnaryOperator* Stmt)
 {
-	if(pass_stmt(Stmt)) return true;
+	if(passStmt(Stmt)) return true;
 	if(Stmt->isIncrementOp())
 	{
 		if(Stmt->getSubExpr()->getType()->isPointerType())
 		{
 			TraverseStmt(Stmt->getSubExpr());
 			out() << ".popFront";
-			extern_includes["std.range.primitives"].insert("popFront");
+			externIncludes["std.range.primitives"].insert("popFront");
 			return true;
 		}
 	}
@@ -3243,7 +3203,7 @@ bool DPrinter::TraverseUnaryOperator(UnaryOperator* Stmt)
 
 		QualType exprType = expr->getType();
 		Semantic operSem =
-		  exprType->hasPointerRepresentation() ? //expr->getStmtClass() == Stmt::StmtClass::CXXThisExprClass ?
+		  exprType->hasPointerRepresentation() ?
 		  getSemantic(exprType->getPointeeType()) :
 		  getSemantic(exprType);
 
@@ -3255,7 +3215,6 @@ bool DPrinter::TraverseUnaryOperator(UnaryOperator* Stmt)
 		}
 		if(showOp)
 			out() << preOp;
-		//TraverseStmt(Stmt->getSubExpr());
 		for(auto c : Stmt->children())
 			TraverseStmt(c);
 		if(showOp)
@@ -3265,7 +3224,7 @@ bool DPrinter::TraverseUnaryOperator(UnaryOperator* Stmt)
 }
 #define OPERATOR(NAME) \
 	bool DPrinter::TraverseUnary##NAME(UnaryOperator* Stmt) \
-	{if (pass_stmt(Stmt)) return true; return TraverseUnaryOperator(Stmt);}
+	{if (passStmt(Stmt)) return true; return TraverseUnaryOperator(Stmt);}
 OPERATOR(PostInc) OPERATOR(PostDec) OPERATOR(PreInc) OPERATOR(PreDec)
 OPERATOR(AddrOf) OPERATOR(Deref) OPERATOR(Plus) OPERATOR(Minus)
 OPERATOR(Not) OPERATOR(LNot) OPERATOR(Real) OPERATOR(Imag)
@@ -3273,9 +3232,9 @@ OPERATOR(Extension) OPERATOR(Coawait)
 #undef OPERATOR
 
 template<typename TDeclRefExpr>
-bool DPrinter::TraverseDeclRefExprImpl(TDeclRefExpr* Expr)
+bool DPrinter::traverseDeclRefExprImpl(TDeclRefExpr* Expr)
 {
-	if(pass_stmt(Expr)) return true;
+	if(passStmt(Expr)) return true;
 	unsigned const argNum = Expr->getNumTemplateArgs();
 	if(argNum != 0)
 	{
@@ -3285,7 +3244,7 @@ bool DPrinter::TraverseDeclRefExprImpl(TDeclRefExpr* Expr)
 		for(unsigned i = 0; i < argNum; ++i)
 		{
 			split.split();
-			PrintTemplateArgument(tmpArgs[i].getArgument());
+			printTemplateArgument(tmpArgs[i].getArgument());
 		}
 		printTmpArgList(popStream());
 	}
@@ -3295,7 +3254,7 @@ bool DPrinter::TraverseDeclRefExprImpl(TDeclRefExpr* Expr)
 
 bool DPrinter::TraverseDeclRefExpr(DeclRefExpr* Expr)
 {
-	if(pass_stmt(Expr)) return true;
+	if(passStmt(Expr)) return true;
 	QualType nnsQualType;
 	if(Expr->hasQualifier())
 	{
@@ -3309,26 +3268,26 @@ bool DPrinter::TraverseDeclRefExpr(DeclRefExpr* Expr)
 	{
 		if(nnsQualType != decl->getType().getUnqualifiedType())
 		{
-			PrintType(decl->getType());
+			printType(decl->getType());
 			out() << '.';
 		}
 	}
 	out() << mangleVar(Expr);
-	return TraverseDeclRefExprImpl(Expr);
+	return traverseDeclRefExprImpl(Expr);
 }
 
 bool DPrinter::TraverseDependentScopeDeclRefExpr(DependentScopeDeclRefExpr* expr)
 {
-	if(pass_stmt(expr)) return true;
+	if(passStmt(expr)) return true;
 	NestedNameSpecifier* nns = expr->getQualifier();
 	TraverseNestedNameSpecifier(nns);
 	out() << expr->getDeclName().getAsString();
-	return TraverseDeclRefExprImpl(expr);
+	return traverseDeclRefExprImpl(expr);
 }
 
 bool DPrinter::TraverseRecordType(RecordType* Type)
 {
-	if(pass_type(Type)) return false;
+	if(passType(Type)) return false;
 	out() << mangleType(Type->getDecl());
 	RecordDecl* decl = Type->getDecl();
 	switch(decl->getKind())
@@ -3346,7 +3305,7 @@ bool DPrinter::TraverseRecordType(RecordType* Type)
 		{
 			spliter2.split();
 			TemplateArgument const& tmpArg = tmpArgsSpec.get(i);
-			PrintTemplateArgument(tmpArg);
+			printTemplateArgument(tmpArg);
 		}
 		printTmpArgList(popStream());
 		break;
@@ -3358,23 +3317,23 @@ bool DPrinter::TraverseRecordType(RecordType* Type)
 
 bool DPrinter::TraverseConstantArrayType(ConstantArrayType* Type)
 {
-	if(pass_type(Type)) return false;
-	PrintType(Type->getElementType());
+	if(passType(Type)) return false;
+	printType(Type->getElementType());
 	out() << '[' << Type->getSize().toString(10, false) << ']';
 	return true;
 }
 
 bool DPrinter::TraverseIncompleteArrayType(IncompleteArrayType* Type)
 {
-	if(pass_type(Type)) return false;
-	PrintType(Type->getElementType());
+	if(passType(Type)) return false;
+	printType(Type->getElementType());
 	out() << "[]";
 	return true;
 }
 
 bool DPrinter::TraverseInitListExpr(InitListExpr* expr)
 {
-	if(pass_stmt(expr)) return true;
+	if(passStmt(expr)) return true;
 	Expr* expr2 = expr->IgnoreImplicit();
 	if(expr2 != expr)
 		return TraverseStmt(expr2);
@@ -3397,7 +3356,7 @@ bool DPrinter::TraverseInitListExpr(InitListExpr* expr)
 		std::string const valInit = popStream();
 		if(valInit.empty() == false)
 		{
-			out() << indent_str() << valInit;
+			out() << indentStr() << valInit;
 			if(isExplicitBracket)
 				out() << ',' << std::endl;
 		}
@@ -3405,13 +3364,13 @@ bool DPrinter::TraverseInitListExpr(InitListExpr* expr)
 	}
 	--indent;
 	if(isExplicitBracket)
-		out() << indent_str() << (isArray ? ']' : '}');
+		out() << indentStr() << (isArray ? ']' : '}');
 	return true;
 }
 
 bool DPrinter::TraverseParenExpr(ParenExpr* expr)
 {
-	if(pass_stmt(expr)) return true;
+	if(passStmt(expr)) return true;
 	if(auto* binOp = dyn_cast<BinaryOperator>(expr->getSubExpr()))
 	{
 		Expr* lhs = binOp->getLHS();
@@ -3456,7 +3415,7 @@ bool DPrinter::TraverseParenExpr(ParenExpr* expr)
 				auto* macro_name = dyn_cast<StringLiteral>(macro_name_and_args->getLHS());
 				auto* macro_args = dyn_cast<CallExpr>(macro_name_and_args->getRHS());
 				out() << "(mixin(" << macro_name->getString().str() << "!(";
-				PrintMacroArgs(macro_args);
+				printMacroArgs(macro_args);
 				out() << ")))";
 				pushStream();
 				TraverseStmt(macro_and_cpp->getRHS()); //Add the required import
@@ -3473,13 +3432,13 @@ bool DPrinter::TraverseParenExpr(ParenExpr* expr)
 
 bool DPrinter::TraverseImplicitValueInitExpr(ImplicitValueInitExpr* expr)
 {
-	if(pass_stmt(expr)) return true;
+	if(passStmt(expr)) return true;
 	return true;
 }
 
 bool DPrinter::TraverseParenListExpr(clang::ParenListExpr* expr)
 {
-	if(pass_stmt(expr)) return true;
+	if(passStmt(expr)) return true;
 	Spliter split(", ");
 	for(Expr* arg : expr->exprs())
 	{
@@ -3490,16 +3449,16 @@ bool DPrinter::TraverseParenListExpr(clang::ParenListExpr* expr)
 }
 
 
-void DPrinter::TraverseVarDeclImpl(VarDecl* Decl)
+void DPrinter::traverseVarDeclImpl(VarDecl* Decl)
 {
 	std::string const varName = Decl->getNameAsString();
 	if(varName.find("CPP2D_MACRO_STMT") == 0)
 	{
-		PrintStmtMacro(varName, Decl->getInit());
+		printStmtMacro(varName, Decl->getInit());
 		return;
 	}
 
-	if(pass_decl(Decl)) return;
+	if(passDecl(Decl)) return;
 
 	if(Decl->isOutOfLine())
 		return;
@@ -3515,7 +3474,7 @@ void DPrinter::TraverseVarDeclImpl(VarDecl* Decl)
 			if(auto qualifier = Decl->getQualifier())
 				TraverseNestedNameSpecifier(qualifier);
 		}
-		PrintType(varType);
+		printType(varType);
 		out() << " ";
 	}
 	out() << mangleName(Decl->getNameAsString());
@@ -3532,13 +3491,13 @@ void DPrinter::TraverseVarDeclImpl(VarDecl* Decl)
 					if(constr->getNumArgs() != 0)
 					{
 						out() << " = ";
-						PrintCXXConstructExprParams(constr);
+						printCXXConstructExprParams(constr);
 					}
 				}
 				else
 				{
 					out() << " = new ";
-					PrintCXXConstructExprParams(constr);
+					printCXXConstructExprParams(constr);
 				}
 			}
 			else
@@ -3557,32 +3516,32 @@ void DPrinter::TraverseVarDeclImpl(VarDecl* Decl)
 
 bool DPrinter::TraverseVarDecl(VarDecl* Decl)
 {
-	if(pass_decl(Decl)) return true;
-	TraverseVarDeclImpl(Decl);
+	if(passDecl(Decl)) return true;
+	traverseVarDeclImpl(Decl);
 	return true;
 }
 
 bool DPrinter::VisitDecl(Decl* Decl)
 {
-	out() << indent_str() << "/*" << Decl->getDeclKindName() << " Decl*/";
+	out() << indentStr() << "/*" << Decl->getDeclKindName() << " Decl*/";
 	return true;
 }
 
 bool DPrinter::VisitStmt(Stmt* Stmt)
 {
-	out() << indent_str() << "/*" << Stmt->getStmtClassName() << " Stmt*/";
+	out() << indentStr() << "/*" << Stmt->getStmtClassName() << " Stmt*/";
 	return true;
 }
 
 bool DPrinter::VisitType(Type* Type)
 {
-	out() << indent_str() << "/*" << Type->getTypeClassName() << " Type*/";
+	out() << indentStr() << "/*" << Type->getTypeClassName() << " Type*/";
 	return true;
 }
 
 void DPrinter::addExternInclude(std::string const& include, std::string const& typeName)
 {
-	extern_includes[include].insert(typeName + " 6");
+	externIncludes[include].insert(typeName);
 }
 
 std::ostream& DPrinter::stream()
@@ -3592,7 +3551,7 @@ std::ostream& DPrinter::stream()
 
 std::map<std::string, std::set<std::string> > const& DPrinter::getExternIncludes() const
 {
-	return extern_includes;
+	return externIncludes;
 }
 
 

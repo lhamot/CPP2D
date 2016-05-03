@@ -22,9 +22,7 @@ std::unique_ptr<clang::ASTConsumer> CPP2DFrontendAction::CreateASTConsumer(
 bool CPP2DFrontendAction::BeginSourceFileAction(CompilerInstance& ci, StringRef file)
 {
 	Preprocessor& pp = ci.getPreprocessor();
-	std::unique_ptr<CPP2DPPHandling> find_includes_callback(
-	  new CPP2DPPHandling(pp.getSourceManager(), pp, file));
-	pp.addPPCallbacks(std::move(find_includes_callback));
+	pp.addPPCallbacks(std::make_unique<CPP2DPPHandling>(pp.getSourceManager(), pp, file));
 	return true;
 }
 

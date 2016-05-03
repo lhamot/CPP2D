@@ -23,7 +23,9 @@ std::set<std::string> new_macros_name;
 extern cl::list<std::string> MacroAsExpr;
 extern cl::list<std::string> MacroAsStmt;
 
-CPP2DPPHandling::CPP2DPPHandling(clang::SourceManager& sourceManager, Preprocessor& pp, StringRef inFile)
+CPP2DPPHandling::CPP2DPPHandling(clang::SourceManager& sourceManager, 
+	                             Preprocessor& pp, 
+	                             StringRef inFile)
 	: sourceManager_(sourceManager)
 	, pp_(pp)
 	, inFile_(inFile)
@@ -60,12 +62,12 @@ CPP2DPPHandling::CPP2DPPHandling(clang::SourceManager& sourceManager, Preprocess
 	}
 
 	// TODO : Find a better way if it exists
-	predefines = pp_.getPredefines();
-	predefines += "\nint cpp2d_dummy_variadic(...);\n";
-	predefines += "template<typename T> int cpp2d_type();\n";
-	predefines += "int cpp2d_name(char const*);\n";
-	predefines += "#define CPP2D_ADD2(A, B) A##B\n";
-	predefines += "#define CPP2D_ADD(A, B) CPP2D_ADD2(A, B)\n";
+	predefines = pp_.getPredefines() + 
+		"\nint cpp2d_dummy_variadic(...);\n"
+		"template<typename T> int cpp2d_type();\n"
+		"int cpp2d_name(char const*);\n"
+		"#define CPP2D_ADD2(A, B) A##B\n"
+		"#define CPP2D_ADD(A, B) CPP2D_ADD2(A, B)\n";
 	pp_.setPredefines(predefines);
 }
 
@@ -237,7 +239,8 @@ void CPP2DPPHandling::inject_macro(
 
 	pp_.EnterSourceFile(fileID, pp_.GetCurDirLookup(), MD->getMacroInfo()->getDefinitionEndLoc());
 
-	if(CPP2DTools::checkFilename(modulename_, CPP2DTools::getFile(sourceManager_, MD->getLocation())))
+	char const* filename = CPP2DTools::getFile(sourceManager_, MD->getLocation());
+	if(CPP2DTools::checkFilename(modulename_, filename))
 		add_before_decl.insert(make_d_macro(MD->getMacroInfo(), name));
 }
 

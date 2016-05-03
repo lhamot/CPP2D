@@ -9,10 +9,13 @@ namespace clang
 class ASTContext;
 }
 
+//! Extract includes and transform macros
 class CPP2DPPHandling : public clang::PPCallbacks
 {
 public:
-	CPP2DPPHandling(clang::SourceManager& sourceManager, clang::Preprocessor& pp, llvm::StringRef inFile);
+	CPP2DPPHandling(clang::SourceManager& sourceManager,
+	                clang::Preprocessor& pp,
+	                llvm::StringRef inFile);
 
 	void InclusionDirective(
 	  clang::SourceLocation,		//hash_loc,

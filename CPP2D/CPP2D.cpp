@@ -24,15 +24,17 @@ static cl::extrahelp CommonHelp(CommonOptionsParser::HelpMessage);
 // A help message for this specific tool can be added afterwards.
 static cl::extrahelp MoreHelp("\nMore help text...");
 
-cl::list<std::string> MacroAsExpr("macro-expr",
-                                  cl::desc("This macro will not be expanded and will be migrated expecting an expression"),
-                                  cl::cat(MyToolCategory),
-                                  cl::ZeroOrMore);
+cl::list<std::string> MacroAsExpr(
+  "macro-expr",
+  cl::desc("This macro will not be expanded and will be migrated expecting an expression"),
+  cl::cat(MyToolCategory),
+  cl::ZeroOrMore);
 
-cl::list<std::string> MacroAsStmt("macro-stmt",
-                                  cl::desc("This macro will not be expanded and will be migrated expecting statments"),
-                                  cl::cat(MyToolCategory),
-                                  cl::ZeroOrMore);
+cl::list<std::string> MacroAsStmt(
+  "macro-stmt",
+  cl::desc("This macro will not be expanded and will be migrated expecting statments"),
+  cl::cat(MyToolCategory),
+  cl::ZeroOrMore);
 
 int main(int argc, char const** argv)
 {
@@ -43,11 +45,11 @@ int main(int argc, char const** argv)
 	argv_vect.push_back("-Wno-builtin-macro-redefined");
 	argv_vect.push_back("-Wno-unused-value");
 	argv_vect.push_back("-DCPP2D");
-	//argv_vect.push_back("-D__LINE__=(\"__CPP2D__LINE__\", 0)");
-	//argv_vect.push_back("-D__FILE__=(\"__CPP2D__FILE__\", \"\")");
-	//argv_vect.push_back("-D__FUNCTION__=(\"__CPP2D__FUNC__\", __FUNCTION__)");
-	//argv_vect.push_back("-D__PRETTY_FUNCTION__=(\"__CPP2D__PFUNC__\", __PRETTY_FUNCTION__)");
-	//argv_vect.push_back("-D__func__=(\"__CPP2D__func__\", __func__)");
+	argv_vect.push_back("-D__LINE__=(\"__CPP2D__LINE__\", 0)");
+	argv_vect.push_back("-D__FILE__=(\"__CPP2D__FILE__\", \"\")");
+	argv_vect.push_back("-D__FUNCTION__=(\"__CPP2D__FUNC__\", __FUNCTION__)");
+	argv_vect.push_back("-D__PRETTY_FUNCTION__=(\"__CPP2D__PFUNC__\", __PRETTY_FUNCTION__)");
+	argv_vect.push_back("-D__func__=(\"__CPP2D__func__\", __func__)");
 	argc = static_cast<int>(argv_vect.size());
 	CommonOptionsParser OptionsParser(argc, argv_vect.data(), MyToolCategory);
 	ClangTool Tool(

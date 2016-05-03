@@ -10,6 +10,7 @@ using namespace clang;
 
 namespace CPP2DTools
 {
+
 const char* getFile(clang::SourceManager const& sourceManager, clang::SourceLocation const& sl)
 {
 	if(sl.isValid() == false)
@@ -43,28 +44,20 @@ bool checkFilename(std::string const& modulename, char const* filepath_str)
 	else
 	{
 		StringRef const filename = llvm::sys::path::filename(filepath);
-		std::string exts[] =
+		static char const* exts[] = { ".h", ".hpp", ".cpp", ".cxx", ".c" };
+		auto iter = std::find_if(std::begin(exts), std::end(exts), [&](auto && ext)
 		{
-			std::string(".h"),
-			std::string(".hpp"),
-			std::string(".cpp"),
-			std::string(".cxx"),
-			std::string(".c"),
-		};
-		for(auto& ext : exts)
-		{
-			std::string const modulenameext = modulename + ext;
-			//if(modulenameext.size() > filepath.size())
-			//	continue;
-			if(filename == modulenameext)
-				return true;
-		}
-		return false;
+			return filename == (modulename + ext);
+		});
+		return iter != std::end(exts);
 	}
 }
 
-bool checkFilename(clang::SourceManager const& sourceManager, std::string const& modulename, clang::Decl const* d)
+bool checkFilename(clang::SourceManager const& sourceManager,
+                   std::string const& modulename,
+                   clang::Decl const* d)
 {
 	return checkFilename(modulename, getFile(sourceManager, d));
 }
-}
+
+} //CPP2DTools

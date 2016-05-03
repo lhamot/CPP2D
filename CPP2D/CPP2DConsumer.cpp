@@ -36,7 +36,8 @@ void VisitorToDConsumer::HandleTranslationUnit(clang::ASTContext& Context)
 	std::string modulename = llvm::sys::path::stem(InFile).str();
 	std::ofstream file(modulename + ".d");
 	std::string new_modulename;
-	std::replace_copy(std::begin(modulename), std::end(modulename), std::back_inserter(new_modulename), '-', '_'); //Replace illegal characters
+	std::replace_copy(std::begin(modulename), std::end(modulename),
+	                  std::back_inserter(new_modulename), '-', '_'); //Replace illegal characters
 	if(new_modulename != modulename)  // When filename has some illegal characters
 		file << "module " << new_modulename << ';';
 	for(auto const& import : Visitor.getExternIncludes())

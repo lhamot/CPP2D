@@ -2188,18 +2188,6 @@ struct ContainScopedClass2
 	}
 };
 
-struct ContainScopedClass3
-{
-	SimpleClass m1;
-
-	ContainScopedClass3() = default;
-
-	ContainScopedClass3(ContainScopedClass3 const& other)
-	{
-		m1 = other.m1;
-	}
-};
-
 void check_struct_containing_scooped_class()
 {
 	{
@@ -2224,16 +2212,6 @@ void check_struct_containing_scooped_class()
 		CHECK(c2.m1.i == 6);
 	}
 
-	{
-		ContainScopedClass3 c1;
-		c1.m1.i = 98;
-		auto c2 = c1;
-		c1.m1.i = 6;
-		CHECK(c2.m1.i == 98);
-		c2 = c1;
-		c1.m1.i = 7;
-		CHECK(c2.m1.i == 6);
-	}
 }
 
 class CopyDisableClass

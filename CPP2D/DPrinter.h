@@ -2,7 +2,6 @@
 
 #pragma warning(push, 0)
 #include <clang/AST/RecursiveASTVisitor.h>
-#include <clang/AST/Decl.h>
 #pragma warning(pop)
 #include <unordered_map>
 
@@ -12,44 +11,6 @@ class DPrinter : public clang::RecursiveASTVisitor<DPrinter>
 {
 	typedef RecursiveASTVisitor<DPrinter> Base;
 
-	void include_file(std::string const& decl_inc, std::string const& typeName);
-
-	std::string mangleType(clang::NamedDecl const* decl);
-
-	std::string mangleVar(clang::DeclRefExpr* expr);
-
-	std::string replace(std::string str, std::string const& in, std::string const& out);
-
-	void printCommentBefore(clang::Decl* t);
-
-	void printCommentAfter(clang::Decl* t);
-
-	// trim from both ends
-	static inline std::string trim(std::string const& s);
-
-	std::vector<std::string> split(std::string const& instr);
-
-	void printStmtComment(
-	  clang::SourceLocation& locStart,
-	  clang::SourceLocation const& locEnd,
-	  clang::SourceLocation const& nextStart = clang::SourceLocation());
-
-	void PrintMacroArgs(clang::CallExpr* macro_args);
-
-	void PrintStmtMacro(std::string const& varName, clang::Expr* init);
-
-	struct RelationInfo
-	{
-		bool hasOpEqual = false;
-		bool hasOpLess = false;
-	};
-	struct ClassInfo
-	{
-		std::unordered_map<clang::Type const*, RelationInfo> relations;
-		bool hasOpExclaim = false;
-		bool hasBoolConv = false;
-	};
-
 public:
 	explicit DPrinter(
 	  clang::ASTContext* Context,
@@ -58,7 +19,109 @@ public:
 
 	void setIncludes(std::set<std::string> const& includes);
 
-	std::string indent_str() const;
+	std::string indentStr() const;
+
+	void printBasesClass(clang::CXXRecordDecl* decl);
+
+	void printTmpArgList(std::string const& tmpArgListStr);
+
+	template<typename TmpSpecFunc, typename PrintBasesClass>
+	bool traverseCXXRecordDeclImpl(
+	  clang::RecordDecl* decl,
+	  TmpSpecFunc traverseTmpSpecs,
+	  PrintBasesClass printBasesClass);
+
+	void printTemplateParameterList(
+	  clang::TemplateParameterList* tmpParams,
+	  std::string const& prevTmplParmsStr);
+
+	template<typename InitList>
+	bool traverseCompoundStmtImpl(clang::CompoundStmt* Stmt, InitList initList);
+
+	template<typename InitList>
+	bool traverseCXXTryStmtImpl(clang::CXXTryStmt* Stmt, InitList initList);
+
+	clang::TemplateParameterList* getTemplateParameters(clang::ClassTemplateSpecializationDecl*);
+
+	clang::TemplateParameterList* getTemplateParameters(
+	  clang::ClassTemplatePartialSpecializationDecl* Decl);
+
+	void printTemplateArgument(clang::TemplateArgument const& ta);
+
+	void printTemplateSpec_TmpArgsAndParms(
+	  clang::TemplateParameterList& primaryTmpParams,
+	  clang::TemplateArgumentList const& tmpArgs,
+	  clang::TemplateParameterList* newTmpParams,
+	  std::string const& prevTmplParmsStr
+	);
+
+	void printCXXConstructExprParams(clang::CXXConstructExpr* Init);
+
+	void printType(clang::QualType const& type);
+
+	void startCtorBody(clang::FunctionDecl*);
+
+	void startCtorBody(clang::CXXConstructorDecl* Decl);
+
+	void printFuncEnd(clang::CXXMethodDecl* Decl);
+
+	void printFuncEnd(clang::FunctionDecl*);
+
+	void printSpecialMethodAttribute(clang::CXXMethodDecl* Decl);
+
+	bool printFuncBegin(clang::CXXMethodDecl* Decl, std::string& tmpParams, int thisArgIndex = -1);
+
+	bool printFuncBegin(clang::FunctionDecl* Decl, std::string& tmpParams, int thisArgIndex = -1);
+
+	bool printFuncBegin(clang::CXXConversionDecl* Decl, std::string& tmpParams, int = -1);
+
+	bool printFuncBegin(clang::CXXConstructorDecl* Decl,
+	                    std::string& tmpParams,
+	                    int thisArgIndex = -1);
+
+	bool printFuncBegin(clang::CXXDestructorDecl*, std::string& tmpParams, int thisArgIndex = -1);
+
+	template<typename D>
+	bool traverseFunctionDeclImpl(D* Decl, int thisArgIndex = -1);
+
+	enum Semantic
+	{
+		Value,
+		Reference,
+		AssocArray,  // Create without new, but reference semantics
+	};
+	static Semantic getSemantic(clang::QualType qt);
+
+	template<typename PType>
+	bool traversePointerTypeImpl(PType* Type);
+
+	template<typename D>
+	bool traverseClassTemplateSpecializationDeclImpl(D* Decl);
+
+	bool isStdArray(clang::QualType const& type);
+
+	bool isStdUnorderedMap(clang::QualType const& type);
+
+	template<typename TDeclRefExpr>
+	bool traverseDeclRefExprImpl(TDeclRefExpr* Expr);
+
+	template<typename ME>
+	bool traverseMemberExprImpl(ME* Stmt);
+
+	std::map<std::string, std::set<std::string>> const& getExternIncludes() const;
+
+	std::string getDCode() const;
+
+	std::ostream& stream();
+
+	void addExternInclude(std::string const& include, std::string const& typeName);
+
+	void printCallExprArgument(clang::CallExpr* Stmt);
+
+	void traverseVarDeclImpl(clang::VarDecl* Decl);
+
+	//  ******************** Function called by RecursiveASTVisitor *******************************
+	bool shouldVisitImplicitCode() const;
 
 	bool TraverseTranslationUnitDecl(clang::TranslationUnitDecl* Decl);
 
@@ -84,19 +147,11 @@ public:
 
 	bool TraverseNestedNameSpecifier(clang::NestedNameSpecifier* NNS);
 
-	void printTmpArgList(std::string const& tmpArgListStr);
-
 	bool TraverseTemplateSpecializationType(clang::TemplateSpecializationType* Type);
 
 	bool TraverseTypedefType(clang::TypedefType* Type);
 
-	template<typename InitList>
-	bool TraverseCompoundStmtImpl(clang::CompoundStmt* Stmt, InitList initList);
-
 	bool TraverseCompoundStmt(clang::CompoundStmt* Stmt);
-
-	template<typename InitList>
-	bool TraverseCXXTryStmtImpl(clang::CXXTryStmt* Stmt, InitList initList);
 
 	bool TraverseCXXTryStmt(clang::CXXTryStmt* Stmt);
 
@@ -106,44 +161,16 @@ public:
 
 	bool TraverseAccessSpecDecl(clang::AccessSpecDecl* Decl);
 
-	void printBasesClass(clang::CXXRecordDecl* decl);
-
 	bool TraverseCXXRecordDecl(clang::CXXRecordDecl* decl);
 
 	bool TraverseRecordDecl(clang::RecordDecl* Decl);
 
-	template<typename TmpSpecFunc, typename PrintBasesClass>
-	bool TraverseCXXRecordDeclImpl(
-	  clang::RecordDecl* decl,
-	  TmpSpecFunc traverseTmpSpecs,
-	  PrintBasesClass printBasesClass);
-
-	void PrintTemplateParameterList(
-	  clang::TemplateParameterList* tmpParams,
-	  std::string const& prevTmplParmsStr);
-
 	bool TraverseClassTemplateDecl(clang::ClassTemplateDecl* Decl);
-
-	clang::TemplateParameterList* getTemplateParameters(clang::ClassTemplateSpecializationDecl*);
-
-	clang::TemplateParameterList* getTemplateParameters(clang::ClassTemplatePartialSpecializationDecl* Decl);
 
 	bool TraverseClassTemplatePartialSpecializationDecl(
 	  clang::ClassTemplatePartialSpecializationDecl* Decl);
 
 	bool TraverseClassTemplateSpecializationDecl(clang::ClassTemplateSpecializationDecl* Decl);
-
-	void PrintTemplateArgument(clang::TemplateArgument const& ta);
-
-	void PrintTemplateSpec_TmpArgsAndParms(
-	  clang::TemplateParameterList& primaryTmpParams,
-	  clang::TemplateArgumentList const& tmpArgs,
-	  clang::TemplateParameterList* newTmpParams,
-	  std::string const& prevTmplParmsStr
-	);
-
-	template<typename D>
-	bool TraverseClassTemplateSpecializationDeclImpl(D* Decl);
 
 	bool TraverseCXXConversionDecl(clang::CXXConversionDecl* Decl);
 
@@ -179,45 +206,9 @@ public:
 
 	bool TraverseCXXNewExpr(clang::CXXNewExpr* Expr);
 
-	void PrintCXXConstructExprParams(clang::CXXConstructExpr* Init);
-
 	bool TraverseCXXConstructExpr(clang::CXXConstructExpr* Init);
 
-	void PrintType(clang::QualType const& type);
-
 	bool TraverseConstructorInitializer(clang::CXXCtorInitializer* Init);
-
-	void startCtorBody(clang::FunctionDecl*);
-
-	void startCtorBody(clang::CXXConstructorDecl* Decl);
-
-	void printFuncEnd(clang::CXXMethodDecl* Decl);
-
-	void printFuncEnd(clang::FunctionDecl*);
-
-	void printSpecialMethodAttribute(clang::CXXMethodDecl* Decl);
-
-	bool printFuncBegin(clang::CXXMethodDecl* Decl, std::string& tmpParams, int arg_become_this = -1);
-
-	bool printFuncBegin(clang::FunctionDecl* Decl, std::string& tmpParams, int arg_become_this = -1);
-
-	bool printFuncBegin(clang::CXXConversionDecl* Decl, std::string& tmpParams, int = -1);
-
-	bool printFuncBegin(clang::CXXConstructorDecl* Decl,
-	                    std::string&,	//tmpParams
-	                    int = -1		//arg_become_this = -1
-	                   );
-
-	bool printFuncBegin(clang::CXXDestructorDecl*,
-	                    std::string&,	//tmpParams,
-	                    int = -1		//arg_become_this = -1
-	                   );
-
-
-	template<typename D>
-	bool TraverseFunctionDeclImpl(
-	  D* Decl,
-	  int arg_become_this = -1);
 
 	bool TraverseUsingDecl(clang::UsingDecl* Decl);
 
@@ -228,17 +219,6 @@ public:
 	bool TraverseFunctionTemplateDecl(clang::FunctionTemplateDecl* Decl);
 
 	bool TraverseBuiltinType(clang::BuiltinType* Type);
-
-	enum Semantic
-	{
-		Value,
-		Reference,
-		AssocArray,  // Create without new, but reference semantics
-	};
-	static Semantic getSemantic(clang::QualType qt);
-
-	template<typename PType>
-	bool TraversePointerTypeImpl(PType* Type);
 
 	bool TraverseMemberPointerType(clang::MemberPointerType* Type);
 
@@ -330,16 +310,9 @@ public:
 
 	bool TraverseCXXThisExpr(clang::CXXThisExpr* expr);
 
-	bool isStdArray(clang::QualType const& type);
-
-	bool isStdUnorderedMap(clang::QualType const& type);
-
 	bool TraverseCXXDependentScopeMemberExpr(clang::CXXDependentScopeMemberExpr* expr);
 
 	bool TraverseMemberExpr(clang::MemberExpr* Stmt);
-
-	template<typename ME>
-	bool TraverseMemberExprImpl(ME* Stmt);
 
 	bool TraverseCXXMemberCallExpr(clang::CXXMemberCallExpr* Stmt);
 
@@ -381,9 +354,6 @@ public:
 	OPERATOR(Extension) OPERATOR(Coawait)
 #undef OPERATOR
 
-	template<typename TDeclRefExpr>
-	bool TraverseDeclRefExprImpl(TDeclRefExpr* Expr);
-
 	bool TraverseDeclRefExpr(clang::DeclRefExpr* Expr);
 
 	bool TraverseDependentScopeDeclRefExpr(clang::DependentScopeDeclRefExpr* expr);
@@ -402,8 +372,6 @@ public:
 
 	bool TraverseParenListExpr(clang::ParenListExpr* Expr);
 
-	void TraverseVarDeclImpl(clang::VarDecl* Decl);
-
 	bool TraverseVarDecl(clang::VarDecl* Decl);
 
 	bool VisitDecl(clang::Decl* Decl);
@@ -412,28 +380,53 @@ public:
 
 	bool VisitType(clang::Type* Type);
 
-	std::map<std::string, std::set<std::string>> const& getExternIncludes() const;
-
-	std::string getDCode() const;
-
-	std::ostream& stream();
-
-	void addExternInclude(std::string const& include, std::string const& typeName);
-
-	void printCallExprArgument(clang::CallExpr* Stmt);
-
-	bool shouldVisitImplicitCode() const;
-
 private:
-	bool pass_decl(clang::Decl* decl);
+	void includeFile(std::string const& declInc, std::string const& typeName);
 
-	bool pass_stmt(clang::Stmt* stmt);
+	std::string mangleType(clang::NamedDecl const* decl);
 
-	bool pass_type(clang::Type* type);
+	std::string mangleVar(clang::DeclRefExpr* expr);
 
-	std::set<std::string> includes_in_file;
-	std::set<clang::Expr*> dont_take_ptr;
-	std::map<std::string, std::set<std::string> > extern_includes;
+	std::string replace(std::string str, std::string const& in, std::string const& out);
+
+	void printCommentBefore(clang::Decl* t);
+
+	void printCommentAfter(clang::Decl* t);
+
+	// trim from both ends
+	static inline std::string trim(std::string const& s);
+
+	std::vector<std::string> split(std::string const& instr);
+
+	void printStmtComment(
+	  clang::SourceLocation& locStart,
+	  clang::SourceLocation const& locEnd,
+	  clang::SourceLocation const& nextStart = clang::SourceLocation());
+
+	void printMacroArgs(clang::CallExpr* macroArgs);
+
+	void printStmtMacro(std::string const& varName, clang::Expr* init);
+
+	struct RelationInfo
+	{
+		bool hasOpEqual = false;
+		bool hasOpLess = false;
+	};
+	struct ClassInfo
+	{
+		std::unordered_map<clang::Type const*, RelationInfo> relations;
+		bool hasOpExclaim = false;
+		bool hasBoolConv = false;
+	};
+	bool passDecl(clang::Decl* decl);
+
+	bool passStmt(clang::Stmt* stmt);
+
+	bool passType(clang::Type* type);
+
+	std::set<std::string> includesInFile;
+	std::set<clang::Expr*> dontTakePtr;
+	std::map<std::string, std::set<std::string> > externIncludes;
 	std::string modulename;
 
 	MatchContainer const& receiver;
@@ -441,7 +434,7 @@ private:
 	clang::ASTContext* Context;
 	size_t isInMacro = 0;
 
-	std::vector<std::vector<clang::NamedDecl* > > template_args_stack;
+	std::vector<std::vector<clang::NamedDecl* > > templateArgsStack;
 	std::unordered_map<clang::IdentifierInfo*, std::string> renamedIdentifiers;
 	std::unordered_map<clang::CXXRecordDecl*, ClassInfo> classInfoMap;
 	bool renameIdentifiers = true;
