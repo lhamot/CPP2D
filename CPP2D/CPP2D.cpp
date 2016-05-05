@@ -1,4 +1,12 @@
+﻿//
+// Copyright (c) 2016 Loïc HAMOT
+//
+// Distributed under the Boost Software License, Version 1.0. (See accompanying
+// file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
+//
+
 #pragma warning(push, 0)
+#pragma warning(disable: 4548)
 #include "clang/Tooling/CommonOptionsParser.h"
 #include "clang/Tooling/Tooling.h"
 #pragma warning(pop)

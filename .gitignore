@@ -1,0 +1,11 @@
+*.suo
+/CPP2D/x64/Debug
+/CPP2D/x64/Release
+*.patch
+/x64/Debug
+/x64/Release
+/AStyle.exe
+*.opensdf
+*.sdf
+/format.bat
+/todo.txt
