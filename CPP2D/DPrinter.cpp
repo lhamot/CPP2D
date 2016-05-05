@@ -3381,17 +3381,7 @@ bool DPrinter::TraverseParenExpr(ParenExpr* expr)
 		if(strLit && (binOp->getOpcode() == BinaryOperatorKind::BO_Comma))
 		{
 			StringRef const str = strLit->getString();
-			if(str == "__CPP2D__LINE__")
-			{
-				out() << "__LINE__";
-				return true;
-			}
-			else if(str == "__CPP2D__FILE__")
-			{
-				out() << "__FILE__ ~ '\\0'";
-				return true;
-			}
-			else if(str == "CPP2D_MACRO_EXPR")
+			if(str == "CPP2D_MACRO_EXPR")
 			{
 				auto get_binop = [](Expr * paren)
 				{

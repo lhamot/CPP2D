@@ -45,8 +45,6 @@ int main(int argc, char const** argv)
 	argv_vect.push_back("-Wno-builtin-macro-redefined");
 	argv_vect.push_back("-Wno-unused-value");
 	argv_vect.push_back("-DCPP2D");
-	argv_vect.push_back("-D__LINE__=(\"__CPP2D__LINE__\", 0)");
-	argv_vect.push_back("-D__FILE__=(\"__CPP2D__FILE__\", \"\")");
 	argc = static_cast<int>(argv_vect.size());
 	CommonOptionsParser OptionsParser(argc, argv_vect.data(), MyToolCategory);
 	ClangTool Tool(
