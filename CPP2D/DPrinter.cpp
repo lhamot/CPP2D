@@ -3391,21 +3391,6 @@ bool DPrinter::TraverseParenExpr(ParenExpr* expr)
 				out() << "__FILE__ ~ '\\0'";
 				return true;
 			}
-			else if(str == "__CPP2D__FUNC__")
-			{
-				out() << "__FUNCTION__ ~ '\\0'";
-				return true;
-			}
-			else if(str == "__CPP2D__PFUNC__")
-			{
-				out() << "__PRETTY_FUNCTION__ ~ '\\0'";
-				return true;
-			}
-			else if(str == "__CPP2D__func__")
-			{
-				out() << "__PRETTY_FUNCTION__ ~ '\\0'";
-				return true;
-			}
 			else if(str == "CPP2D_MACRO_EXPR")
 			{
 				auto get_binop = [](Expr * paren)
