@@ -1,9 +1,11 @@
 #pragma once
 
+#include <unordered_map>
+
 #pragma warning(push, 0)
+#pragma warning(disable: 4265)
 #include <clang/AST/RecursiveASTVisitor.h>
 #pragma warning(pop)
-#include <unordered_map>
 
 class MatchContainer;
 

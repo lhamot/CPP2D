@@ -1,16 +1,21 @@
 #pragma once
 
-#pragma warning(push, 0)
-#include <clang/ASTMatchers/ASTMatchFinder.h>
-#include <clang/AST/Type.h>
-#include <clang/AST/Decl.h>
-#include <clang/AST/Stmt.h>
-#pragma warning(pop)
-
 #include <unordered_map>
 #include <unordered_set>
 
+#pragma warning(push, 0)
+#pragma warning(disable: 4265)
+#include <clang/ASTMatchers/ASTMatchFinder.h>
+#pragma warning(pop)
+
 class DPrinter;
+
+namespace clang
+{
+	class Stmt;
+	class Decl;
+	class Type;
+}
 
 class MatchContainer : public clang::ast_matchers::MatchFinder::MatchCallback
 {
@@ -19,9 +24,9 @@ public:
 
 	void run(clang::ast_matchers::MatchFinder::MatchResult const& Result) override;
 
-	std::unordered_map<std::string, clang::CXXMethodDecl const*> hash_traits;
-	std::unordered_multimap<std::string, clang::FunctionDecl const*> free_operator;  // left operand will become this
-	std::unordered_multimap<std::string, clang::FunctionDecl const*> free_operator_right; // right operand will become this
+	std::unordered_map<std::string, clang::CXXMethodDecl const*> hashTraits;
+	std::unordered_multimap<std::string, clang::FunctionDecl const*> freeOperator;  // left operand will become this
+	std::unordered_multimap<std::string, clang::FunctionDecl const*> freeOperatorRight; // right operand will become this
 
 	std::function<void(DPrinter& printer, clang::Stmt*)> getPrinter(clang::Stmt const*) const;
 	std::function<void(DPrinter& printer, clang::Decl*)> getPrinter(clang::Decl const*) const;
@@ -36,7 +41,7 @@ private:
 	std::unordered_map<std::string, std::function<void(DPrinter& printer, clang::Stmt*)>> stmtPrinters;
 	std::unordered_map<std::string, std::function<void(DPrinter& printer, clang::Decl*)>> declPrinters;
 
-	std::unordered_map<std::string, std::function<void(clang::Stmt const*)>> on_stmt_match;
-	std::unordered_map<std::string, std::function<void(clang::Decl const*)>> on_decl_match;
-	std::unordered_map<std::string, std::function<void(clang::Type const*)>> on_type_match;
+	std::unordered_map<std::string, std::function<void(clang::Stmt const*)>> onStmtMatch;
+	std::unordered_map<std::string, std::function<void(clang::Decl const*)>> onDeclMatch;
+	std::unordered_map<std::string, std::function<void(clang::Type const*)>> onTypeMatch;
 };

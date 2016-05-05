@@ -2,6 +2,7 @@
 
 #pragma warning(push, 0)
 #include <clang/AST/ASTConsumer.h>
+#pragma warning(disable: 4265)
 #include <clang/ASTMatchers/ASTMatchers.h>
 #pragma warning(pop)
 

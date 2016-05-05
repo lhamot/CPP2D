@@ -1,5 +1,4 @@
 #pragma warning(push, 0)
-#pragma warning(disable, 4702)
 #include <clang/Lex/PPCallbacks.h>
 #include <llvm/ADT/StringRef.h>
 #pragma warning(pop)
@@ -56,10 +55,10 @@ private:
 	                        clang::MacroDirective const* MD,
 	                        CPP2DPPHandling::MacroInfo const& args);
 
-	clang::SourceManager& sourceManager_;
-	clang::Preprocessor& pp_;
-	llvm::StringRef inFile_;
-	llvm::StringRef modulename_;
+	clang::SourceManager& sourceManager;
+	clang::Preprocessor& pp;
+	llvm::StringRef inFile;
+	llvm::StringRef modulename;
 	std::map<std::string, MacroInfo> macro_expr;
 	std::map<std::string, MacroInfo> macro_stmt;
 

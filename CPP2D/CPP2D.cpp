@@ -39,7 +39,7 @@ cl::list<std::string> MacroAsStmt(
 int main(int argc, char const** argv)
 {
 	std::vector<char const*> argv_vect;
-	std::copy(argv, argv + argc, std::back_inserter(argv_vect));
+	std::copy(argv, argv + static_cast<intptr_t>(argc), std::back_inserter(argv_vect));
 	argv_vect.push_back("-fno-delayed-template-parsing");
 	argv_vect.push_back("-ferror-limit=999999");
 	argv_vect.push_back("-Wno-builtin-macro-redefined");

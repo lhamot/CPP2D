@@ -1,7 +1,5 @@
 #include "MatchContainer.h"
-
 #include "DPrinter.h"
-
 #include <iostream>
 
 namespace clang
@@ -32,10 +30,10 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 	MatchFinder finder;
 
 	// Some debug bind slot
-	on_stmt_match.emplace("dump", [this](Stmt const * d) {d->dump(); });
-	on_type_match.emplace("dump", [this](Type const * d) {d->dump(); });
-	on_decl_match.emplace("dump", [this](Decl const * d) {d->dump(); });
-	on_decl_match.emplace("print_name", [this](Decl const * d)
+	onStmtMatch.emplace("dump", [this](Stmt const * d) {d->dump(); });
+	onTypeMatch.emplace("dump", [this](Type const * d) {d->dump(); });
+	onDeclMatch.emplace("dump", [this](Decl const * d) {d->dump(); });
+	onDeclMatch.emplace("print_name", [this](Decl const * d)
 	{
 		if(auto* nd = dyn_cast<NamedDecl>(d))
 			llvm::errs() << nd->getNameAsString() << "\n";
@@ -59,7 +57,7 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 	  );
 	finder.addMatcher(hash_trait, this);
 	declPrinters.emplace("dont_print_this_decl", [this](DPrinter&, Decl*) {});
-	on_decl_match.emplace("hash_method", [this](Decl const * d)
+	onDeclMatch.emplace("hash_method", [this](Decl const * d)
 	{
 		if(auto* methDecl = dyn_cast<CXXMethodDecl>(d))
 		{
@@ -68,7 +66,7 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 			if(tmpArgs.size() == 1)
 			{
 				auto const type_name = tmpArgs[0].getAsType().getCanonicalType().getAsString();
-				hash_traits.emplace(type_name, methDecl);
+				hashTraits.emplace(type_name, methDecl);
 			}
 		}
 	});
@@ -81,7 +79,7 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 	  ).bind("free_operator");
 	finder.addMatcher(out_stream_op, this);
 	declPrinters.emplace("free_operator", [this](DPrinter&, Decl*) {});
-	on_decl_match.emplace("free_operator", [this](Decl const * d)
+	onDeclMatch.emplace("free_operator", [this](Decl const * d)
 	{
 		if(auto* funcDecl = dyn_cast<FunctionDecl>(d))
 		{
@@ -96,12 +94,12 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 			if(funcDecl->getNumParams() > 0)
 			{
 				std::string const left_name = getParamTypeName(funcDecl->getParamDecl(0));
-				free_operator.emplace(left_name, funcDecl);
+				freeOperator.emplace(left_name, funcDecl);
 				if(funcDecl->getNumParams() > 1)
 				{
 					std::string const right_name = getParamTypeName(funcDecl->getParamDecl(1));
 					if(right_name != left_name)
-						free_operator_right.emplace(right_name, funcDecl);
+						freeOperatorRight.emplace(right_name, funcDecl);
 				}
 			}
 		}
@@ -453,17 +451,17 @@ void MatchContainer::run(const ast_matchers::MatchFinder::MatchResult& Result)
 	}
 
 	// To call a special handling now
-	for(auto const& name_n_func : on_decl_match)
+	for(auto const& name_n_func : onDeclMatch)
 	{
 		if(auto* decl = Result.Nodes.getNodeAs<Decl>(name_n_func.first))
 			name_n_func.second(decl);
 	}
-	for(auto const& name_n_func : on_stmt_match)
+	for(auto const& name_n_func : onStmtMatch)
 	{
 		if(auto* stmt = Result.Nodes.getNodeAs<Stmt>(name_n_func.first))
 			name_n_func.second(stmt);
 	}
-	for(auto const& name_n_func : on_type_match)
+	for(auto const& name_n_func : onTypeMatch)
 	{
 		if(auto* type = Result.Nodes.getNodeAs<Type>(name_n_func.first))
 			name_n_func.second(type);

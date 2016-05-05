@@ -85,13 +85,14 @@
     <ClCompile>
       <PrecompiledHeader>
       </PrecompiledHeader>
-      <WarningLevel>Level4</WarningLevel>
+      <WarningLevel>EnableAllWarnings</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>I:\C_libs\llvm_bin\include;I:\C_libs\llvm\include;I:\C_libs\llvm\tools\clang\include;I:\C_libs\llvm_bin\tools\clang\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <RuntimeTypeInfo>true</RuntimeTypeInfo>
-      <DisableSpecificWarnings>4996;4702;4714;</DisableSpecificWarnings>
+      <DisableSpecificWarnings>4820;4371;4710;4514;5027;4626;5026;4625;4996;4702;4714</DisableSpecificWarnings>
+      <TreatWarningAsError>true</TreatWarningAsError>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -104,13 +105,14 @@
     <ClCompile>
       <PrecompiledHeader>
       </PrecompiledHeader>
-      <WarningLevel>Level4</WarningLevel>
+      <WarningLevel>EnableAllWarnings</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>I:\C_libs\llvm_bin\include;I:\C_libs\llvm\include;I:\C_libs\llvm\tools\clang\include;I:\C_libs\llvm_bin\tools\clang\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <RuntimeTypeInfo>true</RuntimeTypeInfo>
-      <DisableSpecificWarnings>4996;4702;4714;4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings>4820;4371;4710;4514;5027;4626;5026;4625;4996;4702;4714</DisableSpecificWarnings>
+      <TreatWarningAsError>true</TreatWarningAsError>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -121,7 +123,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
-      <WarningLevel>Level4</WarningLevel>
+      <WarningLevel>EnableAllWarnings</WarningLevel>
       <PrecompiledHeader>
       </PrecompiledHeader>
       <Optimization>Disabled</Optimization>
@@ -130,7 +132,8 @@
       <PreprocessorDefinitions>NDEBUG;WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>I:\C_libs\llvm_bin\include;I:\C_libs\llvm\include;I:\C_libs\llvm\tools\clang\include;I:\C_libs\llvm_bin\tools\clang\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeTypeInfo>true</RuntimeTypeInfo>
-      <DisableSpecificWarnings>4996;4702;4714;4714</DisableSpecificWarnings>
+      <DisableSpecificWarnings>4820;4371;4710;4514;5027;4626;5026;4625;4996;4702;4714</DisableSpecificWarnings>
+      <TreatWarningAsError>true</TreatWarningAsError>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -143,7 +146,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <WarningLevel>Level4</WarningLevel>
+      <WarningLevel>EnableAllWarnings</WarningLevel>
       <PrecompiledHeader>
       </PrecompiledHeader>
       <Optimization>Disabled</Optimization>
@@ -152,7 +155,8 @@
       <PreprocessorDefinitions>NDEBUG;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>I:\C_libs\llvm_bin\include;I:\C_libs\llvm\include;I:\C_libs\llvm\tools\clang\include;I:\C_libs\llvm_bin\tools\clang\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeTypeInfo>true</RuntimeTypeInfo>
-      <DisableSpecificWarnings>4996;4702;4714;47144996</DisableSpecificWarnings>
+      <DisableSpecificWarnings>4820;4371;4710;4514;5027;4626;5026;4625;4996;4702;4714</DisableSpecificWarnings>
+      <TreatWarningAsError>true</TreatWarningAsError>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>

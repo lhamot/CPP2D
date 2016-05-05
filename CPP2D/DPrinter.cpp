@@ -9,21 +9,19 @@
 
 #pragma warning(push, 0)
 #pragma warning(disable, 4702)
+#include <llvm/ADT/SmallString.h>
+#include <llvm/ADT/APFloat.h>
+#include <llvm/Support/Path.h>
 #include <clang/AST/RecursiveASTVisitor.h>
 #include <clang/Frontend/CompilerInstance.h>
 #include <clang/Lex/Preprocessor.h>
 #include <clang/Lex/MacroArgs.h>
-#include <llvm/ADT/SmallString.h>
-#include <llvm/ADT/APFloat.h>
-#include <llvm/Support/Path.h>
 #include <clang/AST/Comment.h>
-//#include "llvm/Support/ConvertUTF.h"
 #pragma warning(pop)
 
 #include "MatchContainer.h"
 #include "CPP2DTools.h"
 
-//using namespace clang::tooling;
 using namespace llvm;
 using namespace clang;
 
@@ -197,7 +195,7 @@ void DPrinter::includeFile(std::string const& declInc, std::string const& typeNa
 				include = include.substr(0, include.size() - 4);
 			std::transform(std::begin(include), std::end(include),
 			               std::begin(include),
-			               tolower);
+				           [](char c) {return static_cast<char>(tolower(c)); });
 			std::replace(std::begin(include), std::end(include), '/', '.');
 			std::replace(std::begin(include), std::end(include), '\\', '.');
 			externIncludes[include].insert(typeName);
@@ -265,10 +263,10 @@ std::string DPrinter::mangleVar(DeclRefExpr* expr)
 std::string DPrinter::replace(std::string str, std::string const& in, std::string const& out)
 {
 	size_t pos = 0;
-	std::string::iterator iter;
-	while((iter = std::find(std::begin(str) + pos, std::end(str), '\r')) != std::end(str))
+	auto iter = std::find(std::begin(str) + static_cast<intptr_t>(pos), std::end(str), '\r');
+	while(iter != std::end(str))
 	{
-		pos = iter - std::begin(str);
+		pos = static_cast<size_t>(iter - std::begin(str));
 		if((pos + 1) < str.size() && str[pos + 1] == '\n')
 		{
 			str = str.substr(0, pos) + out + str.substr(pos + in.size());
@@ -836,7 +834,7 @@ bool DPrinter::TraverseCXXRecordDecl(CXXRecordDecl* decl)
 	{
 		for(auto* ctor : decl->ctors())
 		{
-			if(ctor->isImplicit() && (ctor->isCopyConstructor() || ctor->isCopyConstructor()))
+			if(ctor->isImplicit() && ctor->isCopyConstructor())
 			{
 				llvm::errs() << "error : class " << decl->getNameAsString() <<
 				             " is copy constructible which is not dlang compatible.\n";
@@ -882,7 +880,7 @@ bool DPrinter::traverseCXXRecordDeclImpl(
 		if(FieldDecl* field = llvm::dyn_cast<FieldDecl>(decl2))
 		{
 			if(field->isBitField())
-				return field->getBitWidthValue(*Context);
+				return static_cast<int>(field->getBitWidthValue(*Context));
 			else
 				return - 1;
 		}
@@ -949,7 +947,7 @@ bool DPrinter::traverseCXXRecordDeclImpl(
 
 	//Print all free operator inside the class scope
 	auto record_name = decl->getTypeForDecl()->getCanonicalTypeInternal().getAsString();
-	for(auto rng = receiver.free_operator.equal_range(record_name);
+	for(auto rng = receiver.freeOperator.equal_range(record_name);
 	    rng.first != rng.second;
 	    ++rng.first)
 	{
@@ -957,7 +955,7 @@ bool DPrinter::traverseCXXRecordDeclImpl(
 		traverseFunctionDeclImpl(const_cast<FunctionDecl*>(rng.first->second), 0);
 		out() << std::endl;
 	}
-	for(auto rng = receiver.free_operator_right.equal_range(record_name);
+	for(auto rng = receiver.freeOperatorRight.equal_range(record_name);
 	    rng.first != rng.second;
 	    ++rng.first)
 	{
@@ -1243,7 +1241,7 @@ bool DPrinter::TraverseUnresolvedLookupExpr(UnresolvedLookupExpr*  Expr)
 	out() << mangleName(Expr->getName().getAsString());
 	if(Expr->hasExplicitTemplateArgs())
 	{
-		auto const argNum = Expr->getNumTemplateArgs();
+		size_t const argNum = Expr->getNumTemplateArgs();
 		Spliter spliter(", ");
 		pushStream();
 		for(size_t i = 0; i < argNum; ++i)
@@ -1664,7 +1662,7 @@ bool DPrinter::printFuncBegin(FunctionDecl* Decl, std::string& tmpParams, int ar
 				arg2Record = getRecordType(arg2Type);
 			}
 		}
-		size_t const nbArgs = (arg_become_this == -1 ? 1 : 0) + Decl->getNumParams();
+		auto const nbArgs = (arg_become_this == -1 ? 1 : 0) + Decl->getNumParams();
 		std::string const right = (arg_become_this == 1) ? "Right" : "";
 		OverloadedOperatorKind const opKind = Decl->getOverloadedOperator();
 		if(opKind == OverloadedOperatorKind::OO_EqualEqual)
@@ -1892,7 +1890,7 @@ bool DPrinter::traverseFunctionDeclImpl(
 		  ((arg_become_this == -1) ? 0 : -1);
 		for(ParmVarDecl* decl : Decl->params())
 		{
-			if(arg_become_this == index)
+			if(arg_become_this == static_cast<int>(index))
 				isConstMethod = isConst(decl->getType());
 			else
 			{
@@ -2401,8 +2399,8 @@ bool DPrinter::TraverseDeclStmt(DeclStmt* Stmt)
 	{
 		if(splitMultiLineDecl)
 		{
-			size_t count = 0;
-			size_t const declCount = Stmt->decl_end() - Stmt->decl_begin();
+			auto declCount = Stmt->decl_end() - Stmt->decl_begin();
+			decltype(declCount) count = 0;
 			for(auto d : Stmt->decls())
 			{
 				TraverseDecl(d);
@@ -2733,7 +2731,7 @@ bool DPrinter::TraverseCharacterLiteral(CharacterLiteral* Stmt)
 {
 	if(passStmt(Stmt)) return true;
 	out() << '\'';
-	int c = Stmt->getValue();
+	auto c = Stmt->getValue();
 	switch(c)
 	{
 	case '\0': out() << "\\0"; break;
@@ -2756,14 +2754,18 @@ bool DPrinter::TraverseStringLiteral(StringLiteral* Stmt)
 	{
 		typedef unsigned short ushort;
 		static_assert(sizeof(ushort) == 2, "sizeof(unsigned short) == 2 expected");
-		std::basic_string<unsigned short> literal16((ushort*)str.data(), str.size() / 2);
+		std::basic_string<unsigned short> literal16(
+			reinterpret_cast<ushort const*>(str.data()), 
+			str.size() / 2);
 		std::wstring_convert<std::codecvt_utf8<ushort>, ushort> cv;
 		literal = cv.to_bytes(literal16);
 	}
 	else if(Stmt->isUTF32())
 	{
 		static_assert(sizeof(unsigned int) == 4, "sizeof(unsigned int) == 4 required");
-		std::basic_string<unsigned int> literal32((unsigned int*)str.data(), str.size() / 4);
+		std::basic_string<unsigned int> literal32(
+			reinterpret_cast<unsigned int const*>(str.data()), 
+			str.size() / 4);
 		std::wstring_convert<std::codecvt_utf8<unsigned int>, unsigned int> cv;
 		literal = cv.to_bytes(literal32);
 	}
@@ -3015,7 +3017,7 @@ bool DPrinter::traverseMemberExprImpl(ME* Stmt)
 	if(tmpArgCount != 0)
 	{
 		pushStream();
-		for(unsigned I = 0; I < tmpArgCount; ++I)
+		for(size_t I = 0; I < tmpArgCount; ++I)
 		{
 			spliter.split();
 			printTemplateArgument(TAL[I].getArgument());
@@ -3193,7 +3195,7 @@ bool DPrinter::TraverseUnaryOperator(UnaryOperator* Stmt)
 				return true;
 			}
 
-			preOp = "";
+			preOp.clear();
 			postOp = "[0]";
 		}
 
@@ -3235,13 +3237,13 @@ template<typename TDeclRefExpr>
 bool DPrinter::traverseDeclRefExprImpl(TDeclRefExpr* Expr)
 {
 	if(passStmt(Expr)) return true;
-	unsigned const argNum = Expr->getNumTemplateArgs();
+	size_t const argNum = Expr->getNumTemplateArgs();
 	if(argNum != 0)
 	{
 		TemplateArgumentLoc const* tmpArgs = Expr->getTemplateArgs();
 		Spliter split(", ");
 		pushStream();
-		for(unsigned i = 0; i < argNum; ++i)
+		for(size_t i = 0; i < argNum; ++i)
 		{
 			split.split();
 			printTemplateArgument(tmpArgs[i].getArgument());

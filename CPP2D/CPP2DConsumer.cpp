@@ -1,15 +1,14 @@
 #include "CPP2DConsumer.h"
+#include "CPP2DPPHandling.h"
+
+#include <fstream>
+#include <sstream>
 
 #pragma warning(push, 0)
 #include <clang/Frontend/CompilerInstance.h>
 #include <clang/Lex/Preprocessor.h>
 #include <llvm/Support/Path.h>
 #pragma warning(pop)
-
-#include "CPP2DPPHandling.h"
-
-#include <fstream>
-#include <sstream>
 
 VisitorToDConsumer::VisitorToDConsumer(
   clang::CompilerInstance& Compiler,
