@@ -12,6 +12,7 @@
 #include <stdexcept>
 #include <array>
 #include <unordered_map>
+#include <cassert>
 
 #define CHECK(COND) check(COND, #COND, __LINE__) //if(!(COND)) error(#COND)
 
@@ -914,6 +915,7 @@ void check_builtin_macro()
 	CHECK(find_string(__FUNCTION__, "check_builtin_macro") != -1);
 	CHECK(find_string(__func__, "check_builtin_macro") != -1);
 	CHECK(__LINE__ == l + 4);
+	assert(2 * 3 == 6);
 }
 
 void check_incr_pointer()

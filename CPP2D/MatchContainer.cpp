@@ -406,6 +406,9 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 		}
 	});
 
+	//<assert>
+	globalFuncPrinter(finder, "^(::std)?::_wassert", "_wassert", [this](DPrinter&, Stmt*){});
+
 	//BOOST_THROW_EXCEPTION
 	globalFuncPrinter(
 	  finder, "throw_exception_", "throw_exception_", [this](DPrinter & pr, Stmt * s)

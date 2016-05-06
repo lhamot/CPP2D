@@ -3397,9 +3397,19 @@ bool DPrinter::TraverseParenExpr(ParenExpr* expr)
 				BinaryOperator* macro_name_and_args = get_binop(macro_and_cpp->getLHS());
 				auto* macro_name = dyn_cast<StringLiteral>(macro_name_and_args->getLHS());
 				auto* macro_args = dyn_cast<CallExpr>(macro_name_and_args->getRHS());
-				out() << "(mixin(" << macro_name->getString().str() << "!(";
-				printMacroArgs(macro_args);
-				out() << ")))";
+				std::string macroName = macro_name->getString().str();
+				if (macroName == "assert")
+				{
+					out() << "assert(";
+					TraverseStmt(*macro_args->arg_begin());
+					out() << ")";
+				}
+				else
+				{
+					out() << "(mixin(" << macroName << "!(";
+					printMacroArgs(macro_args);
+					out() << ")))";
+				}
 				pushStream();
 				TraverseStmt(macro_and_cpp->getRHS()); //Add the required import
 				popStream();
