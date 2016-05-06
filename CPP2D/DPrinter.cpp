@@ -1604,6 +1604,8 @@ void DPrinter::printSpecialMethodAttribute(CXXMethodDecl* Decl)
 
 bool DPrinter::printFuncBegin(CXXMethodDecl* Decl, std::string& tmpParams, int arg_become_this)
 {
+	if (not Decl->isPure() && Decl->getBody() == nullptr)
+		return false;
 	if(Decl->isImplicit())
 		return false;
 	if(Decl->isMoveAssignmentOperator())
@@ -1749,7 +1751,7 @@ bool DPrinter::printFuncBegin(CXXConstructorDecl* Decl,
                               int			//arg_become_this = -1
                              )
 {
-	if(Decl->isMoveConstructor())
+	if(Decl->isMoveConstructor() || Decl->getBody() == nullptr)
 		return false;
 
 	CXXRecordDecl* record = Decl->getParent();
@@ -1781,7 +1783,7 @@ bool DPrinter::printFuncBegin(CXXDestructorDecl* decl,
                               int				//arg_become_this = -1
                              )
 {
-	if(decl->isImplicit())
+	if(decl->isImplicit() || decl->getBody() == nullptr)
 		return false;
 	//if(Decl->isPure() && !Decl->hasBody())
 	//	return false; //ctor and dtor can't be abstract
@@ -1809,8 +1811,6 @@ bool DPrinter::traverseFunctionDeclImpl(
   D* Decl,
   int arg_become_this)
 {
-	if(Decl->getAccess() == AccessSpecifier::AS_private && Decl->getBody() == nullptr)
-		return false;
 	if(Decl->isDeleted())
 		return true;
 	if(Decl->isImplicit() && Decl->getBody() == nullptr)

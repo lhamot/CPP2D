@@ -9,3 +9,5 @@
 *.sdf
 /format.bat
 /todo.txt
+/CPP2D_UT_CPP/x64/Debug
+/CPP2D_UT_CPP/x64/Release

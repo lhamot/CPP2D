@@ -49,6 +49,8 @@ bool cmp_string(char const* a, char const* b)
 
 class Tata
 {
+	virtual int funcA2() = 0;
+
 public:
 	virtual int funcV()
 	{
@@ -59,6 +61,8 @@ public:
 	{
 		return 1;
 	}
+
+	virtual int funcA() = 0;
 };
 
 class Tata2 : public Tata
@@ -79,6 +83,16 @@ public:
 	int funcF(int i = 0)
 	{
 		return 2;
+	}
+
+	int funcA() override
+	{
+		return 4;
+	}
+
+	int funcA2() override
+	{
+		return 5;
 	}
 
 	Tata2* getThis()
@@ -402,6 +416,8 @@ void check_class()
 	Tata2* t2 = new Tata2();
 	CHECK(t2->funcV() == 2);
 	CHECK(t2->funcF() == 2);
+	CHECK(t2->funcA() == 4);
+	CHECK(t2->funcA2() == 5);
 	Tata* t = t2;
 	CHECK(t->funcV() == 2);
 	CHECK(t->funcF() == 1);
