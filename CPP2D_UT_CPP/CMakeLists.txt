@@ -1,9 +1,11 @@
 cmake_minimum_required(VERSION 2.6)
 
-project(unittest_cpp)
+project(CPP2D_UT_CPP)
 
 # Déclaration de l'exécutable
 add_executable(
-    unittest_cpp
-    source_file
+    CPP2D_UT_CPP
+    framework.cpp
+    main.cpp
+    test.cpp
 )

@@ -14,9 +14,12 @@ include_directories(${LLVM_PATH}/tools/clang/include)
 add_executable(
     cpp2d
     CPP2D.cpp
+    CPP2DConsumer.cpp
+    CPP2DFrontendAction.cpp
+    CPP2DPPHandling.cpp
+    CPP2DTools.cpp
+    DPrinter.cpp
     MatchContainer.cpp
-    Matcher.cpp
-    VisitorToD.cpp
 )
 
 target_link_libraries(cpp2d
