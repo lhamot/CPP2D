@@ -11,13 +11,13 @@
 #include <fstream>
 #include <sstream>
 #include <locale>
-#include <codecvt>
 #include <ciso646>
 
 #pragma warning(push, 0)
 #include <llvm/ADT/SmallString.h>
 #include <llvm/ADT/APFloat.h>
 #include <llvm/Support/Path.h>
+#include <llvm/Support/ConvertUTF.h>
 #include <clang/AST/RecursiveASTVisitor.h>
 #include <clang/Frontend/CompilerInstance.h>
 #include <clang/Lex/Preprocessor.h>
@@ -201,7 +201,7 @@ void DPrinter::includeFile(std::string const& declInc, std::string const& typeNa
 				include = include.substr(0, include.size() - 4);
 			std::transform(std::begin(include), std::end(include),
 			               std::begin(include),
-				           [](char c) {return static_cast<char>(tolower(c)); });
+			[](char c) {return static_cast<char>(tolower(c)); });
 			std::replace(std::begin(include), std::end(include), '/', '.');
 			std::replace(std::begin(include), std::end(include), '\\', '.');
 			externIncludes[include].insert(typeName);
@@ -1604,7 +1604,7 @@ void DPrinter::printSpecialMethodAttribute(CXXMethodDecl* Decl)
 
 bool DPrinter::printFuncBegin(CXXMethodDecl* Decl, std::string& tmpParams, int arg_become_this)
 {
-	if (not Decl->isPure() && Decl->getBody() == nullptr)
+	if(not Decl->isPure() && Decl->getBody() == nullptr)
 		return false;
 	if(Decl->isImplicit())
 		return false;
@@ -2755,28 +2755,30 @@ bool DPrinter::TraverseStringLiteral(StringLiteral* Stmt)
 	if(passStmt(Stmt)) return true;
 	out() << "\"";
 	std::string literal;
-	auto str = Stmt->getString();
-	if(Stmt->isUTF16() || Stmt->isWide())
+	StringRef str = Stmt->getString();
+	if(not str.empty())
 	{
-		typedef unsigned short ushort;
-		static_assert(sizeof(ushort) == 2, "sizeof(unsigned short) == 2 expected");
-		std::basic_string<unsigned short> literal16(
-			reinterpret_cast<ushort const*>(str.data()), 
-			str.size() / 2);
-		std::wstring_convert<std::codecvt_utf8<ushort>, ushort> cv;
-		literal = cv.to_bytes(literal16);
+		if(Stmt->isUTF16() || Stmt->isWide())
+		{
+			const UTF16* source = reinterpret_cast<const UTF16*>(str.begin());
+			const UTF16* sourceEnd = reinterpret_cast<const UTF16*>(str.end());
+			literal.resize(size_t((sourceEnd - source) * UNI_MAX_UTF8_BYTES_PER_CODE_POINT + 1));
+			auto* dest = reinterpret_cast<UTF8*>(&literal[0]);
+			ConvertUTF16toUTF8(&source, source + str.size(), &dest, dest + literal.size(), ConversionFlags());
+			literal.resize(size_t(reinterpret_cast<char*>(dest) - &literal[0]));
+		}
+		else if(Stmt->isUTF32())
+		{
+			const UTF32* source = reinterpret_cast<const UTF32*>(str.begin());
+			const UTF32* sourceEnd = reinterpret_cast<const UTF32*>(str.end());
+			literal.resize(size_t((sourceEnd - source) * UNI_MAX_UTF8_BYTES_PER_CODE_POINT + 1));
+			auto* dest = reinterpret_cast<UTF8*>(&literal[0]);
+			ConvertUTF32toUTF8(&source, source + str.size(), &dest, dest + literal.size(), ConversionFlags());
+			literal.resize(size_t(reinterpret_cast<char*>(dest) - &literal[0]));
+		}
+		else
+			literal = std::string(str.data(), str.size());
 	}
-	else if(Stmt->isUTF32())
-	{
-		static_assert(sizeof(unsigned int) == 4, "sizeof(unsigned int) == 4 required");
-		std::basic_string<unsigned int> literal32(
-			reinterpret_cast<unsigned int const*>(str.data()), 
-			str.size() / 4);
-		std::wstring_convert<std::codecvt_utf8<unsigned int>, unsigned int> cv;
-		literal = cv.to_bytes(literal32);
-	}
-	else
-		literal = std::string(str.data(), str.size());
 	size_t pos = 0;
 	while((pos = literal.find('\\', pos)) != std::string::npos)
 	{
@@ -3398,7 +3400,7 @@ bool DPrinter::TraverseParenExpr(ParenExpr* expr)
 				auto* macro_name = dyn_cast<StringLiteral>(macro_name_and_args->getLHS());
 				auto* macro_args = dyn_cast<CallExpr>(macro_name_and_args->getRHS());
 				std::string macroName = macro_name->getString().str();
-				if (macroName == "assert")
+				if(macroName == "assert")
 				{
 					out() << "assert(";
 					TraverseStmt(*macro_args->arg_begin());
