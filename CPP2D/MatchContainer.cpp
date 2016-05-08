@@ -121,15 +121,15 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 		printer.stream() << "writef";
 	});
 
-	auto rewriteType = [this](clang::ast_matchers::MatchFinder& finder,
-		                      std::string const& oldName,
-		                      std::string const& newName)
+	auto rewriteType = [this](clang::ast_matchers::MatchFinder & finder,
+	                          std::string const & oldName,
+	                          std::string const & newName)
 	{
 		using namespace clang::ast_matchers;
 		finder.addMatcher(recordType(hasDeclaration(namedDecl(hasName(oldName))))
-			.bind(oldName), this);
+		                  .bind(oldName), this);
 		typePrinters.emplace(oldName,
-			[newName](DPrinter & pr, Type*) {pr.stream() << newName; });
+		[newName](DPrinter & pr, Type*) {pr.stream() << newName; });
 	};
 
 	// std::exception
@@ -284,7 +284,7 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 
 	//********************** std::stream **********************************************************
 	finder.addMatcher(
-		declRefExpr(hasDeclaration(namedDecl(matchesName("cout")))).bind("std::cout"), this);
+	  declRefExpr(hasDeclaration(namedDecl(matchesName("cout")))).bind("std::cout"), this);
 	stmtPrinters.emplace("std::cout", [this](DPrinter & pr, Stmt*)
 	{
 		pr.stream() << "std.stdio.stdout";
@@ -407,7 +407,7 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 	});
 
 	//<assert>
-	globalFuncPrinter(finder, "^(::std)?::_wassert", "_wassert", [this](DPrinter&, Stmt*){});
+	globalFuncPrinter(finder, "^(::std)?::_wassert", "_wassert", [this](DPrinter&, Stmt*) {});
 
 	//BOOST_THROW_EXCEPTION
 	globalFuncPrinter(

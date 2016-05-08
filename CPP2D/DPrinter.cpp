@@ -2034,6 +2034,8 @@ bool DPrinter::TraverseBuiltinType(BuiltinType* Type)
 	if(passType(Type)) return false;
 	out() << [Type]
 	{
+		LangOptions op;
+		PrintingPolicy pp(op);
 		BuiltinType::Kind k = Type->getKind();
 		switch(k)
 		{
@@ -2072,28 +2074,8 @@ bool DPrinter::TraverseBuiltinType(BuiltinType* Type)
 		case BuiltinType::ObjCId: return "id";
 		case BuiltinType::ObjCClass: return "Class";
 		case BuiltinType::ObjCSel: return "SEL";
-		case BuiltinType::OCLImage1d: return "image1d_t";
-		case BuiltinType::OCLImage1dArray: return "image1d_array_t";
-		case BuiltinType::OCLImage1dBuffer: return "image1d_buffer_t";
-		case BuiltinType::OCLImage2d: return "image2d_t";
-		case BuiltinType::OCLImage2dArray: return "image2d_array_t";
-		case BuiltinType::OCLImage2dDepth: return "image2d_depth_t";
-		case BuiltinType::OCLImage2dArrayDepth: return "image2d_array_depth_t";
-		case BuiltinType::OCLImage2dMSAA: return "image2d_msaa_t";
-		case BuiltinType::OCLImage2dArrayMSAA: return "image2d_array_msaa_t";
-		case BuiltinType::OCLImage2dMSAADepth: return "image2d_msaa_depth_t";
-		case BuiltinType::OCLImage2dArrayMSAADepth: return "image2d_array_msaa_depth_t";
-		case BuiltinType::OCLImage3d: return "image3d_t";
-		case BuiltinType::OCLSampler: return "sampler_t";
-		case BuiltinType::OCLEvent: return "event_t";
-		case BuiltinType::OCLClkEvent: return "clk_event_t";
-		case BuiltinType::OCLQueue: return "queue_t";
-		case BuiltinType::OCLNDRange: return "ndrange_t";
-		case BuiltinType::OCLReserveID: return "reserve_id_t";
-		case BuiltinType::OMPArraySection: return "<OpenMP array section type>";
-		default: assert(false && "invalid Type->getKind()");
+		default: return Type->getNameAsCString(pp);
 		}
-		return "";
 	}();
 	return true;
 }

@@ -29,9 +29,9 @@ std::set<std::string> new_macros_name;
 extern cl::list<std::string> MacroAsExpr;
 extern cl::list<std::string> MacroAsStmt;
 
-CPP2DPPHandling::CPP2DPPHandling(clang::SourceManager& sourceManager_, 
-	                             Preprocessor& pp_, 
-	                             StringRef inFile_)
+CPP2DPPHandling::CPP2DPPHandling(clang::SourceManager& sourceManager_,
+                                 Preprocessor& pp_,
+                                 StringRef inFile_)
 	: sourceManager(sourceManager_)
 	, pp(pp_)
 	, inFile(inFile_)
@@ -68,12 +68,12 @@ CPP2DPPHandling::CPP2DPPHandling(clang::SourceManager& sourceManager_,
 	}
 
 	// TODO : Find a better way if it exists
-	predefines = pp_.getPredefines() + 
-		"\nint cpp2d_dummy_variadic(...);\n"
-		"template<typename T> int cpp2d_type();\n"
-		"int cpp2d_name(char const*);\n"
-		"#define CPP2D_ADD2(A, B) A##B\n"
-		"#define CPP2D_ADD(A, B) CPP2D_ADD2(A, B)\n";
+	predefines = pp_.getPredefines() +
+	             "\nint cpp2d_dummy_variadic(...);\n"
+	             "template<typename T> int cpp2d_type();\n"
+	             "int cpp2d_name(char const*);\n"
+	             "#define CPP2D_ADD2(A, B) A##B\n"
+	             "#define CPP2D_ADD(A, B) CPP2D_ADD2(A, B)\n";
 	pp_.setPredefines(predefines);
 }
 
@@ -258,7 +258,7 @@ void CPP2DPPHandling::TransformMacroExpr(
 	clang::MacroInfo const* MI = MD->getMacroInfo();
 
 	pp.appendMacroDirective(MacroNameTok.getIdentifierInfo(),
-	                         new UndefMacroDirective(MacroNameTok.getLocation()));
+	                        new UndefMacroDirective(MacroNameTok.getLocation()));
 
 	new_macros_name.insert(macro_options.name);
 	std::stringstream new_macro;
@@ -289,7 +289,7 @@ void CPP2DPPHandling::TransformMacroStmt(
 	clang:: MacroInfo const* MI = MD->getMacroInfo();
 
 	pp.appendMacroDirective(MacroNameTok.getIdentifierInfo(),
-	                         new UndefMacroDirective(MacroNameTok.getLocation()));
+	                        new UndefMacroDirective(MacroNameTok.getLocation()));
 
 	new_macros_name.insert(macro_options.name);
 	std::stringstream new_macro;
@@ -324,7 +324,7 @@ void CPP2DPPHandling::MacroDefined(const Token& MacroNameTok, const MacroDirecti
 	else
 	{
 		auto macro_stmt_iter = macro_stmt.find(name);
-		if (macro_stmt_iter != macro_stmt.end())
+		if(macro_stmt_iter != macro_stmt.end())
 			TransformMacroStmt(MacroNameTok, MD, macro_stmt_iter->second);
 	}
 }

@@ -18,9 +18,9 @@ class DPrinter;
 
 namespace clang
 {
-	class Stmt;
-	class Decl;
-	class Type;
+class Stmt;
+class Decl;
+class Type;
 }
 
 class MatchContainer : public clang::ast_matchers::MatchFinder::MatchCallback
