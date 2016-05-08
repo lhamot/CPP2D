@@ -13,6 +13,7 @@
 #include <array>
 #include <unordered_map>
 #include <cassert>
+#include <vector>
 
 #define CHECK(COND) check(COND, #COND, __LINE__) //if(!(COND)) error(#COND)
 
@@ -559,7 +560,7 @@ void check_convertion_operator()
 class AbsMethClass
 {
 public:
-	virtual ~AbsMethClass() = 0 {};
+	virtual ~AbsMethClass() {};
 	virtual int meth() = 0;
 };
 
@@ -2015,7 +2016,7 @@ void check_multidecl_line()
 
 struct ArrayStruct
 {
-	std::array<int, 3> tab = { 0, 0, 0 };
+	std::array<int, 3> tab = { { 0, 0, 0 } };
 
 	ArrayStruct(int a, int b, int c)
 	{
