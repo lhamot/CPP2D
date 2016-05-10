@@ -55,5 +55,11 @@ target_link_libraries(cpp2d
   LLVMObject # BitReader, Core, Support
   LLVMBitReader # Core, Support
   LLVMCore # Support
+  LLVMProfileData
   LLVMSupport
 )
+
+if(CMAKE_COMPILER_IS_GNUCXX)
+    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -fno-rtti")
+    target_link_libraries(cpp2d rt dl tinfo pthread z m)
+endif()
