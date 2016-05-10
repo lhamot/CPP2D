@@ -32,7 +32,7 @@ VisitorToDConsumer::VisitorToDConsumer(
 void VisitorToDConsumer::HandleTranslationUnit(clang::ASTContext& Context)
 {
 	//Find_Includes
-	auto& ppcallback = dynamic_cast<CPP2DPPHandling&>(*Compiler.getPreprocessor().getPPCallbacks());
+	auto& ppcallback = static_cast<CPP2DPPHandling&>(*Compiler.getPreprocessor().getPPCallbacks());
 	auto& incs = ppcallback.getIncludes();
 
 	finderConsumer->HandleTranslationUnit(Context);
