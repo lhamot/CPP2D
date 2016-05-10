@@ -44,20 +44,52 @@ cl::list<std::string> MacroAsStmt(
   cl::cat(MyToolCategory),
   cl::ZeroOrMore);
 
+
+//! Used to add fake options to the compiler
+//!  - Like for example : -fno-delayed-template-parsing
+class CPP2DCompilationDatabase : public clang::tooling::CompilationDatabase
+{
+	clang::tooling::CompilationDatabase& sourceCDB;
+
+public:
+	CPP2DCompilationDatabase(clang::tooling::CompilationDatabase& sourceCDB_)
+		: sourceCDB(sourceCDB_)
+	{
+	}
+
+	std::vector<CompileCommand> getCompileCommands(StringRef FilePath) const override
+	{
+		std::vector<CompileCommand> result = sourceCDB.getCompileCommands(FilePath);
+		for(CompileCommand& cc : result)
+		{
+			cc.CommandLine.push_back("-fno-delayed-template-parsing");
+			cc.CommandLine.push_back("-ferror-limit=999999");
+			cc.CommandLine.push_back("-Wno-builtin-macro-redefined");
+			cc.CommandLine.push_back("-Wno-unused-value");
+			cc.CommandLine.push_back("-DCPP2D");
+		}
+		return result;
+	}
+
+	std::vector<std::string> getAllFiles() const override { return sourceCDB.getAllFiles(); }
+
+	std::vector<CompileCommand> getAllCompileCommands() const override
+	{
+		assert(false && "Unexpected call to function CPP2DCompilationDatabase::getAllCompileCommands");
+		return sourceCDB.getAllCompileCommands();
+	}
+};
+
 int main(int argc, char const** argv)
 {
 	std::vector<char const*> argv_vect;
 	std::copy(argv, argv + static_cast<intptr_t>(argc), std::back_inserter(argv_vect));
 	argv_vect.insert(std::begin(argv_vect) + 1, "-macro-expr=assert/e");
-	argv_vect.push_back("-fno-delayed-template-parsing");
-	argv_vect.push_back("-ferror-limit=999999");
-	argv_vect.push_back("-Wno-builtin-macro-redefined");
-	argv_vect.push_back("-Wno-unused-value");
-	argv_vect.push_back("-DCPP2D");
 	argc = static_cast<int>(argv_vect.size());
 	CommonOptionsParser OptionsParser(argc, argv_vect.data(), MyToolCategory);
+	CPP2DCompilationDatabase compilationDatabase(OptionsParser.getCompilations());
 	ClangTool Tool(
-	  OptionsParser.getCompilations(),
+	  compilationDatabase,
 	  OptionsParser.getSourcePathList());
 	return Tool.run(newFrontendActionFactory<CPP2DFrontendAction>().get());
 }
