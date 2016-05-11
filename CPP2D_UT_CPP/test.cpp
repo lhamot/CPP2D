@@ -54,6 +54,7 @@ class Tata
 	virtual int funcA2() = 0;
 
 public:
+	~Tata() = default;
 	virtual int funcV()
 	{
 		return 1;

@@ -14,7 +14,7 @@ See ./LICENSE_1_0.txt or http://www.boost.org/LICENSE_1_0.txt
 
 ## Already handled C++ features
 
-Majority of C++ code is already convertible to C++.
+Majority of C++ code is already convertible to D.
 
 A not exhaustive list:
 * class
@@ -40,7 +40,7 @@ A not exhaustive list:
    * std::vector (partialy)
    * std::array (partialy)
 
-Some samples heres : https://github.com/lhamot/CPP2D/wiki/Conversion-samples
+Some samples here : https://github.com/lhamot/CPP2D/wiki/Conversion-samples
 
 ## Requierements
 * cmake >= 2.6
@@ -59,21 +59,44 @@ Some samples heres : https://github.com/lhamot/CPP2D/wiki/Conversion-samples
 ## How to use it?
 **Be aware than this project is far to be finished. Do not expect a fully working D project immediately. That you can expect is a great help to the conversion of your project, doing all the simple repetitive job, which is not so bad.**
 
-There is many enhancement to do in the usage of CPP2D.
+CPP2D work like any clang tools. This could help you:
+- http://clang.llvm.org/docs/HowToSetupToolingForLLVM.html
 
-For the moment there is two way to use CPP2d:
+There is two way to use CPP2D:
 
-### 1. Call file by file
+### 1. Without compilation database
 1. Go to the destination directory (D project)
 2. Call ```CPP2D.exe [options] <source0> [... <sourceN>] -- [compiler options]```
+   - The two dashes are needed to informe cpp2d you don't need a compilation database
    - <sourceN> are C++ source files
    - [compiler options] are options forwarded to the compiler, like includes path, preprocessor definitions and so on.
    - [options] can be **-macro-stmt** and **-macro-exec** which are for macro handling
 
-### 2. Use compilation database
-I didn't tested it yet!
+### 2. With compilation database
 
-Waiting a better documentation you can see here : http://clang.llvm.org/docs/HowToSetupToolingForLLVM.html
+It seems to be impossible to generate a compilation database under windows...
+
+If you are not under windows, and you are using cmake to compile your project:
+- Add a line in your CMakeFiles.txt
+```cmake
+include_directories(path/to/llvm/lib/clang/3.9.0/include)
+```
+```sh
+# Go to project build directory
+$ cd project/build/directory
+# Run cmake with "**cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON path/to/project/sources**"
+$ cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON path/to/project/sources
+# You will obtain a compilation database
+# Link it to the source project
+$ ln -s $PWD/compile_commands.json path/to/project/source/
+# Convert files, calling cpp2d
+$ cd path/to/project/source
+$ path/to/CPP2D/cpp2d source1.cpp source2.cpp source3.cpp
+# You will find **D** files in the project/build/directory
+```
+
+Need for more documentation? You can search here : 
+- http://eli.thegreenplace.net/2014/05/21/compilation-databases-for-clang-based-tools
 
 ## Future of the project?
 Small C++ project are almost fully convertible to D, but many things have to be done for the bigger ones.
