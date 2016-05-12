@@ -22,10 +22,6 @@
 using namespace clang;
 using namespace llvm;
 
-std::string predefines;
-std::set<std::string> new_macros;
-std::set<std::string> new_macros_name;
-
 extern cl::list<std::string> MacroAsExpr;
 extern cl::list<std::string> MacroAsStmt;
 

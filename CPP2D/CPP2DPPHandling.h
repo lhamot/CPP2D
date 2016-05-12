@@ -72,4 +72,8 @@ private:
 
 	std::set<std::string> includes_in_file;
 	std::set<std::string> add_before_decl;
+
+	std::string predefines;
+	std::set<std::string> new_macros;
+	std::set<std::string> new_macros_name;
 };
