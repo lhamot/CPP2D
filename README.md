@@ -91,8 +91,10 @@ $ cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON path/to/project/sources
 $ ln -s $PWD/compile_commands.json path/to/project/source/
 # Convert files, calling cpp2d
 $ cd path/to/project/source
-$ path/to/CPP2D/cpp2d source1.cpp source2.cpp source3.cpp
+$ project/build/directory/CPP2D/cpp2d source1.cpp source2.cpp source3.cpp
 # You will find **D** files in the project/build/directory
+# You also need to copy the cpp_std.d file to your D source directory
+$ cp project/build/directory/CPP2D/cpp_std.d dproject/source
 ```
 
 Need for more documentation? You can search here : 
