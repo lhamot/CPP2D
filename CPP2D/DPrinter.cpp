@@ -1501,11 +1501,11 @@ bool DPrinter::TraverseConstructorInitializer(CXXCtorInitializer* Init)
 		else
 		{
 			isThisFunctionUsefull = true;
-			if(auto* ctorExpr = dyn_cast<CXXConstructExpr>(Init->getInit()))
+			if(auto* ctor = dyn_cast<CXXConstructExpr>(Init->getInit()))
 			{
-				if(ctorExpr->getNumArgs() == 1)
+				if(ctor->getNumArgs() == 1)
 				{
-					QualType initType = ctorExpr->getArg(0)->getType().getCanonicalType();
+					QualType initType = ctor->getArg(0)->getType().getCanonicalType();
 					QualType fieldType = fieldDecl->getType().getCanonicalType();
 					initType.removeLocalConst();
 					fieldType.removeLocalConst();
@@ -1516,8 +1516,11 @@ bool DPrinter::TraverseConstructorInitializer(CXXCtorInitializer* Init)
 						return true;
 					}
 				}
-				else if(ctorExpr->getNumArgs() == 0 && sem == Semantic::AssocArray)
-					return true;
+				else if (sem == Semantic::AssocArray)
+				{
+					if(ctor->getNumArgs() == 0 || isa<CXXDefaultArgExpr>(*ctor->arg_begin()))
+						return true;
+				}
 			}
 			out() << "new ";
 			printType(fieldDecl->getType());
@@ -1549,10 +1552,10 @@ void DPrinter::startCtorBody(CXXConstructorDecl* Decl)
 			std::string const initStr = popStream();
 			if(initStr.empty() == false)
 			{
-				out() << std::endl << indentStr();
 				// If nothing to print, default init is enought.
 				if(initStr.substr(initStr.size() - 2) != "= ")
 				{
+					out() << std::endl << indentStr();
 					out() << initStr;
 					out() << ";";
 				}
