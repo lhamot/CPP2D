@@ -106,7 +106,7 @@ public:
 	template<typename D>
 	bool traverseClassTemplateSpecializationDeclImpl(D* Decl);
 
-	bool isStdArray(clang::QualType const& type);
+	static bool isStdArray(clang::QualType const& type);
 
 	static bool isStdUnorderedMap(clang::QualType const& type);
 

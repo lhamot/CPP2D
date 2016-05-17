@@ -2104,7 +2104,7 @@ DPrinter::Semantic DPrinter::getSemantic(QualType qt)
 	// TODO : Externalize the semantic customization
 	if(name.find("class SafeInt<") == 0)
 		return Value;
-	if(name.find("class boost::array<") == 0)
+	if (isStdArray(qt))
 		return Value;
 	if(name.find("class std::basic_string<") == 0)
 		return Value;
@@ -2956,12 +2956,17 @@ bool DPrinter::isStdArray(QualType const& type)
 	                         type :
 	                         type.getCanonicalType();
 	std::string const name = rawType.getAsString();
-	//TODO : merge, optimize and use regexpr (class/struct std/bost)
-	static std::string const boost_array = "class boost::array<";
-	static std::string const std_array = "class std::array<";
-	return
-	  name.substr(0, boost_array.size()) == boost_array ||
-	  name.substr(0, std_array.size()) == std_array;
+	static std::string const arrayNames[] =
+	{
+		"class boost::array<",
+		"class std::array<",
+		"struct boost::array<",
+		"struct std::array<"
+	};
+	return std::any_of(std::begin(arrayNames), std::end(arrayNames), [&](auto && arrayName)
+	{
+		return name.find(arrayName) == 0;
+	});
 }
 
 bool DPrinter::isStdUnorderedMap(QualType const& type)
@@ -2970,12 +2975,17 @@ bool DPrinter::isStdUnorderedMap(QualType const& type)
 	                         type :
 	                         type.getCanonicalType();
 	std::string const name = rawType.getAsString();
-	//TODO : Add boost and use regexpr (class/struct std/bost)
-	static std::string const std_unordered_map = "class std::unordered_map<";
-	static std::string const std_unordered_map2 = "struct std::unordered_map<";
-	return
-	  name.substr(0, std_unordered_map.size()) == std_unordered_map ||
-	  name.substr(0, std_unordered_map2.size()) == std_unordered_map2;
+	static std::string const arrayNames[] =
+	{
+		"class std::unordered_map<",
+		"class boost::unordered_map<",
+		"struct std::unordered_map<",
+		"struct boost::unordered_map<",
+	};
+	return std::any_of(std::begin(arrayNames), std::end(arrayNames), [&](auto && arrayName)
+	{
+		return name.find(arrayName) == 0;
+	});
 }
 
 bool DPrinter::TraverseCXXDependentScopeMemberExpr(CXXDependentScopeMemberExpr* expr)
