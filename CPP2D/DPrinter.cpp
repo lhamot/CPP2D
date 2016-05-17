@@ -77,6 +77,7 @@ static std::map<std::string, std::string> type2type =
 	{ "uint32_t", "core.stdc.stdint.uint32_t" },
 	{ "int64_t", "core.stdc.stdint.int64_t" },
 	{ "uint64_t", "core.stdc.stdint.uint64_t" },
+	{ "size_t", "size_t" },
 	{ "SafeInt", "std.experimental.safeint.SafeInt" },
 	{ "RedBlackTree", "std.container.rbtree" },
 	{ "std::map", "cpp_std.map" },
@@ -1275,8 +1276,7 @@ bool DPrinter::TraverseCXXForRangeStmt(CXXForRangeStmt*  Stmt)
 	TraverseStmt(rangeInit);
 	if(TagDecl* rangeInitDecl = rangeInit->getType()->getAsTagDecl())
 	{
-		std::string const name = rangeInitDecl->getQualifiedNameAsString();
-		if(name.find("std::unordered_map") != std::string::npos)
+		if(isStdUnorderedMap(QualType(rangeInitDecl->getTypeForDecl(), 0)))
 			out() << ".byKeyValue";
 	}
 
@@ -1459,6 +1459,14 @@ void DPrinter::printType(QualType const& type)
 	}
 }
 
+template<typename T>
+T* dynCastAcrossCleanup(Expr* expr)
+{
+	if(auto* cleanup = dyn_cast<ExprWithCleanups>(expr))
+		expr = cleanup->getSubExpr();
+	return dyn_cast<T>(expr);
+}
+
 bool DPrinter::TraverseConstructorInitializer(CXXCtorInitializer* Init)
 {
 	if(Init->isAnyMemberInitializer())
@@ -1501,7 +1509,8 @@ bool DPrinter::TraverseConstructorInitializer(CXXCtorInitializer* Init)
 		else
 		{
 			isThisFunctionUsefull = true;
-			if(auto* ctor = dyn_cast<CXXConstructExpr>(Init->getInit()))
+			Expr* init = Init->getInit();
+			if(auto* ctor = dynCastAcrossCleanup<CXXConstructExpr>(init))
 			{
 				if(ctor->getNumArgs() == 1)
 				{
@@ -1511,12 +1520,12 @@ bool DPrinter::TraverseConstructorInitializer(CXXCtorInitializer* Init)
 					fieldType.removeLocalConst();
 					if(fieldType == initType)
 					{
-						TraverseStmt(Init->getInit());
+						TraverseStmt(init);
 						out() << ".dup()";
 						return true;
 					}
 				}
-				else if (sem == Semantic::AssocArray)
+				if(sem == Semantic::AssocArray)
 				{
 					if(ctor->getNumArgs() == 0 || isa<CXXDefaultArgExpr>(*ctor->arg_begin()))
 						return true;
@@ -1525,7 +1534,7 @@ bool DPrinter::TraverseConstructorInitializer(CXXCtorInitializer* Init)
 			out() << "new ";
 			printType(fieldDecl->getType());
 			out() << '(';
-			TraverseStmt(Init->getInit());
+			TraverseStmt(init);
 			out() << ')';
 		}
 	}
@@ -2109,7 +2118,7 @@ DPrinter::Semantic DPrinter::getSemantic(QualType qt)
 		return Value;
 	if(name.find("class std::scoped_ptr<") == 0)
 		return Value;
-	if(name.find("class std::unordered_map<") == 0)
+	if(isStdUnorderedMap(qt))
 		return AssocArray;
 	Type::TypeClass const cla = type->getTypeClass();
 	return
@@ -2947,6 +2956,7 @@ bool DPrinter::isStdArray(QualType const& type)
 	                         type :
 	                         type.getCanonicalType();
 	std::string const name = rawType.getAsString();
+	//TODO : merge, optimize and use regexpr (class/struct std/bost)
 	static std::string const boost_array = "class boost::array<";
 	static std::string const std_array = "class std::array<";
 	return
@@ -2960,8 +2970,12 @@ bool DPrinter::isStdUnorderedMap(QualType const& type)
 	                         type :
 	                         type.getCanonicalType();
 	std::string const name = rawType.getAsString();
+	//TODO : Add boost and use regexpr (class/struct std/bost)
 	static std::string const std_unordered_map = "class std::unordered_map<";
-	return name.substr(0, std_unordered_map.size()) == std_unordered_map;
+	static std::string const std_unordered_map2 = "struct std::unordered_map<";
+	return
+	  name.substr(0, std_unordered_map.size()) == std_unordered_map ||
+	  name.substr(0, std_unordered_map2.size()) == std_unordered_map2;
 }
 
 bool DPrinter::TraverseCXXDependentScopeMemberExpr(CXXDependentScopeMemberExpr* expr)
@@ -3464,11 +3478,19 @@ void DPrinter::traverseVarDeclImpl(VarDecl* Decl)
 		Expr* init = Decl->getInit();
 		if(Decl->isDirectInit())
 		{
-			if(auto* constr = dyn_cast<CXXConstructExpr>(init))
+			if(auto* constr = dynCastAcrossCleanup<CXXConstructExpr>(init))
 			{
-				if(getSemantic(varType) != Reference)
+				if(getSemantic(varType) == Value)
 				{
 					if(constr->getNumArgs() != 0)
+					{
+						out() << " = ";
+						printCXXConstructExprParams(constr);
+					}
+				}
+				else if(getSemantic(varType) == Semantic::AssocArray)
+				{
+					if(constr->getNumArgs() != 0 && not isa<CXXDefaultArgExpr>(*constr->arg_begin()))
 					{
 						out() << " = ";
 						printCXXConstructExprParams(constr);

@@ -108,7 +108,7 @@ public:
 
 	bool isStdArray(clang::QualType const& type);
 
-	bool isStdUnorderedMap(clang::QualType const& type);
+	static bool isStdUnorderedMap(clang::QualType const& type);
 
 	template<typename TDeclRefExpr>
 	bool traverseDeclRefExprImpl(TDeclRefExpr* Expr);
