@@ -133,12 +133,15 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 	};
 
 	auto methodPrinter = [this](clang::ast_matchers::MatchFinder & finder,
-	                            std::string const & regexpr,
+	                            std::string const & classRegexpr,
+	                            std::string const & methodRegexpr,
 	                            std::string const & tag,
 	                            auto && printer)
 	{
-		finder.addMatcher(cxxMemberCallExpr(callee(cxxMethodDecl(matchesName(regexpr)))
-		                                   ).bind(tag), this);
+		finder.addMatcher(cxxMemberCallExpr(
+		                    thisPointerType(cxxRecordDecl(isSameOrDerivedFrom(matchesName(classRegexpr)))),
+		                    callee(cxxMethodDecl(matchesName(methodRegexpr)))
+		                  ).bind(tag), this);
 		stmtPrinters.emplace(tag, printer);
 	};
 
@@ -147,9 +150,7 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 	rewriteType(finder, "std::logic_error", "Error");
 	rewriteType(finder, "std::runtime_error", "Exception");
 
-	methodPrinter(finder,
-	              "^::std::exception::what",
-	              "std::exception::what",
+	methodPrinter(finder, "^::std::exception$", "::what$", "std::exception::what",
 	              [this](DPrinter & pr, Stmt * s)
 	{
 		if(auto* memCall = dyn_cast<CXXMemberCallExpr>(s))
@@ -218,7 +219,7 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 		}
 	});
 
-	methodPrinter(finder, containers + "\\<.*\\>::(assign|fill)$", "std::vector::assign",
+	methodPrinter(finder, containers, "::(assign|fill)$", "std::vector::assign",
 	              [this](DPrinter & pr, Stmt * s)
 	{
 		if(auto* memCall = dyn_cast<CXXMemberCallExpr>(s))
@@ -232,7 +233,7 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 		}
 	});
 
-	methodPrinter(finder, containers + "\\<.*\\>::swap$", "std::vector::swap",
+	methodPrinter(finder, containers + "\\<.*\\>", "::swap$", "std::vector::swap",
 	              [this](DPrinter & pr, Stmt * s)
 	{
 		if(auto* memCall = dyn_cast<CXXMemberCallExpr>(s))
@@ -249,7 +250,7 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 		}
 	});
 
-	methodPrinter(finder, containers + "\\<.*\\>::push_back", "std::vector::push_back",
+	methodPrinter(finder, containers + "\\<.*\\>", "::push_back$", "std::vector::push_back",
 	              [this](DPrinter & pr, Stmt * s)
 	{
 		if(auto* memCall = dyn_cast<CXXMemberCallExpr>(s))
@@ -264,7 +265,7 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 		}
 	});
 
-	methodPrinter(finder, containers + "\\<.*\\>::push_front", "std::vector::push_back",
+	methodPrinter(finder, containers + "\\<.*\\>", "::push_front$", "std::vector::push_back",
 	              [this](DPrinter & pr, Stmt * s)
 	{
 		if(auto* memCall = dyn_cast<CXXMemberCallExpr>(s))
@@ -290,7 +291,7 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 
 	// std::option
 	methodPrinter(finder,
-	              "^::(std|boost)::optional\\<.*\\>::operator bool",
+	              "^::(std|boost)::optional\\<.*\\>", "::operator bool$",
 	              "std::optional::operator bool",
 	              [this](DPrinter & pr, Stmt * s)
 	{
