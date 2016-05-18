@@ -1940,6 +1940,7 @@ bool DPrinter::traverseFunctionDeclImpl(
 			if(numParam != 1)
 				out() << "\n" << indentStr();
 			out() << "...";
+			addExternInclude("core.vararg", "...");
 		}
 		pushStream();
 		if(funcTypeLoc.isNull() == false)
@@ -2104,7 +2105,7 @@ DPrinter::Semantic DPrinter::getSemantic(QualType qt)
 	// TODO : Externalize the semantic customization
 	if(name.find("class SafeInt<") == 0)
 		return Value;
-	if (isStdArray(qt))
+	if(isStdArray(qt))
 		return Value;
 	if(name.find("class std::basic_string<") == 0)
 		return Value;
@@ -2706,6 +2707,7 @@ bool DPrinter::TraverseFunctionProtoType(FunctionProtoType* Type)
 	{
 		spliter.split();
 		out() << "...";
+		addExternInclude("core.vararg", "...");
 	}
 	out() << ')';
 	return true;
@@ -2877,6 +2879,7 @@ bool DPrinter::TraverseLambdaExpr(LambdaExpr* Node)
 		{
 			split.split();
 			out() << "...";
+			addExternInclude("core.vararg", "...");
 		}
 		out() << ')';
 		inFuncArgs = false;
