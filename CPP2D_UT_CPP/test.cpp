@@ -2036,6 +2036,10 @@ void check_std_array()
 	ArrayStruct tab2(0, 0, 0);
 	ArrayArrayStruct toto;
 	CHECK(toto.tab2.tab[0] == 0);
+
+	std::array<int, 3> tab3 = { { 4, 5, 6 } };
+	tab3.fill(18);
+	CHECK(tab3[0] == 18);
 }
 
 

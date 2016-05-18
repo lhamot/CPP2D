@@ -132,14 +132,25 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 		[newName](DPrinter & pr, Type*) {pr.stream() << newName; });
 	};
 
+	auto methodPrinter = [this](clang::ast_matchers::MatchFinder & finder,
+	                            std::string const & regexpr,
+	                            std::string const & tag,
+	                            auto && printer)
+	{
+		finder.addMatcher(cxxMemberCallExpr(callee(cxxMethodDecl(matchesName(regexpr)))
+		                                   ).bind(tag), this);
+		stmtPrinters.emplace(tag, printer);
+	};
+
 	// std::exception
 	rewriteType(finder, "std::exception", "Throwable");
 	rewriteType(finder, "std::logic_error", "Error");
 	rewriteType(finder, "std::runtime_error", "Exception");
 
-	finder.addMatcher(cxxMemberCallExpr(thisPointerType(namedDecl(hasName("std::exception"))))
-	                  .bind("std::exception::what"), this);
-	stmtPrinters.emplace("std::exception::what", [this](DPrinter & pr, Stmt * s)
+	methodPrinter(finder,
+	              "^::std::exception::what",
+	              "std::exception::what",
+	              [this](DPrinter & pr, Stmt * s)
 	{
 		if(auto* memCall = dyn_cast<CXXMemberCallExpr>(s))
 		{
@@ -207,12 +218,8 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 		}
 	});
 
-	finder.addMatcher(cxxMemberCallExpr(
-	                    anyOf(
-	                      callee(cxxMethodDecl(matchesName(containers + "\\<.*\\>::fill$"))),
-	                      callee(cxxMethodDecl(matchesName(containers + "\\<.*\\>::assign$")))
-	                    )).bind("std::array::fill"), this);
-	stmtPrinters.emplace("std::array::fill", [this](DPrinter & pr, Stmt * s)
+	methodPrinter(finder, containers + "\\<.*\\>::(assign|fill)$", "std::vector::assign",
+	              [this](DPrinter & pr, Stmt * s)
 	{
 		if(auto* memCall = dyn_cast<CXXMemberCallExpr>(s))
 		{
@@ -224,16 +231,6 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 			}
 		}
 	});
-
-	auto methodPrinter = [this](clang::ast_matchers::MatchFinder & finder,
-	                            std::string const & regexpr,
-	                            std::string const & tag,
-	                            auto && printer)
-	{
-		finder.addMatcher(cxxMemberCallExpr(callee(cxxMethodDecl(matchesName(regexpr)))
-		                                   ).bind(tag), this);
-		stmtPrinters.emplace(tag, printer);
-	};
 
 	methodPrinter(finder, containers + "\\<.*\\>::swap$", "std::vector::swap",
 	              [this](DPrinter & pr, Stmt * s)
