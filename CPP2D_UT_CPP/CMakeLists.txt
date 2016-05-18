@@ -2,7 +2,9 @@ cmake_minimum_required(VERSION 2.6)
 
 project(CPP2D_UT_CPP)
 
-include_directories(${LLVM_PATH}/lib/clang/3.9.0/include)
+if(CMAKE_EXPORT_COMPILE_COMMANDS STREQUAL "ON")
+    include_directories(${LLVM_PATH}/lib/clang/3.9.0/include)
+endif()
 
 # Déclaration de l'exécutable
 add_executable(
