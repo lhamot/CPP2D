@@ -20,33 +20,25 @@ using namespace clang::tooling;
 using namespace llvm;
 using namespace clang;
 
-// Apply a custom category to all command-line options so that they are the
-// only ones displayed.
-static cl::OptionCategory MyToolCategory("my-tool options");
+cl::OptionCategory cpp2dCategory("cpp2d options");
 
-// CommonOptionsParser declares HelpMessage with a description of the common
-// command-line options related to the compilation database and input files.
-// It's nice to have this help message in all tools.
-static cl::extrahelp CommonHelp(CommonOptionsParser::HelpMessage);
-
-// A help message for this specific tool can be added afterwards.
-static cl::extrahelp MoreHelp("\nMore help text...");
+cl::extrahelp CommonHelp(CommonOptionsParser::HelpMessage);
 
 cl::list<std::string> MacroAsExpr(
   "macro-expr",
   cl::desc("This macro will not be expanded and will be migrated expecting an expression"),
-  cl::cat(MyToolCategory),
+  cl::cat(cpp2dCategory),
   cl::ZeroOrMore);
 
 cl::list<std::string> MacroAsStmt(
   "macro-stmt",
   cl::desc("This macro will not be expanded and will be migrated expecting statments"),
-  cl::cat(MyToolCategory),
+  cl::cat(cpp2dCategory),
   cl::ZeroOrMore);
 
 
 //! Used to add fake options to the compiler
-//!  - Like for example : -fno-delayed-template-parsing
+//!  - For example : -fno-delayed-template-parsing
 class CPP2DCompilationDatabase : public clang::tooling::CompilationDatabase
 {
 	clang::tooling::CompilationDatabase& sourceCDB;
@@ -86,7 +78,7 @@ int main(int argc, char const** argv)
 	std::copy(argv, argv + static_cast<intptr_t>(argc), std::back_inserter(argv_vect));
 	argv_vect.insert(std::begin(argv_vect) + 1, "-macro-expr=assert/e");
 	argc = static_cast<int>(argv_vect.size());
-	CommonOptionsParser OptionsParser(argc, argv_vect.data(), MyToolCategory);
+	CommonOptionsParser OptionsParser(argc, argv_vect.data(), cpp2dCategory);
 	CPP2DCompilationDatabase compilationDatabase(OptionsParser.getCompilations());
 	ClangTool Tool(
 	  compilationDatabase,
