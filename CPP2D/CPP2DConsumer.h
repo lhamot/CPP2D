@@ -20,22 +20,24 @@ namespace clang
 class CompilerInstance;
 }
 
-class VisitorToDConsumer : public clang::ASTConsumer
+//! Implement clang::ASTConsumer to call the DPrinter
+class CPP2DConsumer : public clang::ASTConsumer
 {
 public:
-	explicit VisitorToDConsumer(
-	  clang::CompilerInstance& Compiler,
-	  llvm::StringRef InFile
+	explicit CPP2DConsumer(
+	  clang::CompilerInstance& compiler,
+	  llvm::StringRef inFile
 	);
 
-	void HandleTranslationUnit(clang::ASTContext& Context) override;
+	//! Print imports, mixins, and finaly call the DPrinter on the translationUnit
+	void HandleTranslationUnit(clang::ASTContext& context) override;
 
 private:
-	clang::CompilerInstance& Compiler;
+	clang::CompilerInstance& compiler;
 	MatchContainer receiver;
 	clang::ast_matchers::MatchFinder finder;
 	std::unique_ptr<clang::ASTConsumer> finderConsumer;
-	std::string InFile;
-	DPrinter Visitor;
+	std::string inFile;
+	DPrinter visitor;
 };
 

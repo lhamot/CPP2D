@@ -22,8 +22,7 @@ std::unique_ptr<clang::ASTConsumer> CPP2DFrontendAction::CreateASTConsumer(
   llvm::StringRef InFile
 )
 {
-	auto visitor = std::make_unique<VisitorToDConsumer>(Compiler, InFile);
-	return std::move(visitor);
+	return std::make_unique<CPP2DConsumer>(Compiler, InFile);
 }
 
 bool CPP2DFrontendAction::BeginSourceFileAction(CompilerInstance& ci, StringRef file)
@@ -33,6 +32,3 @@ bool CPP2DFrontendAction::BeginSourceFileAction(CompilerInstance& ci, StringRef 
 	return true;
 }
 
-void CPP2DFrontendAction::EndSourceFileAction()
-{
-}

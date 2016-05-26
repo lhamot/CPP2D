@@ -17,18 +17,16 @@ namespace clang
 class CompilerInstance;
 }
 
+//! Implement clang::ASTFrontendAction to create the CPP2DConsumer
 class CPP2DFrontendAction : public clang::ASTFrontendAction
 {
 public:
+	//! Create the CPP2DConsumer
 	std::unique_ptr<clang::ASTConsumer> CreateASTConsumer(
 	  clang::CompilerInstance& Compiler,
 	  llvm::StringRef InFile
 	) override;
 
-	bool BeginSourceFileAction(clang::CompilerInstance& ci, llvm::StringRef) override;
-
-	void EndSourceFileAction() override;
-
-private:
-	llvm::StringRef modulename;
+	//! Add the CPP2DPPHandling (PPCallbacks) to the Preprocessor
+	bool BeginSourceFileAction(clang::CompilerInstance& ci, llvm::StringRef file) override;
 };

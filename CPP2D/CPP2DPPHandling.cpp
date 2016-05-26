@@ -88,6 +88,7 @@ void CPP2DPPHandling::InclusionDirective(
 	includes_in_file.insert(file_name);
 }
 
+//! Print arguments of the macro MI into a std::stringstream, for a normal macro declaration
 auto print_macro_args(MacroInfo const* MI,
                       std::stringstream& new_macro,
                       char const* prefix = nullptr)
@@ -107,6 +108,8 @@ auto print_macro_args(MacroInfo const* MI,
 	new_macro << ')';
 }
 
+//! Print arguments of the macro MI into a std::stringstream,
+//!  in a way they are compilable in C++, and convertible to D
 auto print_macro_args_expand(MacroInfo const* MI,
                              std::stringstream& new_macro,
                              std::string args)
@@ -137,7 +140,8 @@ auto print_macro_args_expand(MacroInfo const* MI,
 	new_macro << ')';
 }
 
-std::string expand_macro(MacroInfo const* MI)
+//! Print the macro, as a C macro
+std::string print_macro(MacroInfo const* MI)
 {
 	std::string new_macro;
 	bool first = true;
@@ -159,6 +163,7 @@ std::string expand_macro(MacroInfo const* MI)
 	return new_macro;
 }
 
+//! Print the macro as a D mixin
 std::string make_d_macro(MacroInfo const* MI, std::string const& name)
 {
 	std::set<std::string> arg_names;
@@ -269,7 +274,7 @@ void CPP2DPPHandling::TransformMacroExpr(
 		new_macro << "()";
 	new_macro << "), ";
 	if(macro_options.cppReplace.empty())
-		new_macro << expand_macro(MI);
+		new_macro << print_macro(MI);
 	else
 		new_macro << macro_options.cppReplace;
 	new_macro << + "))\n";
@@ -301,7 +306,7 @@ void CPP2DPPHandling::TransformMacroStmt(
 		new_macro << "()";
 	new_macro << ");\\\n";
 
-	new_macro << expand_macro(MI) << "\\\n";
+	new_macro << print_macro(MI) << "\\\n";
 	new_macro << "int CPP2D_ADD(CPP2D_MACRO_STMT_END, __COUNTER__);";
 
 	inject_macro(MD, macro_options.name, new_macro.str());
@@ -323,15 +328,6 @@ void CPP2DPPHandling::MacroDefined(const Token& MacroNameTok, const MacroDirecti
 		if(macro_stmt_iter != macro_stmt.end())
 			TransformMacroStmt(MacroNameTok, MD, macro_stmt_iter->second);
 	}
-}
-
-void CPP2DPPHandling::MacroExpands(
-  const clang::Token&, //MacroNameTok,
-  const clang::MacroDefinition&, //MD,
-  clang::SourceRange, //Range,
-  const clang::MacroArgs* //Args
-)
-{
 }
 
 std::set<std::string> const& CPP2DPPHandling::getIncludes() const

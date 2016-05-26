@@ -24,6 +24,7 @@ public:
 	                clang::Preprocessor& pp,
 	                llvm::StringRef inFile);
 
+	//! Fill the list of included files (includes_in_file)
 	void InclusionDirective(
 	  clang::SourceLocation,		//hash_loc,
 	  const clang::Token&,			//include_token,
@@ -36,29 +37,35 @@ public:
 	  const clang::Module*			//imported
 	) override;
 
+	//! Transform macro definition by calling TransformMacroExpr or TransformMacroStmt
 	void MacroDefined(const clang::Token& MacroNameTok, const clang::MacroDirective* MD) override;
 
-	void MacroExpands(const clang::Token& MacroNameTok,
-	                  const clang::MacroDefinition& MD, clang::SourceRange Range,
-	                  const clang::MacroArgs* Args) override;
-
+	//! Get include list
 	std::set<std::string> const& getIncludes() const;
+	//! Get macros to add in the D code
 	std::set<std::string> const& getInsertedBeforeDecls() const;
 
 private:
+	//! Add or replace a macro definition in the clang::Preprocessor
 	void inject_macro(
 	  clang::MacroDirective const* MD,
 	  std::string const& name,
 	  std::string const& new_macro);
+
+	//! Options passed by the user about a specific macro
 	struct MacroInfo
 	{
-		std::string name;
-		std::string argType;
-		std::string cppReplace;
+		std::string name;		//!< Macro name
+		std::string argType;	//!< e:expression n:name t:type
+		std::string cppReplace;	//!< override the macro, in C++ code
 	};
+	//! @brief Transform macro definition if tagged by -macro-expr option
+	//! + Add the D mixin version in the list add_before_decl
 	void TransformMacroExpr(clang::Token const& MacroNameTok,
 	                        clang::MacroDirective const* MD,
 	                        CPP2DPPHandling::MacroInfo const& args);
+	//! @brief Transform macro definition if tagged by -macro-stmt option
+	//! + Add the D mixin version in the list add_before_decl
 	void TransformMacroStmt(clang::Token const& MacroNameTok,
 	                        clang::MacroDirective const* MD,
 	                        CPP2DPPHandling::MacroInfo const& args);

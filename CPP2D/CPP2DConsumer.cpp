@@ -17,36 +17,36 @@
 #include <llvm/Support/Path.h>
 #pragma warning(pop)
 
-VisitorToDConsumer::VisitorToDConsumer(
-  clang::CompilerInstance& Compiler,
-  llvm::StringRef InFile
+CPP2DConsumer::CPP2DConsumer(
+  clang::CompilerInstance& compiler,
+  llvm::StringRef inFile
 )
-	: Compiler(Compiler)
+	: compiler(compiler)
 	, finder(receiver.getMatcher())
 	, finderConsumer(finder.newASTConsumer())
-	, InFile(InFile.str())
-	, Visitor(&Compiler.getASTContext(), receiver, InFile)
+	, inFile(inFile.str())
+	, visitor(&compiler.getASTContext(), receiver, inFile)
 {
 }
 
-void VisitorToDConsumer::HandleTranslationUnit(clang::ASTContext& Context)
+void CPP2DConsumer::HandleTranslationUnit(clang::ASTContext& context)
 {
 	//Find_Includes
-	auto& ppcallback = static_cast<CPP2DPPHandling&>(*Compiler.getPreprocessor().getPPCallbacks());
+	auto& ppcallback = static_cast<CPP2DPPHandling&>(*compiler.getPreprocessor().getPPCallbacks());
 	auto& incs = ppcallback.getIncludes();
 
-	finderConsumer->HandleTranslationUnit(Context);
-	Visitor.setIncludes(incs);
-	Visitor.TraverseTranslationUnitDecl(Context.getTranslationUnitDecl());
+	finderConsumer->HandleTranslationUnit(context);
+	visitor.setIncludes(incs);
+	visitor.TraverseTranslationUnitDecl(context.getTranslationUnitDecl());
 
-	std::string modulename = llvm::sys::path::stem(InFile).str();
+	std::string modulename = llvm::sys::path::stem(inFile).str();
 	std::ofstream file(modulename + ".d");
 	std::string new_modulename;
 	std::replace_copy(std::begin(modulename), std::end(modulename),
 	                  std::back_inserter(new_modulename), '-', '_'); //Replace illegal characters
 	if(new_modulename != modulename)  // When filename has some illegal characters
 		file << "module " << new_modulename << ';';
-	for(auto const& import : Visitor.getExternIncludes())
+	for(auto const& import : visitor.getExternIncludes())
 	{
 		file << "import " << import.first << "; //";
 		for(auto const& type : import.second)
@@ -56,5 +56,5 @@ void VisitorToDConsumer::HandleTranslationUnit(clang::ASTContext& Context)
 	file << "\n\n";
 	for(auto const& code : ppcallback.getInsertedBeforeDecls())
 		file << code << '\n';
-	file << Visitor.getDCode();
+	file << visitor.getDCode();
 }

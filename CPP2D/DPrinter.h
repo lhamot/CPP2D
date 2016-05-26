@@ -15,6 +15,7 @@
 
 class MatchContainer;
 
+//! Visit all the AST and print the compilation unit into **D** language file
 class DPrinter : public clang::RecursiveASTVisitor<DPrinter>
 {
 	typedef RecursiveASTVisitor<DPrinter> Base;
@@ -25,112 +26,181 @@ public:
 	  MatchContainer const& receiver,
 	  llvm::StringRef file);
 
+	//! Set the list if #include found in the C++ source
 	void setIncludes(std::set<std::string> const& includes);
 
+	//! Get indentation string for a new line in **D** code
 	std::string indentStr() const;
 
+	//! Print in **dlang** the base class part of a class declaration. Like class A <b>: B</b>
 	void printBasesClass(clang::CXXRecordDecl* decl);
 
+	//! Print in **dlang** the template argument of a template func/type. Like A<b>!(B)</b>
 	void printTmpArgList(std::string const& tmpArgListStr);
 
+	//! Print in **dlang** the common part of RecordDecl, CXXRecordDecl, and template records
 	template<typename TmpSpecFunc, typename PrintBasesClass>
-	bool traverseCXXRecordDeclImpl(
+	void traverseCXXRecordDeclImpl(
 	  clang::RecordDecl* decl,
-	  TmpSpecFunc traverseTmpSpecs,
-	  PrintBasesClass printBasesClass);
+	  TmpSpecFunc traverseTmpSpecs,		//!< A callable printing the template parameters. Like struct A<b>(C, int)</b>
+	  PrintBasesClass printBasesClass	//!< A callable printing the base classes. Like class A <b>: B</b>
+	);
 
+	//! Print the template parameters of a struct/func declaration. Like struct A<b>(C, int)</b>
 	void printTemplateParameterList(
 	  clang::TemplateParameterList* tmpParams,
 	  std::string const& prevTmplParmsStr);
 
+	//! Print a clang::CompoundStmt with an optional function for print an initialization list
 	template<typename InitList>
-	bool traverseCompoundStmtImpl(clang::CompoundStmt* Stmt, InitList initList);
+	void traverseCompoundStmtImpl(
+	  clang::CompoundStmt* Stmt, //!< The clang::CompoundStmt to print
+	  InitList initList //!< A callable printing somthing a the begining of the scope
+	);
 
+	//! Print a clang::CXXTryStmt with an optional function for print an initialization list
 	template<typename InitList>
-	bool traverseCXXTryStmtImpl(clang::CXXTryStmt* Stmt, InitList initList);
+	void traverseCXXTryStmtImpl(
+	  clang::CXXTryStmt* Stmt, //!< The clang::CXXTryStmt to print
+	  InitList initList //!< A callable printing somthing a the begining of the scope
+	);
 
-	clang::TemplateParameterList* getTemplateParameters(clang::ClassTemplateSpecializationDecl*);
+	//! Get TemplateParameterList* of Decl if Decl is a clang::ClassTemplatePartialSpecializationDecl
+	clang::TemplateParameterList* getTemplateParameters(
+	  clang::ClassTemplateSpecializationDecl* Decl);
 
+	//! Get TemplateParameterList* of Decl if Decl is a clang::ClassTemplatePartialSpecializationDecl
 	clang::TemplateParameterList* getTemplateParameters(
 	  clang::ClassTemplatePartialSpecializationDecl* Decl);
 
+	//! Print to **dlang** the clang::TemplateArgument ta
 	void printTemplateArgument(clang::TemplateArgument const& ta);
 
+	//! Print the template part a of tmpl specialization. Like class A<b>(B = int, int = 2, C)</b>
 	void printTemplateSpec_TmpArgsAndParms(
-	  clang::TemplateParameterList& primaryTmpParams,
-	  clang::TemplateArgumentList const& tmpArgs,
-	  clang::TemplateParameterList* newTmpParams,
-	  std::string const& prevTmplParmsStr
+	  clang::TemplateParameterList& primaryTmpParams, //!< Tmpl params of the specialized template
+	  clang::TemplateArgumentList const& tmpArgs, //!< Tmpl arguments of the specialization
+	  clang::TemplateParameterList* newTmpParams, //!< [optional] Tmpl params of the specialization
+	  std::string const& prevTmplParmsStr //!< String to add before the first param
 	);
 
+	//! Print to **dlang** the construction expr in this way ```Type(arg1, arg2)```
 	void printCXXConstructExprParams(clang::CXXConstructExpr* Init);
 
+	//! Print a type name to **dlang**
 	void printType(clang::QualType const& type);
 
+	//! Trait printing the initialization list of the clang::FunctionDecl (nothing)
 	void startCtorBody(clang::FunctionDecl*);
 
+	//! Trait printing the initialization list of the clang::CXXConstructorDecl
 	void startCtorBody(clang::CXXConstructorDecl* Decl);
 
+	//! Trait printing the const keyword (nothing) at the end of the clang::FunctionDecl prototype
+	void printFuncEnd(clang::FunctionDecl* decl);
+
+	//! Trait printing the const keyword at the end of the clang::CXXMethodDecl prototype
 	void printFuncEnd(clang::CXXMethodDecl* Decl);
 
-	void printFuncEnd(clang::FunctionDecl*);
-
+	//! Print keywords of a method. Like **static**, **abstract**, **override**, **final**
 	void printSpecialMethodAttribute(clang::CXXMethodDecl* Decl);
 
-	bool printFuncBegin(clang::CXXMethodDecl* Decl, std::string& tmpParams, int thisArgIndex = -1);
+	//! @brief Print the return type and name of a function. Like **rtype func_name**(arg1, arg2)
+	//! @return true if this Decl has to be printed, else false
+	bool printFuncBegin(
+	  clang::FunctionDecl* Decl,
+	  std::string& tmpParams,
+	  int thisArgIndex
+	);
 
-	bool printFuncBegin(clang::FunctionDecl* Decl, std::string& tmpParams, int thisArgIndex = -1);
+	//! @brief Print the return type and name of a method. Like **rtype method_name**(arg1, arg2)
+	//! @overload bool DPrinter::printFuncBegin(clang::FunctionDecl* Decl, std::string& tmpParams, int thisArgIndex)
+	bool printFuncBegin(clang::CXXMethodDecl* Decl, std::string& tmpParams, int thisArgIndex);
 
-	bool printFuncBegin(clang::CXXConversionDecl* Decl, std::string& tmpParams, int = -1);
+	//! @brief Print the return type and name of a function. Like **T opCast**(T)()
+	//! @overload bool DPrinter::printFuncBegin(clang::FunctionDecl* Decl, std::string& tmpParams, int thisArgIndex)
+	bool printFuncBegin(clang::CXXConversionDecl* Decl, std::string& tmpParams, int thisArgIndex);
 
+	//! @brief Print the return type and name of ctor. Like **this**(arg1)
+	//! @overload bool DPrinter::printFuncBegin(clang::FunctionDecl* Decl, std::string& tmpParams, int thisArgIndex)
 	bool printFuncBegin(clang::CXXConstructorDecl* Decl,
 	                    std::string& tmpParams,
-	                    int thisArgIndex = -1);
+	                    int thisArgIndex);
 
-	bool printFuncBegin(clang::CXXDestructorDecl*, std::string& tmpParams, int thisArgIndex = -1);
+	//! @brief Print the return type and name of dtor. Like <b>~this</b>()
+	//! @overload bool DPrinter::printFuncBegin(clang::FunctionDecl* Decl, std::string& tmpParams, int thisArgIndex)
+	bool printFuncBegin(clang::CXXDestructorDecl*, std::string& tmpParams, int thisArgIndex);
 
+	//! @brief Common function to print function
+	//! @param Decl FunctionDel to print
+	//! @param thisArgIndex This parameter will be "this".\n
+	//!        Usefull to put free operators inside, because one operand become "this".\n
+	//!        -1 mean no parameter is changed.
 	template<typename D>
-	bool traverseFunctionDeclImpl(D* Decl, int thisArgIndex = -1);
+	void traverseFunctionDeclImpl(D* Decl, int thisArgIndex = -1);
 
+	//! Semantic of an object (Value or Reference)
 	enum Semantic
 	{
-		Value,
-		Reference,
-		AssocArray,  // Create without new, but reference semantics
+		Value,      //!< Like **D** struct and everything in <b>C++</b>
+		Reference,  //!< Garbage collected like **D** class
+		AssocArray, //!< Special case for hashmap. Created without new, but reference semantic.
 	};
+	//! Get the semantic of the passed type
 	static Semantic getSemantic(clang::QualType qt);
 
+	//! @brief Print a <b>C++</b> pointer type to **D**
+	//! Pointer to Semantic::Value become T[], and Semantic::Reference become just T.
 	template<typename PType>
-	bool traversePointerTypeImpl(PType* Type);
+	void traversePointerTypeImpl(PType* Type);
 
+	//! Common printing code for TraverseClassTemplate(Partial)SpecializationDecl
 	template<typename D>
-	bool traverseClassTemplateSpecializationDeclImpl(D* Decl);
+	void traverseClassTemplateSpecializationDeclImpl(D* Decl);
 
+	//! Is this clang::QualType a std::array or a boost::array ?
 	static bool isStdArray(clang::QualType const& type);
 
+	//! Is this clang::QualType a std::unordered_map or a boost::unordered_map ?
 	static bool isStdUnorderedMap(clang::QualType const& type);
 
-	template<typename TDeclRefExpr>
-	bool traverseDeclRefExprImpl(TDeclRefExpr* Expr);
+	//! @brief Print the template args for (DependentScope)DeclRefExpr and UnresolvedLookupExpr
+	//! Example : func<b>!(T1, T2)</b>
+	template<typename ME>
+	void traverseDeclRefExprImpl(ME* Expr);
 
+	//! Print a (CXXDependentScope)MemberExpr
 	template<typename ME>
 	bool traverseMemberExprImpl(ME* Stmt);
 
+	//! Get the list of all **import** to print in **D**
 	std::map<std::string, std::set<std::string>> const& getExternIncludes() const;
 
+	//! Get the printer **D** code
 	std::string getDCode() const;
 
+	//! Get the std::ostream where print **D** code.
 	std::ostream& stream();
 
-	void addExternInclude(std::string const& include, std::string const& typeName);
+	//! Insert this include to the needed imports
+	void addExternInclude(
+	  std::string const& include, //!< Modulename to import
+	  std::string const& typeName //!< Hint to known why this module is imported
+	);
 
+	//! Print arguments of (CXXMember)CallExpr
 	void printCallExprArgument(clang::CallExpr* Stmt);
 
+	//! Print clang::VarDecl, also in CXXForRangeStmt and catch
 	void traverseVarDeclImpl(clang::VarDecl* Decl);
+
+	//! Print a statment which can be a compound one, a normal one, or a NullStmt (printed to {})
+	void traverseCompoundStmtOrNot(clang::Stmt* Stmt);
 
 	//  ******************** Function called by RecursiveASTVisitor *******************************
 	bool shouldVisitImplicitCode() const;
 
+	//! @pre setIncludes has already been called before
 	bool TraverseTranslationUnitDecl(clang::TranslationUnitDecl* Decl);
 
 	bool TraverseTypedefDecl(clang::TypedefDecl* Decl);
@@ -272,8 +342,6 @@ public:
 
 	bool TraverseExprWithCleanups(clang::ExprWithCleanups* Stmt);
 
-	void TraverseCompoundStmtOrNot(clang::Stmt* Stmt);
-
 	bool TraverseArraySubscriptExpr(clang::ArraySubscriptExpr* Expr);
 
 	bool TraverseFloatingLiteral(clang::FloatingLiteral* Expr);
@@ -382,6 +450,8 @@ public:
 
 	bool TraverseVarDecl(clang::VarDecl* Decl);
 
+	bool TraverseIndirectFieldDecl(clang::IndirectFieldDecl*);
+
 	bool VisitDecl(clang::Decl* Decl);
 
 	bool VisitStmt(clang::Stmt* Stmt);
@@ -389,69 +459,82 @@ public:
 	bool VisitType(clang::Type* Type);
 
 private:
-	void includeFile(std::string const& declInc, std::string const& typeName);
+	//! Add the import of for this file if it was included in the C++ file
+	void includeFile(std::string const& inclFile, std::string const& typeName);
 
+	//! Get type name and transform it for **D** printing
 	std::string mangleType(clang::NamedDecl const* decl);
 
-	std::string mangleVar(clang::DeclRefExpr* expr);
-
-	std::string replace(std::string str, std::string const& in, std::string const& out);
-
+	//! Print the comment preceding this clang::Decl
 	void printCommentBefore(clang::Decl* t);
 
+	//! Print the comment after this clang::Decl
 	void printCommentAfter(clang::Decl* t);
 
-	// trim from both ends
-	static inline std::string trim(std::string const& s);
+	//! Trim from begin and end
+	static std::string trim(std::string const& s);
 
-	std::vector<std::string> split(std::string const& instr);
+	static std::vector<std::string> split_lines(std::string const& instr);
 
+	//! Print comment before a clang::Stmt
 	void printStmtComment(
-	  clang::SourceLocation& locStart,
-	  clang::SourceLocation const& locEnd,
-	  clang::SourceLocation const& nextStart = clang::SourceLocation());
+	  clang::SourceLocation& locStart,      //!< IN/OUT Comment start (Will become nextStart)
+	  clang::SourceLocation const& locEnd,  //!< Comment end (Stmt start)
+	  clang::SourceLocation const& nextStart = clang::SourceLocation()  //!< Stmt end
+	);
 
-	void printMacroArgs(clang::CallExpr* macroArgs);
+	//! @brief Print to **D**, arguments of a **cpp2d_dummy_variadic** function call
+	//! @see https://github.com/lhamot/CPP2D/wiki/Macro-migration
+	void printMacroArgs(clang::CallExpr* macroArgs //!< Argument of the **cpp2d_dummy_variadic**
+	                   );
 
-	void printStmtMacro(std::string const& varName, clang::Expr* init);
+	//! @brief Print a "stmt-style" macro
+	//! @see https://github.com/lhamot/CPP2D/wiki/Macro-migration
+	void printStmtMacro(
+	  std::string const& varName, //!< CPP2D_MACRO_STMT or CPP2D_MACRO_STMT_END
+	  clang::Expr* init           //!< Initialisation of the CPP2D_MACRO_STMT object
+	);
 
+	//! Info about the relation between two type
 	struct RelationInfo
 	{
-		bool hasOpEqual = false;
-		bool hasOpLess = false;
+		bool hasOpEqual = false; //!< If ```a == b``` is valid
+		bool hasOpLess = false;  //!< If ```a < b``` is valid
 	};
+	//! Info about a type
 	struct ClassInfo
 	{
-		std::unordered_map<clang::Type const*, RelationInfo> relations;
-		bool hasOpExclaim = false;
-		bool hasBoolConv = false;
+		std::unordered_map<clang::Type const*, RelationInfo> relations; //!< Relation with other types
+		bool hasOpExclaim = false;   //!< If ```!a``` is valid
+		bool hasBoolConv = false;    //!< If has an operator ```operator bool()```
 	};
+	//!< Using Custom matchers and custom printer (in MatchContainer) decide to custom print or not
 	bool passDecl(clang::Decl* decl);
-
+	//!< Using Custom matchers and custom printer (in MatchContainer) decide to custom print or not
 	bool passStmt(clang::Stmt* stmt);
-
+	//!< Using Custom matchers and custom printer (in MatchContainer) decide to custom print or not
 	bool passType(clang::Type* type);
 
-	std::set<std::string> includesInFile;
-	std::set<clang::Expr*> dontTakePtr;
-	std::map<std::string, std::set<std::string> > externIncludes;
-	std::string modulename;
+	std::set<std::string> includesInFile;  //!< All includes find in the <b>C++</b> file
+	std::set<clang::Expr*> dontTakePtr;    //!< Avoid to take pointer when implicit FunctionToPointerDecay
+	std::map<std::string, std::set<std::string> > externIncludes; //!< import to do in **D**
+	std::string modulename; //!< Name of the <b>C++</b> module
 
-	MatchContainer const& receiver;
-	size_t indent = 0;
+	MatchContainer const& receiver; //!< Custom matchers and custom printers
+	size_t indent = 0;              //!< Indentation level
 	clang::ASTContext* Context;
-	size_t isInMacro = 0;
+	size_t isInMacro = 0;       //!< Disable printing if inside a macro expantion
 
-	std::vector<std::vector<clang::NamedDecl* > > templateArgsStack;
-	std::unordered_map<clang::IdentifierInfo*, std::string> renamedIdentifiers;
-	std::unordered_map<clang::CXXRecordDecl*, ClassInfo> classInfoMap;
-	bool renameIdentifiers = true;
-	bool refAccepted = false;
-	bool inFuncArgs = false;
-	bool inForRangeInit = false;
-	bool doPrintType = true;
-	bool splitMultiLineDecl = true;
-	bool portConst = false;
+	std::vector<std::vector<clang::NamedDecl* > > templateArgsStack; //!< Template argument names
+	std::unordered_map<clang::IdentifierInfo*, std::string> renamedIdentifiers; //!< Avoid name collision
+	std::unordered_map<clang::CXXRecordDecl*, ClassInfo> classInfoMap; //!< Info about all clang::CXXRecordDecl
+	bool renameIdentifiers = true;  //!< Use renamedIdentifiers ?
+	bool refAccepted = false; //!< If we are in a **D** place where we can use **ref**
+	bool inFuncParams = false;  //!< We are printing function parameters
+	bool inForRangeInit = false;  //!< If in for-range-base-loop initialization
+	bool doPrintType = true;  //!< Do not re-print type in if multi-decl one line
+	bool splitMultiLineDecl = true;  //!< If split multi line declaration is needed. False in for init.
+	bool portConst = false;          //!< True to port **const** keyword.
 	bool printDefaultValue = true;
-	bool isThisFunctionUsefull = false;
+	bool isThisFunctionUsefull = false; //!< To keep usefull implicit function
 };

@@ -23,31 +23,57 @@ class Decl;
 class Type;
 }
 
+//! Store matchers and receive the callbacks when the are find
+//!
+//! Find some paterns in the source which are hard to finc while parsing
+//! Permit the excecution of custom matcher and custom printer in order to
+//!     translate external library usages
 class MatchContainer : public clang::ast_matchers::MatchFinder::MatchCallback
 {
 public:
+	//! Generate all ASTMatchers
 	clang::ast_matchers::MatchFinder getMatcher();
 
-	void run(clang::ast_matchers::MatchFinder::MatchResult const& Result) override;
-
+	//! Hash traits (std::hash) of this record. [recordname] -> method
 	std::unordered_map<std::string, clang::CXXMethodDecl const*> hashTraits;
-	std::unordered_multimap<std::string, clang::FunctionDecl const*> freeOperator;  // left operand will become this
-	std::unordered_multimap<std::string, clang::FunctionDecl const*> freeOperatorRight; // right operand will become this
+	//! @brief Free operators (left) of this record. [recordname] -> operator
+	//! @remark The record appear on the left side
+	std::unordered_multimap<std::string, clang::FunctionDecl const*> freeOperator;
+	//! @brief Free operators (right) of this record. [recordname] -> operator
+	//! @remark The record appear on the right side
+	std::unordered_multimap<std::string, clang::FunctionDecl const*> freeOperatorRight;
 
-	std::function<void(DPrinter& printer, clang::Stmt*)> getPrinter(clang::Stmt const*) const;
-	std::function<void(DPrinter& printer, clang::Decl*)> getPrinter(clang::Decl const*) const;
-	std::function<void(DPrinter& printer, clang::Type*)> getPrinter(clang::Type const*) const;
+	typedef std::function<void(DPrinter& printer, clang::Stmt*)> StmtPrinter; //!< Custom Stmt printer
+	typedef std::function<void(DPrinter& printer, clang::Decl*)> DeclPrinter; //!< Custom Decl printer
+	typedef std::function<void(DPrinter& printer, clang::Type*)> TypePrinter; //!< Custom Type printer
 
+
+	StmtPrinter getPrinter(clang::Stmt const*) const; //!< Get the custom printer for this statment
+	DeclPrinter getPrinter(clang::Decl const*) const; //!< Get the custom printer for this decl
+	TypePrinter getPrinter(clang::Type const*) const; //!< Get the custom printer for this type
+
+	//! clang::Stmt which match. [clang::Stmt] -> matchername
 	std::unordered_multimap<clang::Stmt const*, std::string> stmtTags;
+	//! clang::Stmt which match. [clang::Decl] -> matchername
 	std::unordered_multimap<clang::Decl const*, std::string> declTags;
+	//! clang::Stmt which match. [clang::Type] -> matchername
 	std::unordered_multimap<clang::Type const*, std::string> typeTags;
 
 private:
-	std::unordered_map<std::string, std::function<void(DPrinter& printer, clang::Type*)>> typePrinters;
-	std::unordered_map<std::string, std::function<void(DPrinter& printer, clang::Stmt*)>> stmtPrinters;
-	std::unordered_map<std::string, std::function<void(DPrinter& printer, clang::Decl*)>> declPrinters;
+	//! When match is find, excecute on*Match or add the node to *Tags
+	void run(clang::ast_matchers::MatchFinder::MatchResult const& Result) override;
 
+	//! Custom printer for clang::Type matchers. [matchername] -> printer
+	std::unordered_map<std::string, TypePrinter> typePrinters;
+	//! Custom printer for clang::Stmt matchers. [matchername] -> printer
+	std::unordered_map<std::string, StmtPrinter> stmtPrinters;
+	//! Custom printer for clang::Decl matchers. [matchername] -> printer
+	std::unordered_map<std::string, DeclPrinter> declPrinters;
+
+	//! Function excecuted when a clang::Stmt match. [matchername] -> function
 	std::unordered_map<std::string, std::function<void(clang::Stmt const*)>> onStmtMatch;
+	//! Function excecuted when a clang::Decl match. [matchername] -> function
 	std::unordered_map<std::string, std::function<void(clang::Decl const*)>> onDeclMatch;
+	//! Function excecuted when a clang::Type match. [matchername] -> function
 	std::unordered_map<std::string, std::function<void(clang::Type const*)>> onTypeMatch;
 };
