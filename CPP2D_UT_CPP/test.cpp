@@ -49,7 +49,15 @@ bool cmp_string(char const* a, char const* b)
 }
 
 
-class Tata
+class noncopyable
+{
+	noncopyable(noncopyable const&);
+	noncopyable& operator=(noncopyable const&);
+public:
+	noncopyable() = default;
+};
+
+class Tata : noncopyable
 {
 	virtual int funcA2() = 0;
 

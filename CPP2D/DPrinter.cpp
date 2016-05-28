@@ -814,7 +814,7 @@ bool DPrinter::TraverseCXXRecordDecl(CXXRecordDecl* decl)
 	{
 		for(auto* ctor : decl->ctors())
 		{
-			if(ctor->isImplicit() && ctor->isCopyConstructor())
+			if(ctor->isImplicit() && ctor->isCopyConstructor() && not ctor->isDeleted())
 			{
 				llvm::errs() << "error : class " << decl->getNameAsString() <<
 				             " is copy constructible which is not dlang compatible.\n";
