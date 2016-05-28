@@ -208,6 +208,9 @@ void check_static_array()
 	int tab3[] = { 4, 5, 6, 7 };
 	CHECK(sizeof(tab3) == 4 * sizeof(int));
 
+	char const* tabStr[] = {"aa", "bb", "cc"};
+	CHECK(sizeof(tabStr) == 3 * sizeof(char const*));
+
 	int tabA[3] = { 1, 2, 3 };
 	int tabB[3] = { 1, 2, 3 };
 	CHECK(tabA != tabB);  // Pointer comparison
@@ -2082,7 +2085,7 @@ class WithExternBody
 {
 public:
 	
-	int give42();
+	int give42(int i = 1);
 
 	int give43()
 	{
@@ -2090,16 +2093,16 @@ public:
 	}
 };
 
-int WithExternBody::give42()
+int WithExternBody::give42(int tu)
 {
-	return 42;
+	return 42 * tu;
 }
 
-int give42();
+int give42(int i = 1);
 
-int give42()
+int give42(int tu)
 {
-	return 42;
+	return 42 * tu;
 }
 
 

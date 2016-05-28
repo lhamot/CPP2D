@@ -63,7 +63,7 @@ static std::map<std::string, std::string> type2type =
 {
 	{ "boost::optional", "std.typecons.Nullable" },
 	{ "std::vector", "cpp_std.vector" },
-	{ "std::set", "std.container.rbtree.RedBlackTree" },
+	{ "std::set", "cpp_std.set" },
 	{ "boost::shared_mutex", "core.sync.rwmutex.ReadWriteMutex" },
 	{ "boost::mutex", "core.sync.mutex.Mutex" },
 	{ "std::allocator", "cpp_std.allocator" },
@@ -83,6 +83,8 @@ static std::map<std::string, std::string> type2type =
 	{ "std::map", "cpp_std.map" },
 	{ "std::string", "string" },
 	{ "std::ostream", "std.stdio.File" },
+	{ "std::rand", "core.stdc.rand" },
+	{ "::rand", "core.stdc.stdlib.rand" },
 };
 
 
@@ -1875,7 +1877,11 @@ void DPrinter::traverseFunctionDeclImpl(
 		  Decl->getNumParams() +
 		  (Decl->isVariadic() ? 1 : 0) +
 		  ((arg_become_this == -1) ? 0 : -1);
-		for(ParmVarDecl* decl : Decl->params())
+		FunctionDecl* bodyDecl = Decl;
+		for(FunctionDecl* decl : Decl->redecls())  //Print params of the function definition
+			if(decl != bodyDecl)                   //  rather than the function declaration
+				bodyDecl = decl;
+		for(ParmVarDecl* decl : bodyDecl->params())
 		{
 			if(arg_become_this == static_cast<int>(index))
 				isConstMethod = isConst(decl->getType());
@@ -2790,17 +2796,18 @@ bool DPrinter::TraverseCXXBoolLiteralExpr(CXXBoolLiteralExpr* Stmt)
 bool DPrinter::TraverseUnaryExprOrTypeTraitExpr(UnaryExprOrTypeTraitExpr* Expr)
 {
 	if(passStmt(Expr)) return true;
+	out() << '(';
 	if(Expr->isArgumentType())
 		printType(Expr->getArgumentType());
 	else
 		TraverseStmt(Expr->getArgumentExpr());
 	UnaryExprOrTypeTrait const kind = Expr->getKind();
 	out() << (
-	        kind == UETT_AlignOf					? ".alignof"					:
-	        kind == UETT_SizeOf						? ".sizeof"						:
-	        kind == UETT_OpenMPRequiredSimdAlign	? ".OpenMPRequiredSimdAlign"	:
-	        kind == UETT_VecStep					? ".VecStep"					:
-	        "");
+	        kind == UETT_AlignOf					? ").alignof"					:
+	        kind == UETT_SizeOf						? ").sizeof"						:
+	        kind == UETT_OpenMPRequiredSimdAlign	? ").OpenMPRequiredSimdAlign"	:
+	        kind == UETT_VecStep					? ").VecStep"					:
+	        ")");
 	return true;
 }
 
