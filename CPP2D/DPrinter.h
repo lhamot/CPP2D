@@ -276,6 +276,8 @@ public:
 
 	bool TraverseBreakStmt(clang::BreakStmt* Stmt);
 
+	bool TraverseContinueStmt(clang::ContinueStmt* Stmt);
+
 	bool TraverseStaticAssertDecl(clang::StaticAssertDecl* Decl);
 
 	bool TraverseDefaultStmt(clang::DefaultStmt* Stmt);

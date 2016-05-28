@@ -1,5 +1,5 @@
-//
-// Copyright (c) 2016 Lo�c HAMOT
+﻿//
+// Copyright (c) 2016 Loïc HAMOT
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -2270,4 +2270,47 @@ void check_not_copyable_class()
 	CHECK(a.i == 3);
 	CopyDisableClass2 b;
 	CHECK(b.i == 3);
+}
+
+void check_break()
+{
+	int i = 0;
+	for (; i < 10; ++i)
+	{
+		if (i == 5)
+			break;
+	}
+	CHECK(i == 5);
+}
+
+void check_continue()
+{
+	int i = 0;
+	for (; i < 10; ++i)
+	{
+		if (i == 5)
+			continue;
+		CHECK(i != 5);
+	}
+	CHECK(i == 10);
+}
+
+void check_switch()
+{
+	auto test = [](int value)
+	{
+		int res;
+		switch (value)
+		{
+		case 0: return 0;
+		case 1: return 1;
+		case 2: res = 2; break;
+		default: res = 3;
+		}
+		return res;
+	};
+	CHECK(test(0) == 0);
+	CHECK(test(1) == 1);
+	CHECK(test(2) == 2);
+	CHECK(test(3) == 3);
 }

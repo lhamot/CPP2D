@@ -1281,6 +1281,13 @@ bool DPrinter::TraverseBreakStmt(BreakStmt* Stmt)
 	return true;
 }
 
+bool DPrinter::TraverseContinueStmt(ContinueStmt* Stmt)
+{
+	if(passStmt(Stmt)) return false;
+	out() << "continue";
+	return true;
+}
+
 bool DPrinter::TraverseStaticAssertDecl(StaticAssertDecl* Decl)
 {
 	if(passDecl(Decl)) return true;

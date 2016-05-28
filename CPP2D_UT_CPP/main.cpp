@@ -1,5 +1,5 @@
-//
-// Copyright (c) 2016 Lo�c HAMOT
+﻿//
+// Copyright (c) 2016 Loïc HAMOT
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -104,6 +104,12 @@ int main()
 	check_struct_containing_scooped_class();
 
 	check_not_copyable_class();
+
+	check_break();
+
+	check_continue();
+
+	check_switch();
 
 	print_results();
 
