@@ -3452,6 +3452,9 @@ void DPrinter::traverseVarDeclImpl(VarDecl* Decl)
 
 	if(passDecl(Decl)) return;
 
+	if(Decl->getCanonicalDecl() != Decl)
+		return;
+
 	if(Decl->isOutOfLine())
 		return;
 	else if(Decl->getOutOfLineDefinition())
@@ -3471,10 +3474,11 @@ void DPrinter::traverseVarDeclImpl(VarDecl* Decl)
 	}
 	out() << mangleName(Decl->getNameAsString());
 	bool const in_foreach_decl = inForRangeInit;
-	if(Decl->hasInit() && !in_foreach_decl)
+	VarDecl* definition = Decl->hasInit() ? Decl : Decl->getDefinition();
+	if(definition && definition->hasInit() && !in_foreach_decl)
 	{
-		Expr* init = Decl->getInit();
-		if(Decl->isDirectInit())
+		Expr* init = definition->getInit();
+		if(definition->isDirectInit())
 		{
 			if(auto* constr = dynCastAcrossCleanup<CXXConstructExpr>(init))
 			{

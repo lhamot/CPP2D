@@ -111,6 +111,8 @@ int main()
 
 	check_switch();
 
+	check_ext_vat();
+
 	print_results();
 
 	return 0;

@@ -109,3 +109,5 @@ void check_break();
 void check_continue();
 
 void check_switch();
+
+void check_ext_vat();

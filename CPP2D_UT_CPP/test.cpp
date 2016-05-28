@@ -2314,3 +2314,12 @@ void check_switch()
 	CHECK(test(2) == 2);
 	CHECK(test(3) == 3);
 }
+
+extern int ext_var;
+
+int ext_var = 18;
+
+void check_ext_vat()
+{
+	CHECK(ext_var == 18);
+}
