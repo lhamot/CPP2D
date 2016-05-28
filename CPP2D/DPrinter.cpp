@@ -882,9 +882,7 @@ void DPrinter::traverseCXXRecordDeclImpl(
 
 	int bit_count = 0;
 	bool inBitField = false;
-	AccessSpecifier access = isClass ?
-	                         AccessSpecifier::AS_private :
-	                         AccessSpecifier::AS_public;
+	AccessSpecifier access = AccessSpecifier::AS_public;
 	for(Decl* decl2 : decl->decls())
 	{
 		pushStream();
@@ -902,6 +900,15 @@ void DPrinter::traverseCXXRecordDeclImpl(
 			AccessSpecifier newAccess = decl2->getAccess();
 			if(newAccess == AccessSpecifier::AS_none)
 				newAccess = AccessSpecifier::AS_public;
+			if(newAccess == AccessSpecifier::AS_private)
+			{
+				// A private method can't be virtual in D => change them to protected
+				if(auto* meth = dyn_cast<CXXMethodDecl>(decl2))
+				{
+					if(meth->isVirtual())
+						newAccess = AccessSpecifier::AS_protected;
+				}
+			}
 			if(newAccess != access && (isInMacro == 0))
 			{
 				--indent;

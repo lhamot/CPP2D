@@ -528,6 +528,7 @@ void check_injectedclassnametype()
 class ConvertibleClass
 {
 	int a_;
+	void meth(){} //check private non virtual method
 public:
 	ConvertibleClass(int a) :a_(a) {}
 
