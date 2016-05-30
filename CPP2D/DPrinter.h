@@ -80,6 +80,7 @@ public:
 	void printTemplateSpec_TmpArgsAndParms(
 	  clang::TemplateParameterList& primaryTmpParams, //!< Tmpl params of the specialized template
 	  clang::TemplateArgumentList const& tmpArgs, //!< Tmpl arguments of the specialization
+	  const clang::ASTTemplateArgumentListInfo* tmpArgsInfo, //!< Tmpl arguments of the specialization
 	  clang::TemplateParameterList* newTmpParams, //!< [optional] Tmpl params of the specialization
 	  std::string const& prevTmplParmsStr //!< String to add before the first param
 	);
@@ -156,7 +157,10 @@ public:
 
 	//! Common printing code for TraverseClassTemplate(Partial)SpecializationDecl
 	template<typename D>
-	void traverseClassTemplateSpecializationDeclImpl(D* Decl);
+	void traverseClassTemplateSpecializationDeclImpl(
+	  D* Decl,
+	  const clang::ASTTemplateArgumentListInfo* tmpArgsInfo //!< Optional
+	);
 
 	//! Is this clang::QualType a std::array or a boost::array ?
 	static bool isStdArray(clang::QualType const& type);
@@ -442,6 +446,8 @@ public:
 
 	bool TraverseIncompleteArrayType(clang::IncompleteArrayType* Type);
 
+	bool TraverseDependentSizedArrayType(clang::DependentSizedArrayType* Type);
+
 	bool TraverseInitListExpr(clang::InitListExpr* Expr);
 
 	bool TraverseParenExpr(clang::ParenExpr* expr);
@@ -527,7 +533,7 @@ private:
 	clang::ASTContext* Context;
 	size_t isInMacro = 0;       //!< Disable printing if inside a macro expantion
 
-	std::vector<std::vector<clang::NamedDecl* > > templateArgsStack; //!< Template argument names
+	std::map<unsigned int, std::map<unsigned int, clang::NamedDecl* > > templateArgsStack; //!< Template argument names
 	std::unordered_map<clang::IdentifierInfo*, std::string> renamedIdentifiers; //!< Avoid name collision
 	std::unordered_map<clang::CXXRecordDecl*, ClassInfo> classInfoMap; //!< Info about all clang::CXXRecordDecl
 	bool renameIdentifiers = true;  //!< Use renamedIdentifiers ?
@@ -539,4 +545,5 @@ private:
 	bool portConst = false;          //!< True to port **const** keyword.
 	bool printDefaultValue = true;
 	bool isThisFunctionUsefull = false; //!< To keep usefull implicit function
+	std::stack<std::string> catchedExceptNames;
 };

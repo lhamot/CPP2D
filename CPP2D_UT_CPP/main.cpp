@@ -113,6 +113,10 @@ int main()
 
 	check_ext_vat();
 
+	check_tmpl_sized_array();
+
+	check_rethrow();
+
 	print_results();
 
 	return 0;

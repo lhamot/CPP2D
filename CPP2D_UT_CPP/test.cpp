@@ -2335,3 +2335,62 @@ void check_ext_vat()
 {
 	CHECK(ext_var == 18);
 }
+
+template<typename T>
+struct TableTraits2;
+
+template<typename T, size_t I>
+struct TableTraits2<T[I]>
+{
+	static size_t const Size = I;
+};
+
+template<typename T>
+struct TableTraits;
+
+template<>
+struct TableTraits<int[6]>
+{
+	static size_t const Size = 6;
+};
+
+
+void check_tmpl_sized_array()
+{
+	int tab[] = { 0, 1, 2, 3, 4, 5 };
+	static_assert(TableTraits<decltype(tab)>::Size == 6, "");
+	static_assert(TableTraits2<decltype(tab)>::Size == 6, "");
+}
+
+void check_rethrow()
+{
+	int status = 0;
+	try
+	{
+		try
+		{
+			try
+			{
+				throw std::runtime_error("test");
+			}
+			catch (std::runtime_error& ex)
+			{
+				CHECK(status == 0);
+				++status;
+				throw;
+			}
+		}
+		catch (std::runtime_error&)
+		{
+			CHECK(status == 1);
+			++status;
+			throw;
+		}
+	}
+	catch (std::runtime_error&)
+	{
+		CHECK(status == 2);
+		++status;
+	}
+	CHECK(status == 3);
+}

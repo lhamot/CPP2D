@@ -280,6 +280,20 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 		}
 	});
 
+	finder.addMatcher(cxxOperatorCallExpr(
+	                    hasArgument(0, hasType(cxxRecordDecl(isSameOrDerivedFrom(matchesName("^::std::basic_string\\<.*\\>"))))),
+	                    hasOverloadedOperatorName("+=")
+	                  ).bind("std::string::operator +="), this);
+	stmtPrinters.emplace("std::string::operator +=", [this](DPrinter & pr, Stmt * s)
+	{
+		if(auto* opCall = dyn_cast<CXXOperatorCallExpr>(s))
+		{
+			pr.TraverseStmt(opCall->getArg(0));
+			pr.stream() << " ~= ";
+			pr.TraverseStmt(opCall->getArg(1));
+		}
+	});
+
 	//********************** std::stream **********************************************************
 	finder.addMatcher(
 	  declRefExpr(hasDeclaration(namedDecl(matchesName("cout")))).bind("std::cout"), this);
@@ -381,25 +395,42 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 
 	globalFuncPrinter(finder, "^::std::max$", "std::max", [this](DPrinter & pr, Stmt * s)
 	{
-		if(auto* memCall = dyn_cast<CallExpr>(s))
+		if(auto* call = dyn_cast<CallExpr>(s))
 		{
-			pr.stream() << "std.algorithm.comparison.max(";
-			pr.TraverseStmt(memCall->getArg(0));
-			pr.stream() << ", ";
-			pr.TraverseStmt(memCall->getArg(1));
-			pr.stream() << ")";
-			pr.addExternInclude("sstd.algorithm.comparison", "std.algorithm.comparison.max");
+			pr.stream() << "std.algorithm.comparison.max";
+			pr.printCallExprArgument(call);
+			pr.addExternInclude("std.algorithm.comparison", "std.algorithm.comparison.max");
+		}
+	});
+
+	globalFuncPrinter(finder, "^(::std)?::strlen", "std::strlen", [this](DPrinter & pr, Stmt * s)
+	{
+		if(auto* call = dyn_cast<CallExpr>(s))
+		{
+			pr.stream() << "core.stdc.string.strlen(";
+			pr.TraverseStmt(call->getArg(0));
+			pr.stream() << ".ptr)";
+			pr.addExternInclude("core.stdc.string", "core.stdc.string.strlen");
+		}
+	});
+
+	globalFuncPrinter(finder, "^(::std)?::rand", "std::rand", [this](DPrinter & pr, Stmt * s)
+	{
+		if(auto* call = dyn_cast<CallExpr>(s))
+		{
+			pr.stream() << "core.stdc.stdlib.rand";
+			pr.printCallExprArgument(call);
+			pr.addExternInclude("core.stdc.stdlib", "core.stdc.stdlib.rand");
 		}
 	});
 
 	// <ctime>
 	globalFuncPrinter(finder, "^(::std)?::time$", "std::time", [this](DPrinter & pr, Stmt * s)
 	{
-		if(auto* memCall = dyn_cast<CallExpr>(s))
+		if(auto* call = dyn_cast<CallExpr>(s))
 		{
-			pr.stream() << "core.stdc.time.time(";
-			pr.TraverseStmt(memCall->getArg(0));
-			pr.stream() << ")";
+			pr.stream() << "core.stdc.time.time";
+			pr.printCallExprArgument(call);
 			pr.addExternInclude("core.stdc.time", "core.stdc.time.time");
 		}
 	});

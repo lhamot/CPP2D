@@ -446,8 +446,27 @@ bool DPrinter::TraverseTranslationUnitDecl(TranslationUnitDecl* Decl)
 	outStack.clear();
 	outStack.emplace_back(std::make_unique<std::stringstream>());
 
-	for(auto c : Decl->decls())
+	std::error_code ec;
+	llvm::raw_fd_ostream file(StringRef(modulename + ".print.cpp"), ec, sys::fs::OpenFlags());
+	LangOptions lo;
+	lo.CPlusPlus14 = true;
+	lo.DelayedTemplateParsing = false;
+	PrintingPolicy pp(lo);
+	pp.ConstantArraySizeAsWritten = true;
+	Decl->print(file);
+
+	std::ofstream file2(modulename + ".source.cpp");
+
+	for(clang::Decl* c : Decl->decls())
 	{
+		auto& sm = Context->getSourceManager();
+		std::string decl_str =
+		  Lexer::getSourceText(CharSourceRange(c->getSourceRange(), true),
+		                       sm,
+		                       LangOptions()
+		                      ).str();
+		file2 << decl_str;
+
 		if(CPP2DTools::checkFilename(Context->getSourceManager(), modulename, c))
 		{
 			pushStream();
@@ -768,12 +787,14 @@ bool DPrinter::TraverseCXXCatchStmt(CXXCatchStmt* Stmt)
 	if(Stmt->getExceptionDecl())
 	{
 		out() << '(';
+		catchedExceptNames.push(getName(Stmt->getExceptionDecl()->getDeclName()));
 		traverseVarDeclImpl(Stmt->getExceptionDecl());
 		out() << ')';
 	}
 	out() << std::endl;
 	out() << indentStr();
 	TraverseStmt(Stmt->getHandlerBlock());
+	catchedExceptNames.pop();
 	return true;
 }
 
@@ -788,10 +809,14 @@ void DPrinter::printBasesClass(CXXRecordDecl* decl)
 	Spliter splitBase(", ");
 	if(decl->getNumBases() + decl->getNumVBases() != 0)
 	{
-		out() << " : ";
+		pushStream();
 		auto printBaseSpec = [&](CXXBaseSpecifier & base)
 		{
 			splitBase.split();
+			TagDecl* tagDecl = base.getType()->getAsTagDecl();
+			NamedDecl* named = tagDecl ? dyn_cast<NamedDecl>(tagDecl) : nullptr;
+			if(named && named->getNameAsString() == "noncopyable")
+				return;
 			AccessSpecifier const as = base.getAccessSpecifier();
 			if(as != AccessSpecifier::AS_public)
 			{
@@ -800,12 +825,15 @@ void DPrinter::printBasesClass(CXXRecordDecl* decl)
 				    << " use of base class protection private and protected is no supported\n";
 				out() << "/*" << AccessSpecifierStr[as] << "*/ ";
 			}
-			printType(base.getType());
+			TraverseType(base.getType());
 		};
 		for(CXXBaseSpecifier& base : decl->bases())
 			printBaseSpec(base);
 		for(CXXBaseSpecifier& base : decl->vbases())
 			printBaseSpec(base);
+		std::string const bases = popStream();
+		if(not bases.empty())
+			out() << " : " << bases;
 	}
 }
 
@@ -1067,14 +1095,14 @@ bool DPrinter::TraverseClassTemplatePartialSpecializationDecl(
   ClassTemplatePartialSpecializationDecl* Decl)
 {
 	if(passDecl(Decl)) return true;
-	traverseClassTemplateSpecializationDeclImpl(Decl);
+	traverseClassTemplateSpecializationDeclImpl(Decl, Decl->getTemplateArgsAsWritten());
 	return true;
 }
 
 bool DPrinter::TraverseClassTemplateSpecializationDecl(ClassTemplateSpecializationDecl* Decl)
 {
 	if(passDecl(Decl)) return true;
-	traverseClassTemplateSpecializationDeclImpl(Decl);
+	traverseClassTemplateSpecializationDeclImpl(Decl, nullptr);
 	return true;
 }
 
@@ -1094,6 +1122,7 @@ void DPrinter::printTemplateArgument(TemplateArgument const& ta)
 void DPrinter::printTemplateSpec_TmpArgsAndParms(
   TemplateParameterList& primaryTmpParams,
   TemplateArgumentList const& tmpArgs,
+  const ASTTemplateArgumentListInfo* tmpArgsInfo,
   TemplateParameterList* newTmpParams,
   std::string const& prevTmplParmsStr
 )
@@ -1117,14 +1146,24 @@ void DPrinter::printTemplateSpec_TmpArgsAndParms(
 		}
 	}
 
-	for(decltype(tmpArgs.size()) i = 0, size = tmpArgs.size(); i != size; ++i)
+	auto printRedefinedTmp = [&](NamedDecl * tmpl, TemplateArgument const & tmplDef)
 	{
 		spliter2.split();
 		renameIdentifiers = false;
-		TraverseDecl(primaryTmpParams.getParam(i));
+		TraverseDecl(tmpl);
 		renameIdentifiers = true;
 		out() << " : ";
-		printTemplateArgument(tmpArgs.get(i));
+		printTemplateArgument(tmplDef);
+	};
+	if(tmpArgsInfo)
+	{
+		for(unsigned i = 0, size = tmpArgsInfo->NumTemplateArgs; i != size; ++i)
+			printRedefinedTmp(primaryTmpParams.getParam(i), (*tmpArgsInfo)[i].getArgument());
+	}
+	else
+	{
+		for(decltype(tmpArgs.size()) i = 0, size = tmpArgs.size(); i != size; ++i)
+			printRedefinedTmp(primaryTmpParams.getParam(i), tmpArgs.get(i));
 	}
 	if(newTmpParams)
 	{
@@ -1138,30 +1177,33 @@ void DPrinter::printTemplateSpec_TmpArgsAndParms(
 }
 
 template<typename D>
-void DPrinter::traverseClassTemplateSpecializationDeclImpl(D* Decl)
+void DPrinter::traverseClassTemplateSpecializationDeclImpl(
+  D* Decl,
+  const ASTTemplateArgumentListInfo* tmpArgsInfo
+)
 {
 	if(Decl->getSpecializationKind() == TSK_ExplicitInstantiationDeclaration
 	   || Decl->getSpecializationKind() == TSK_ExplicitInstantiationDefinition
 	   || Decl->getSpecializationKind() == TSK_ImplicitInstantiation)
 		return;
 
-	templateArgsStack.emplace_back();
 	TemplateParameterList* tmpParams = getTemplateParameters(Decl);
 	if(tmpParams)
 	{
-		auto& template_args = templateArgsStack.back();
+		unsigned Depth = tmpParams->getDepth();
 		for(decltype(tmpParams->size()) i = 0, size = tmpParams->size(); i != size; ++i)
-			template_args.push_back(tmpParams->getParam(i));
+			templateArgsStack[Depth][i] = tmpParams->getParam(i);
 	}
 	TemplateParameterList& specializedTmpParams =
 	  *Decl->getSpecializedTemplate()->getTemplateParameters();
 	TemplateArgumentList const& tmpArgs = Decl->getTemplateArgs();
 	traverseCXXRecordDeclImpl(Decl, [&]
 	{
-		printTemplateSpec_TmpArgsAndParms(specializedTmpParams, tmpArgs, tmpParams, "");
+		printTemplateSpec_TmpArgsAndParms(specializedTmpParams, tmpArgs, tmpArgsInfo, tmpParams, "");
 	},
 	[this, Decl] {printBasesClass(Decl); });
-	templateArgsStack.pop_back();
+	if(tmpParams)
+		templateArgsStack[tmpParams->getDepth()].clear();
 }
 
 bool DPrinter::TraverseCXXConversionDecl(CXXConversionDecl* Decl)
@@ -1833,7 +1875,12 @@ void DPrinter::traverseFunctionDeclImpl(
 			TemplateParameterList* primaryTmpParams = tDecl->getTemplateParameters();
 			TemplateArgumentList const* tmpArgs = Decl->getTemplateSpecializationArgs();
 			assert(primaryTmpParams && tmpArgs);
-			printTemplateSpec_TmpArgsAndParms(*primaryTmpParams, *tmpArgs, nullptr, tmplParamsStr);
+			printTemplateSpec_TmpArgsAndParms(
+			  *primaryTmpParams,
+			  *tmpArgs,
+			  Decl->getTemplateSpecializationArgsAsWritten(),
+			  nullptr,
+			  tmplParamsStr);
 			tmplPrinted = true;
 		}
 		break;
@@ -2646,7 +2693,10 @@ bool DPrinter::TraverseCXXThrowExpr(CXXThrowExpr* Stmt)
 {
 	if(passStmt(Stmt)) return true;
 	out() << "throw ";
-	TraverseStmt(Stmt->getSubExpr());
+	if(Stmt->getSubExpr() == nullptr)
+		out() << catchedExceptNames.top();
+	else
+		TraverseStmt(Stmt->getSubExpr());
 	return true;
 }
 
@@ -3352,6 +3402,16 @@ bool DPrinter::TraverseIncompleteArrayType(IncompleteArrayType* Type)
 	return true;
 }
 
+bool DPrinter::TraverseDependentSizedArrayType(DependentSizedArrayType* type)
+{
+	if(passType(type)) return false;
+	printType(type->getElementType());
+	out() << '[';
+	TraverseStmt(type->getSizeExpr());
+	out() << ']';
+	return true;
+}
+
 bool DPrinter::TraverseInitListExpr(InitListExpr* expr)
 {
 	if(passStmt(expr)) return true;
@@ -3457,7 +3517,7 @@ bool DPrinter::TraverseParenListExpr(clang::ParenListExpr* expr)
 
 void DPrinter::traverseVarDeclImpl(VarDecl* Decl)
 {
-	std::string const varName = Decl->getNameAsString();
+	std::string const varName = getName(Decl->getDeclName());
 	if(varName.find("CPP2D_MACRO_STMT") == 0)
 	{
 		printStmtMacro(varName, Decl->getInit());
@@ -3486,7 +3546,7 @@ void DPrinter::traverseVarDeclImpl(VarDecl* Decl)
 		printType(varType);
 		out() << " ";
 	}
-	out() << mangleName(Decl->getNameAsString());
+	out() << mangleName(varName);
 	bool const in_foreach_decl = inForRangeInit;
 	VarDecl* definition = Decl->hasInit() ? Decl : Decl->getDefinition();
 	if(definition && definition->hasInit() && !in_foreach_decl)

@@ -111,3 +111,8 @@ void check_continue();
 void check_switch();
 
 void check_ext_vat();
+
+void check_tmpl_sized_array();
+
+void check_rethrow();
+
