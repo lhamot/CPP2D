@@ -8,6 +8,7 @@
 #include "MatchContainer.h"
 #include "DPrinter.h"
 #include <iostream>
+#include <ciso646>
 
 namespace clang
 {
@@ -30,6 +31,43 @@ AST_MATCHER_P(UnresolvedLookupExpr, uleMatchesName, std::string, RegExp)
 }
 
 using namespace clang;
+
+//! Get the Nth template argument of this type
+TemplateArgument const* getTypeTemplateArgument(Expr const* e, size_t tmplArgIndex)
+{
+	if(auto* cast = dyn_cast<ImplicitCastExpr>(e))
+	{
+		if(auto* ref = dyn_cast<DeclRefExpr>(cast->getSubExpr()))
+		{
+			TemplateArgumentLoc const* tmpArgs = ref->getTemplateArgs();
+			if(tmpArgs)
+			{
+				assert(ref->getNumTemplateArgs() > tmplArgIndex);
+				return &tmpArgs[tmplArgIndex].getArgument();
+			}
+			else
+			{
+				if(auto elType = dyn_cast<ElaboratedType>(ref->getType()))
+				{
+					if(auto* TSType = dyn_cast<TemplateSpecializationType>(elType->getNamedType()))
+					{
+						assert(TSType->getNumTemplateArgs() > tmplArgIndex);
+						return &TSType->getArg((unsigned int)tmplArgIndex);
+					}
+					else
+						return nullptr;
+				}
+				else
+					return nullptr;
+			}
+		}
+		else
+			return nullptr;
+	}
+	else
+		return nullptr;
+};
+
 
 clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 {
@@ -142,6 +180,17 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 		                    thisPointerType(cxxRecordDecl(isSameOrDerivedFrom(matchesName(classRegexpr)))),
 		                    callee(cxxMethodDecl(matchesName(methodRegexpr)))
 		                  ).bind(tag), this);
+		stmtPrinters.emplace(tag, printer);
+	};
+
+	auto globalFuncPrinter = [this](clang::ast_matchers::MatchFinder & finder,
+	                                std::string const & regexpr,
+	                                std::string const & tag,
+	                                auto && printer)
+	{
+		finder.addMatcher(callExpr(callee(functionDecl(matchesName(regexpr)))).bind(tag), this);
+		finder.addMatcher(
+		  callExpr(callee(unresolvedLookupExpr(uleMatchesName(regexpr)))).bind(tag), this);
 		stmtPrinters.emplace(tag, printer);
 	};
 
@@ -294,6 +343,107 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 		}
 	});
 
+	//********************** memory ***************************************************************
+
+	tmplTypePrinter(finder, "std::shared_ptr", [this](DPrinter & printer, Type * Type)
+	{
+		auto* TSType = dyn_cast<TemplateSpecializationType>(Type);
+		TemplateArgument const& arg = TSType->getArg(0);
+		DPrinter::Semantic const sem = DPrinter::getSemantic(arg.getAsType());
+		if(sem == DPrinter::Value)
+		{
+			printer.addExternInclude("std.typecons", "RefCounted");
+			printer.stream() << "std.typecons.RefCounted!(";
+			printer.printTemplateArgument(TSType->getArg(0));
+			printer.stream() << ")";
+		}
+		else
+			printer.printTemplateArgument(TSType->getArg(0));
+	});
+
+	globalFuncPrinter(finder, "^::(std|boost)::make_shared", "std::make_shared", [this](DPrinter & pr, Stmt * s)
+	{
+		if(auto* call = dyn_cast<CallExpr>(s))
+		{
+			TemplateArgument const* tmpArg = getTypeTemplateArgument(call->getCallee(), 0);
+			if(tmpArg)
+			{
+				DPrinter::Semantic const sem = DPrinter::getSemantic(tmpArg->getAsType());
+				if(sem != DPrinter::Value)
+					pr.stream() << "new ";
+				pr.printTemplateArgument(*tmpArg);
+				pr.printCallExprArgument(call);
+			}
+		}
+	});
+
+	methodPrinter(finder, "^::(std|boost)::shared_ptr\\<.*\\>", "::reset$", "std::shared_ptr::reset$",
+	              [this](DPrinter & pr, Stmt * s)
+	{
+		if(auto* memCall = dyn_cast<CXXMemberCallExpr>(s))
+		{
+			if(auto* memExpr = dyn_cast<MemberExpr>(memCall->getCallee()))
+			{
+				pr.TraverseStmt(memExpr->isImplicitAccess() ? nullptr : memExpr->getBase());
+				pr.stream() << " = ";
+				pr.TraverseStmt(*memCall->arg_begin());
+			}
+		}
+	});
+
+	finder.addMatcher(cxxOperatorCallExpr(
+	                    hasArgument(0, hasType(cxxRecordDecl(isSameOrDerivedFrom(matchesName("^::std::shared_ptr\\<.*\\>"))))),
+	                    hasOverloadedOperatorName("==")
+	                  ).bind("std::shared_ptr::operator=="), this);
+	stmtPrinters.emplace("std::shared_ptr::operator==", [this](DPrinter & pr, Stmt * s)
+	{
+		if(auto* opCall = dyn_cast<CXXOperatorCallExpr>(s))
+		{
+			Expr* leftOp = opCall->getArg(0);
+			TemplateArgument const* tmpArg = getTypeTemplateArgument(leftOp, 0);
+			DPrinter::Semantic const sem = tmpArg ?
+			                               DPrinter::getSemantic(tmpArg->getAsType()) :
+			                               DPrinter::Reference;
+
+			pr.TraverseStmt(leftOp);
+			Expr* rightOp = opCall->getArg(1);
+			if(sem == DPrinter::Value and isa<CXXNullPtrLiteralExpr>(rightOp))
+				pr.stream() << ".refCountedStore.isInitialized == false";
+			else
+			{
+				pr.stream() << " is ";
+				pr.TraverseStmt(rightOp);
+			}
+		}
+	});
+
+	finder.addMatcher(cxxOperatorCallExpr(
+	                    hasArgument(0, hasType(cxxRecordDecl(isSameOrDerivedFrom(matchesName("^::std::shared_ptr\\<.*\\>"))))),
+	                    hasOverloadedOperatorName("!=")
+	                  ).bind("std::shared_ptr::operator!="), this);
+	stmtPrinters.emplace("std::shared_ptr::operator!=", [this](DPrinter & pr, Stmt * s)
+	{
+		if(auto* opCall = dyn_cast<CXXOperatorCallExpr>(s))
+		{
+			Expr* leftOp = opCall->getArg(0);
+			TemplateArgument const* tmpArg = getTypeTemplateArgument(leftOp, 0);
+			DPrinter::Semantic const sem = tmpArg ?
+			                               DPrinter::getSemantic(tmpArg->getAsType()) :
+			                               DPrinter::Reference;
+
+			pr.TraverseStmt(leftOp);
+			Expr* rightOp = opCall->getArg(1);
+			if(sem == DPrinter::Value and isa<CXXNullPtrLiteralExpr>(rightOp))
+				pr.stream() << ".refCountedStore.isInitialized";
+			else
+			{
+				pr.stream() << " !is ";
+				pr.TraverseStmt(rightOp);
+			}
+		}
+	});
+
+
 	//********************** std::stream **********************************************************
 	finder.addMatcher(
 	  declRefExpr(hasDeclaration(namedDecl(matchesName("cout")))).bind("std::cout"), this);
@@ -368,17 +518,6 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 			pr.stream() << ".key";
 		}
 	});
-
-	auto globalFuncPrinter = [this](clang::ast_matchers::MatchFinder & finder,
-	                                std::string const & regexpr,
-	                                std::string const & tag,
-	                                auto && printer)
-	{
-		finder.addMatcher(callExpr(callee(functionDecl(matchesName(regexpr)))).bind(tag), this);
-		finder.addMatcher(
-		  callExpr(callee(unresolvedLookupExpr(uleMatchesName(regexpr)))).bind(tag), this);
-		stmtPrinters.emplace(tag, printer);
-	};
 
 	globalFuncPrinter(finder, "^::std::swap$", "std::swap", [this](DPrinter & pr, Stmt * s)
 	{

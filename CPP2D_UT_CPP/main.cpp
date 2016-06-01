@@ -117,6 +117,8 @@ int main()
 
 	check_rethrow();
 
+	check_shared_ptr();
+
 	print_results();
 
 	return 0;

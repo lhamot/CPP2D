@@ -116,3 +116,5 @@ void check_tmpl_sized_array();
 
 void check_rethrow();
 
+void check_shared_ptr();
+

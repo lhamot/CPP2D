@@ -14,6 +14,7 @@
 #include <unordered_map>
 #include <cassert>
 #include <vector>
+#include <memory>
 
 #define CHECK(COND) check(COND, #COND, __LINE__) //if(!(COND)) error(#COND)
 
@@ -2393,4 +2394,38 @@ void check_rethrow()
 		++status;
 	}
 	CHECK(status == 3);
+}
+
+void check_shared_ptr()
+{
+	std::shared_ptr<Class781> classptr1;  //default ctor
+	CHECK(classptr1 == nullptr);
+	classptr1.reset(new Class781());
+	CHECK(classptr1 != nullptr);
+	std::shared_ptr<Class781> classptr2 = classptr1;  //copy ctor
+	CHECK(classptr1 == classptr2);
+	//std::shared_ptr<Class781> classptr3(new Class781()); //Use make_shared!!
+	//CHECK(classptr3 != nullptr);
+	std::shared_ptr<Class781> classptr4 = std::make_shared<Class781>();  //make_shared ctor
+	CHECK(classptr4 != nullptr);
+	classptr4 = std::make_shared<Class781>(); //assign make_shared
+	CHECK(classptr4 != nullptr);
+	classptr4 = classptr2; //assign
+	CHECK(classptr4 == classptr2);
+
+	std::shared_ptr<Struct781> structptr1; //default ctor
+	CHECK(structptr1 == nullptr);
+	structptr1 = std::make_shared<Struct781>(); //assign make_shared
+	CHECK(structptr1 != nullptr);
+	//structptr1.reset(new Struct781()); //Use make_shared!!
+	//CHECK(structptr1 != nullptr);
+	std::shared_ptr<Struct781> structptr2 = structptr1; //copy stor
+	CHECK(structptr2 == structptr1);
+	//std::shared_ptr<Struct781> structptr3(new Struct781()); //Use make_shared!!
+	//CHECK(structptr2 != nullptr);
+	std::shared_ptr<Struct781> structptr4 = std::make_shared<Struct781>(); //make_shared ctor
+	CHECK(structptr4 != nullptr);
+	structptr4 = structptr1; //assign
+	CHECK(structptr4 == structptr1);
+	return;
 }

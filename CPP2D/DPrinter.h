@@ -150,6 +150,9 @@ public:
 	//! Get the semantic of the passed type
 	static Semantic getSemantic(clang::QualType qt);
 
+	//! Is this type a pointer, or a smart pointer
+	static bool isPointer(clang::QualType const&);
+
 	//! @brief Print a <b>C++</b> pointer type to **D**
 	//! Pointer to Semantic::Value become T[], and Semantic::Reference become just T.
 	template<typename PType>

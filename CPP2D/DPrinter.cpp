@@ -2149,12 +2149,53 @@ DPrinter::Semantic DPrinter::getSemantic(QualType qt)
 		return Value;
 	if(isStdUnorderedMap(qt))
 		return AssocArray;
+	if(name.find("class std::set<") == 0)
+		return Value;
+	if(name.find("class std::unordered_set<") == 0)
+		return Value;
+	if(name.find("class std::map<") == 0)
+		return Value;
+	if(name.find("class std::multiset<") == 0)
+		return Value;
+	if(name.find("class std::unordered_multiset<") == 0)
+		return Value;
+	if(name.find("class std::multimap<") == 0)
+		return Value;
+	if(name.find("class std::unordered_multimap<") == 0)
+		return Value;
 	Type::TypeClass const cla = type->getTypeClass();
 	return
 	  cla == Type::TypeClass::Auto ? Value :
 	  (type->isClassType() || type->isFunctionType()) ? Reference :
 	  Value;
 }
+
+bool DPrinter::isPointer(QualType const& type)
+{
+	if(type->isPointerType())
+		return true;
+
+	QualType const rawType = type.isCanonical() ?
+	                         type :
+	                         type.getCanonicalType();
+	std::string const name = rawType.getAsString();
+	static std::string const arrayNames[] =
+	{
+		"class std::shared_ptr<",
+		"class std::unique_ptr<",
+		"struct std::shared_ptr<",
+		"struct std::unique_ptr<",
+		"class boost::shared_ptr<",
+		"class boost::scoped_ptr<",
+		"struct boost::shared_ptr<",
+		"struct boost::scoped_ptr<",
+	};
+	return std::any_of(std::begin(arrayNames), std::end(arrayNames), [&](auto && arrayName)
+	{
+		return name.find(arrayName) == 0;
+	});
+}
+
 
 template<typename PType>
 void DPrinter::traversePointerTypeImpl(PType* Type)
@@ -2517,8 +2558,8 @@ bool DPrinter::TraverseCXXOperatorCallExpr(CXXOperatorCallExpr* Stmt)
 		Expr* lo = *Stmt->arg_begin();
 		Expr* ro = *(Stmt->arg_end() - 1);
 
-		bool const lo_ptr = lo->getType()->isPointerType();
-		bool const ro_ptr = ro->getType()->isPointerType();
+		bool const lo_ptr = isPointer(lo->getType());
+		bool const ro_ptr = isPointer(ro->getType());
 
 		Semantic const lo_sem = getSemantic(lo->getType());
 		Semantic const ro_sem = getSemantic(ro->getType());
@@ -3134,7 +3175,7 @@ bool DPrinter::TraverseCompoundAssignOperator(CompoundAssignOperator* op)
 bool DPrinter::TraverseBinAddAssign(CompoundAssignOperator* expr)
 {
 	if(passStmt(expr)) return true;
-	if(expr->getLHS()->getType()->isPointerType())
+	if(isPointer(expr->getLHS()->getType()))
 	{
 		TraverseStmt(expr->getLHS());
 		out() << ".popFrontN(";
@@ -3168,9 +3209,7 @@ bool DPrinter::TraverseBinaryOperator(BinaryOperator* Stmt)
 	if(passStmt(Stmt)) return true;
 	Expr* lhs = Stmt->getLHS();
 	Expr* rhs = Stmt->getRHS();
-	Type const* typeL = lhs->getType().getTypePtr();
-	Type const* typeR = rhs->getType().getTypePtr();
-	if(typeL->isPointerType() and typeR->isPointerType())
+	if(isPointer(lhs->getType()) and isPointer(rhs->getType()))
 	{
 		TraverseStmt(Stmt->getLHS());
 		switch(Stmt->getOpcode())
@@ -3193,7 +3232,7 @@ bool DPrinter::TraverseBinaryOperator(BinaryOperator* Stmt)
 bool DPrinter::TraverseBinAdd(BinaryOperator* expr)
 {
 	if(passStmt(expr)) return true;
-	if(expr->getLHS()->getType()->isPointerType())
+	if(isPointer(expr->getLHS()->getType()))
 	{
 		TraverseStmt(expr->getLHS());
 		out() << '[';
@@ -3220,7 +3259,7 @@ bool DPrinter::TraverseUnaryOperator(UnaryOperator* Stmt)
 	if(passStmt(Stmt)) return true;
 	if(Stmt->isIncrementOp())
 	{
-		if(Stmt->getSubExpr()->getType()->isPointerType())
+		if(isPointer(Stmt->getSubExpr()->getType()))
 		{
 			TraverseStmt(Stmt->getSubExpr());
 			out() << ".popFront";
