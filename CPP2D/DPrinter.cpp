@@ -791,6 +791,11 @@ bool DPrinter::TraverseCXXCatchStmt(CXXCatchStmt* Stmt)
 		traverseVarDeclImpl(Stmt->getExceptionDecl());
 		out() << ')';
 	}
+	else
+	{
+		out() << "(Throwable ex)";
+		catchedExceptNames.push("ex");
+	}
 	out() << std::endl;
 	out() << indentStr();
 	TraverseStmt(Stmt->getHandlerBlock());
