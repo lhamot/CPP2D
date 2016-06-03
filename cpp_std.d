@@ -19,8 +19,8 @@ struct pair(K, V)
 	{
 		return 
 			first < s.first? -1:
-			first > s.first? 1:
-			0;
+		first > s.first? 1:
+		0;
 	}
 }
 
@@ -67,3 +67,19 @@ struct toFunctor(alias F)
 
 struct DefaultCtorArgType{};
 static DefaultCtorArgType DefaultCtorArg;
+
+// ********************** std::move ****************************************
+
+auto move(T)(auto ref T ptr) if(is(T == struct))
+{
+	auto newPtr = ptr;
+	ptr = T.init;
+	return newPtr;
+}
+
+auto move(T)(auto ref T ptr) if(is(T == class))
+{
+	auto newPtr = ptr;
+	ptr = null;
+	return newPtr;
+}

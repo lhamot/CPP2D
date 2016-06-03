@@ -345,6 +345,8 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 
 	//********************** memory ***************************************************************
 
+
+	// shared_ptr
 	tmplTypePrinter(finder, "std::shared_ptr", [this](DPrinter & printer, Type * Type)
 	{
 		auto* TSType = dyn_cast<TemplateSpecializationType>(Type);
@@ -443,6 +445,115 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 		}
 	});
 
+	// unique_ptr
+	tmplTypePrinter(finder, "std::unique_ptr", [this](DPrinter & printer, Type * Type)
+	{
+		auto* TSType = dyn_cast<TemplateSpecializationType>(Type);
+		TemplateArgument const& arg = TSType->getArg(0);
+		DPrinter::Semantic const sem = DPrinter::getSemantic(arg.getAsType());
+		if(sem == DPrinter::Value)
+		{
+			printer.addExternInclude("std.typecons", "RefCounted");
+			printer.stream() << "std.typecons.RefCounted!(";
+			printer.printTemplateArgument(TSType->getArg(0));
+			printer.stream() << ")";
+		}
+		else
+			printer.printTemplateArgument(TSType->getArg(0));
+	});
+
+	globalFuncPrinter(finder, "^::(std|boost)::make_unique", "std::make_unique", [this](DPrinter & pr, Stmt * s)
+	{
+		if(auto* call = dyn_cast<CallExpr>(s))
+		{
+			TemplateArgument const* tmpArg = getTypeTemplateArgument(call->getCallee(), 0);
+			if(tmpArg)
+			{
+				DPrinter::Semantic const sem = DPrinter::getSemantic(tmpArg->getAsType());
+				if(sem != DPrinter::Value)
+					pr.stream() << "new ";
+				pr.printTemplateArgument(*tmpArg);
+				pr.printCallExprArgument(call);
+			}
+		}
+	});
+
+	methodPrinter(finder, "^::(std|boost)::unique_ptr\\<.*\\>", "::reset$", "std::unique_ptr::reset$",
+	              [this](DPrinter & pr, Stmt * s)
+	{
+		if(auto* memCall = dyn_cast<CXXMemberCallExpr>(s))
+		{
+			if(auto* memExpr = dyn_cast<MemberExpr>(memCall->getCallee()))
+			{
+				pr.TraverseStmt(memExpr->isImplicitAccess() ? nullptr : memExpr->getBase());
+				pr.stream() << " = ";
+				pr.TraverseStmt(*memCall->arg_begin());
+			}
+		}
+	});
+
+	finder.addMatcher(cxxOperatorCallExpr(
+	                    hasArgument(0, hasType(cxxRecordDecl(isSameOrDerivedFrom(matchesName("^::std::unique_ptr\\<.*\\>"))))),
+	                    hasOverloadedOperatorName("==")
+	                  ).bind("std::unique_ptr::operator=="), this);
+	stmtPrinters.emplace("std::unique_ptr::operator==", [this](DPrinter & pr, Stmt * s)
+	{
+		if(auto* opCall = dyn_cast<CXXOperatorCallExpr>(s))
+		{
+			Expr* leftOp = opCall->getArg(0);
+			TemplateArgument const* tmpArg = getTypeTemplateArgument(leftOp, 0);
+			DPrinter::Semantic const sem = tmpArg ?
+			                               DPrinter::getSemantic(tmpArg->getAsType()) :
+			                               DPrinter::Reference;
+
+			pr.TraverseStmt(leftOp);
+			Expr* rightOp = opCall->getArg(1);
+			if(sem == DPrinter::Value and isa<CXXNullPtrLiteralExpr>(rightOp))
+				pr.stream() << ".refCountedStore.isInitialized == false";
+			else
+			{
+				pr.stream() << " is ";
+				pr.TraverseStmt(rightOp);
+			}
+		}
+	});
+
+	finder.addMatcher(cxxOperatorCallExpr(
+	                    hasArgument(0, hasType(cxxRecordDecl(isSameOrDerivedFrom(matchesName("^::std::unique_ptr\\<.*\\>"))))),
+	                    hasOverloadedOperatorName("!=")
+	                  ).bind("std::unique_ptr::operator!="), this);
+	stmtPrinters.emplace("std::unique_ptr::operator!=", [this](DPrinter & pr, Stmt * s)
+	{
+		if(auto* opCall = dyn_cast<CXXOperatorCallExpr>(s))
+		{
+			Expr* leftOp = opCall->getArg(0);
+			TemplateArgument const* tmpArg = getTypeTemplateArgument(leftOp, 0);
+			DPrinter::Semantic const sem = tmpArg ?
+			                               DPrinter::getSemantic(tmpArg->getAsType()) :
+			                               DPrinter::Reference;
+
+			pr.TraverseStmt(leftOp);
+			Expr* rightOp = opCall->getArg(1);
+			if(sem == DPrinter::Value and isa<CXXNullPtrLiteralExpr>(rightOp))
+				pr.stream() << ".refCountedStore.isInitialized";
+			else
+			{
+				pr.stream() << " !is ";
+				pr.TraverseStmt(rightOp);
+			}
+		}
+	});
+
+	globalFuncPrinter(finder, "^::std::move", "std::move", [this](DPrinter & pr, Stmt * s)
+	{
+		if(auto* memCall = dyn_cast<CallExpr>(s))
+		{
+			pr.stream() << "cpp_std.move(";
+			pr.TraverseStmt(memCall->getArg(0));
+			pr.stream() << ")";
+			pr.addExternInclude("cpp_std", "cpp_std.move");
+		}
+	});
 
 	//********************** std::stream **********************************************************
 	finder.addMatcher(

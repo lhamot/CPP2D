@@ -2177,7 +2177,9 @@ DPrinter::Semantic DPrinter::getSemantic(QualType qt)
 		return Value;
 	if(name.find("class std::shared_ptr<") == 0)
 		return Value;
-	if(name.find("class std::scoped_ptr<") == 0)
+	if(name.find("class boost::scoped_ptr<") == 0)
+		return Value;
+	if(name.find("class std::unique_ptr<") == 0)
 		return Value;
 	if(isStdUnorderedMap(qt))
 		return AssocArray;

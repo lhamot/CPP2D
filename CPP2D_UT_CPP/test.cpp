@@ -2394,6 +2394,25 @@ void check_rethrow()
 		++status;
 	}
 	CHECK(status == 3);
+
+	try
+	{
+		try
+		{
+			throw std::runtime_error("test");
+		}
+		catch (...)
+		{
+			++status;
+			throw;
+		}
+	}
+	catch (...)
+	{
+		CHECK(status == 4);
+		++status;
+	}
+	CHECK(status == 5);
 }
 
 void check_shared_ptr()
@@ -2427,5 +2446,43 @@ void check_shared_ptr()
 	CHECK(structptr4 != nullptr);
 	structptr4 = structptr1; //assign
 	CHECK(structptr4 == structptr1);
+	return;
+}
+
+void check_unique_ptr()
+{
+	std::unique_ptr<Class781> classptr1;  //default ctor
+	CHECK(classptr1 == nullptr);
+	classptr1.reset(new Class781());
+	CHECK(classptr1 != nullptr);
+	std::unique_ptr<Class781> classptr2 = std::move(classptr1);  //move copy
+	CHECK(classptr2 != nullptr);
+	CHECK(classptr1 == nullptr);
+	//std::unique_ptrd_ptr<Class781> classptr3(new Class781()); //Use make_shared!!
+	//CHECK(classptr3 != nullptr);
+	std::unique_ptr<Class781> classptr4 = std::make_unique<Class781>();  //make_shared ctor
+	CHECK(classptr4 != nullptr);
+	classptr4 = std::make_unique<Class781>(); //assign make_shared
+	CHECK(classptr4 != nullptr);
+	classptr4 = std::move(classptr2); //move assign
+	CHECK(classptr4 != nullptr);
+	CHECK(classptr2 == nullptr);
+
+	std::unique_ptr<Struct781> structptr1; //default ctor
+	CHECK(structptr1 == nullptr);
+	structptr1 = std::make_unique<Struct781>(); //assign make_shared
+	CHECK(structptr1 != nullptr);
+	//structptr1.reset(new Struct781()); //Use make_shared!!
+	//CHECK(structptr1 != nullptr);
+	std::unique_ptr<Struct781> structptr2 = std::move(structptr1); //move copy
+	CHECK(structptr2 != nullptr);
+	CHECK(structptr1 == nullptr);
+	//std::unique_ptr<Struct781> structptr3(new Struct781()); //Use make_shared!!
+	//CHECK(structptr2 != nullptr);
+	std::unique_ptr<Struct781> structptr4 = std::make_unique<Struct781>(); //make_shared ctor
+	CHECK(structptr4 != nullptr);
+	structptr4 = std::move(structptr2); //assign
+	CHECK(structptr4 != nullptr);
+	CHECK(structptr2 == nullptr);
 	return;
 }

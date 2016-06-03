@@ -118,3 +118,4 @@ void check_rethrow();
 
 void check_shared_ptr();
 
+void check_unique_ptr();

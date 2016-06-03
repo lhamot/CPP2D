@@ -119,6 +119,8 @@ int main()
 
 	check_shared_ptr();
 
+	check_unique_ptr();
+
 	print_results();
 
 	return 0;
