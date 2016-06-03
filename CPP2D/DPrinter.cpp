@@ -200,10 +200,12 @@ void DPrinter::includeFile(std::string const& inclFile, std::string const& typeN
 		   pos == (inclFile.size() - include.size()) &&
 		   (pos == 0 || inclFile[pos - 1] == '/' || inclFile[pos - 1] == '\\'))
 		{
-			if(include.find(".h") == include.size() - 2)
-				include = include.substr(0, include.size() - 2);
-			if(include.find(".hpp") == include.size() - 4)
-				include = include.substr(0, include.size() - 4);
+			static std::string const hExt = ".h";
+			static std::string const hppExt = ".hpp";
+			if(include.find(hExt) == include.size() - hExt.size())
+				include = include.substr(0, include.size() - hExt.size());
+			if(include.find(hppExt) == include.size() - hppExt.size())
+				include = include.substr(0, include.size() - hppExt.size());
 			std::transform(std::begin(include), std::end(include),
 			               std::begin(include),
 			[](char c) {return static_cast<char>(tolower(c)); });
@@ -436,7 +438,29 @@ DPrinter::DPrinter(
 
 std::string DPrinter::indentStr() const
 {
-	return std::string(indent * 4, ' ');
+	return std::string(indent * 4, ' '); //-V112
+}
+
+bool DPrinter::isA(CXXRecordDecl* decl, std::string const& baseName)
+{
+	std::string declName = decl->getQualifiedNameAsString();
+	if(declName == baseName)
+		return true;
+	for(CXXBaseSpecifier const& baseSpec : decl->bases())
+	{
+		CXXRecordDecl* base = baseSpec.getType()->getAsCXXRecordDecl();
+		assert(base);
+		if(isA(base, baseName))
+			return true;
+	}
+	for(CXXBaseSpecifier const& baseSpec : decl->vbases())
+	{
+		CXXRecordDecl* base = baseSpec.getType()->getAsCXXRecordDecl();
+		assert(base);
+		if(isA(base, baseName))
+			return true;
+	}
+	return false;
 }
 
 bool DPrinter::TraverseTranslationUnitDecl(TranslationUnitDecl* Decl)
@@ -849,7 +873,10 @@ bool DPrinter::TraverseCXXRecordDecl(CXXRecordDecl* decl)
 	{
 		for(auto* ctor : decl->ctors())
 		{
-			if(ctor->isImplicit() && ctor->isCopyConstructor() && not ctor->isDeleted())
+			if(ctor->isImplicit()
+			   && ctor->isCopyConstructor()
+			   && not ctor->isDeleted()
+			   && not isA(decl, "std::exception"))
 			{
 				llvm::errs() << "error : class " << decl->getNameAsString() <<
 				             " is copy constructible which is not dlang compatible.\n";
@@ -911,7 +938,7 @@ void DPrinter::traverseCXXRecordDeclImpl(
 		  bit_count <= 0 ? 0 :
 		  bit_count <= 8 ? 8 :
 		  bit_count <= 16 ? 16 :
-		  bit_count <= 32 ? 32 :
+		  bit_count <= 32 ? 32 : //-V112
 		  64;
 	};
 
@@ -2418,9 +2445,9 @@ bool DPrinter::TraverseTemplateTypeParmType(TemplateTypeParmType* Type)
 		IdentifierInfo* identifier = Type->getIdentifier();
 		if(identifier == nullptr)
 		{
-			if(Type->getDepth() >= templateArgsStack.size())
+			if(static_cast<size_t>(Type->getDepth()) >= templateArgsStack.size())
 				out() << "/* getDepth : " << Type->getDepth() << "*/";
-			else if(Type->getIndex() >= templateArgsStack[Type->getDepth()].size())
+			else if(static_cast<size_t>(Type->getIndex()) >= templateArgsStack[Type->getDepth()].size())
 				out() << "/* getIndex : " << Type->getIndex() << "*/";
 			else
 			{

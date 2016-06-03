@@ -204,6 +204,9 @@ public:
 	//! Print a statment which can be a compound one, a normal one, or a NullStmt (printed to {})
 	void traverseCompoundStmtOrNot(clang::Stmt* Stmt);
 
+	//! Check if decl is the type named baseName, or inherit from it directly or indirectly
+	static bool isA(clang::CXXRecordDecl* decl, std::string const& baseName);
+
 	//  ******************** Function called by RecursiveASTVisitor *******************************
 	bool shouldVisitImplicitCode() const;
 
