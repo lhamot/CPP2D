@@ -3587,7 +3587,7 @@ bool DPrinter::TraverseParenListExpr(clang::ParenListExpr* expr)
 	return true;
 }
 
-bool DPrinter::TraverseCXXScalarValueInitExpr(clang::CXXScalarValueInitExpr* expr)
+bool DPrinter::TraverseCXXScalarValueInitExpr(CXXScalarValueInitExpr* expr)
 {
 	QualType type;
 	if(TypeSourceInfo* TSInfo = expr->getTypeSourceInfo())
@@ -3602,6 +3602,20 @@ bool DPrinter::TraverseCXXScalarValueInitExpr(clang::CXXScalarValueInitExpr* exp
 		out() << "()";
 	}
 
+	return true;
+}
+
+bool DPrinter::TraverseUnresolvedMemberExpr(UnresolvedMemberExpr* expr)
+{
+	if(!expr->isImplicitAccess())
+	{
+		TraverseStmt(expr->getBase());
+		out() << '.';
+	}
+	if(NestedNameSpecifier* Qualifier = expr->getQualifier())
+		TraverseNestedNameSpecifier(Qualifier);
+	out() << expr->getMemberNameInfo().getAsString();
+	traverseDeclRefExprImpl(expr);
 	return true;
 }
 

@@ -464,6 +464,8 @@ public:
 
 	bool TraverseCXXScalarValueInitExpr(clang::CXXScalarValueInitExpr* Expr);
 
+	bool TraverseUnresolvedMemberExpr(clang::UnresolvedMemberExpr* Expr);
+
 	bool TraverseVarDecl(clang::VarDecl* Decl);
 
 	bool TraverseIndirectFieldDecl(clang::IndirectFieldDecl*);
