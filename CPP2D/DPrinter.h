@@ -462,6 +462,8 @@ public:
 
 	bool TraverseParenListExpr(clang::ParenListExpr* Expr);
 
+	bool TraverseCXXScalarValueInitExpr(clang::CXXScalarValueInitExpr* Expr);
+
 	bool TraverseVarDecl(clang::VarDecl* Decl);
 
 	bool TraverseIndirectFieldDecl(clang::IndirectFieldDecl*);

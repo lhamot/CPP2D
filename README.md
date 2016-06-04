@@ -122,4 +122,7 @@ Small C++ project are almost fully convertible to **D**, but many things have to
 * Clang integration : Maybe there is a better way to integrate **CPP2D** with **clang**, like make it a real clang tool, in clang/tools, or clang/tools/extra.
    
 ## Want to help?
-I would be happy to get some help on this project. If you are interested, do not hesitate to contact me at loic.hamot@yahoo.fr, or just checkout and enjoy!
+I would be happy to get some help on this project. If you are interested, do not hesitate to :
+- Reach us on the mailing list: https://groups.google.com/forum/#!forum/cpp2d
+- Contact me at loic.hamot@yahoo.fr
+- Or just checkout and enjoy ;)

@@ -388,7 +388,10 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 			{
 				pr.TraverseStmt(memExpr->isImplicitAccess() ? nullptr : memExpr->getBase());
 				pr.stream() << " = ";
-				pr.TraverseStmt(*memCall->arg_begin());
+				if(memCall->getNumArgs() == 0)
+					pr.stream() << "null";
+				else
+					pr.TraverseStmt(*memCall->arg_begin());
 			}
 		}
 	});

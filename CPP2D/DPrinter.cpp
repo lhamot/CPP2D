@@ -271,7 +271,7 @@ void DPrinter::printCommentBefore(Decl* t)
 		out() << std::endl << indentStr();
 		string comment = rc->getRawText(sm).str();
 		auto end = std::remove(std::begin(comment), std::end(comment), '\r');
-		comment.erase(end);
+		comment.erase(end, comment.end());
 		out() << comment << std::endl << indentStr();
 	}
 	else
@@ -3587,6 +3587,23 @@ bool DPrinter::TraverseParenListExpr(clang::ParenListExpr* expr)
 	return true;
 }
 
+bool DPrinter::TraverseCXXScalarValueInitExpr(clang::CXXScalarValueInitExpr* expr)
+{
+	QualType type;
+	if(TypeSourceInfo* TSInfo = expr->getTypeSourceInfo())
+		type = TSInfo->getType();
+	else
+		type = expr->getType();
+	if(type->isPointerType())
+		out() << "null";
+	else
+	{
+		printType(type);
+		out() << "()";
+	}
+
+	return true;
+}
 
 void DPrinter::traverseVarDeclImpl(VarDecl* Decl)
 {
