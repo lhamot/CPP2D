@@ -6,11 +6,13 @@
 //
 #include "framework.h"
 #include "test.h"
+#include "stdlib_testsuite.h"
 
 int main()
 {
 	TestFrameWork testFrameWork;
 	test_register(testFrameWork); 
+	stdlib_register(testFrameWork);
 	testFrameWork.run();
 
 	testFrameWork.print_results();
