@@ -299,7 +299,7 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 		}
 	});
 
-	methodPrinter(finder, containers + "\\<.*\\>", "::push_back$", "std::vector::push_back",
+	methodPrinter(finder, containers + "\\<.*\\>", "::(push_back|emplace_back)$", "std::vector::push_back",
 	              [this](DPrinter & pr, Stmt * s)
 	{
 		if(auto* memCall = dyn_cast<CXXMemberCallExpr>(s))
@@ -314,7 +314,7 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 		}
 	});
 
-	methodPrinter(finder, containers + "\\<.*\\>", "::push_front$", "std::vector::push_back",
+	methodPrinter(finder, containers + "\\<.*\\>", "::push_front$", "std::vector::push_front",
 	              [this](DPrinter & pr, Stmt * s)
 	{
 		if(auto* memCall = dyn_cast<CXXMemberCallExpr>(s))
@@ -379,7 +379,7 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 		}
 	});
 
-	methodPrinter(finder, "^::(std|boost)::shared_ptr\\<.*\\>", "::reset$", "std::shared_ptr::reset$",
+	methodPrinter(finder, "^::(std|boost)::shared_ptr\\<.*\\>", "::reset$", "std::shared_ptr::reset",
 	              [this](DPrinter & pr, Stmt * s)
 	{
 		if(auto* memCall = dyn_cast<CXXMemberCallExpr>(s))
@@ -556,6 +556,19 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 			pr.stream() << ")";
 			pr.addExternInclude("cpp_std", "cpp_std.move");
 		}
+	});
+
+	globalFuncPrinter(finder, "^::std::forward", "std::forward", [this](DPrinter & pr, Stmt * s)
+	{
+		if(auto* memCall = dyn_cast<CallExpr>(s))
+			pr.TraverseStmt(memCall->getArg(0));
+	});
+
+	//********************************* std::function *********************************************
+	tmplTypePrinter(finder, "std::function", [this](DPrinter & printer, Type * Type)
+	{
+		auto* TSType = dyn_cast<TemplateSpecializationType>(Type);
+		printer.printTemplateArgument(TSType->getArg(0));
 	});
 
 	//********************** std::stream **********************************************************
