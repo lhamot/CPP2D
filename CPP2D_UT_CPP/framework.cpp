@@ -19,7 +19,39 @@ void check(bool ok, char const* message, int line)
 	}
 }
 
-void print_results()
+void TestSuite::run() const noexcept
+{
+	for (TestCase const& testcase : testCases)
+	{
+		try
+		{
+			testcase();
+		}
+		catch (...)
+		{
+			CHECK(false && "Exception thrown from a test case");
+		}
+	}
+}
+
+void TestSuite::addTestCase(TestCase testCase)
+{
+	testCases.push_back(testCase);
+}
+
+void TestFrameWork::run() const noexcept
+{
+	for (std::unique_ptr<TestSuite const> const& suite : testSuites)
+		suite->run();
+}
+
+void TestFrameWork::print_results()
 {
 	printf("%u tests\n", testCount);
 }
+
+void TestFrameWork::addTestSuite(std::unique_ptr<TestSuite>&& testSuite)
+{
+	testSuites.emplace_back(std::move(testSuite));
+}
+

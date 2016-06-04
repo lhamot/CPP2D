@@ -16,8 +16,6 @@
 #include <vector>
 #include <memory>
 
-#define CHECK(COND) check(COND, #COND, __LINE__) //if(!(COND)) error(#COND)
-
 size_t equal_len(char const* a, char const* b)
 {
 	size_t pos = 0;
@@ -2485,4 +2483,123 @@ void check_unique_ptr()
 	CHECK(structptr4 != nullptr);
 	CHECK(structptr2 == nullptr);
 	return;
+}
+
+void test_register(TestFrameWork& tf)
+{
+	auto ts = std::make_unique<TestSuite>();
+
+	ts->addTestCase(check_operators);
+
+	ts->addTestCase(check_function);
+
+	ts->addTestCase(check_static_array);
+
+	ts->addTestCase(check_dynamic_array);
+
+	ts->addTestCase(check_struct);
+
+	ts->addTestCase(check_template_struct_specialization);
+
+	ts->addTestCase(check_template_function);
+
+	ts->addTestCase(check_class);
+
+	ts->addTestCase(check_type_alias);
+
+	ts->addTestCase(check_bitfield);
+
+	ts->addTestCase(check_decayed_type);
+
+	ts->addTestCase(check_injectedclassnametype);
+
+	ts->addTestCase(check_convertion_operator);
+
+	ts->addTestCase(check_abstract_keyword);
+
+	ts->addTestCase(check_class_opassign);
+
+	ts->addTestCase(check_tmpl_func_spec);
+
+	ts->addTestCase(check_variadic);
+
+	ts->addTestCase(check_tmpl_meth);
+
+	ts->addTestCase(check_function_pointer);
+
+	ts->addTestCase(check_method_pointer);
+
+	ts->addTestCase(check_member_pointer);
+
+	ts->addTestCase(check_uninstantiated_default_arg);
+
+	ts->addTestCase(check_class_instantiation);
+
+	ts->addTestCase(check_incomplete_array_type);
+
+	ts->addTestCase(check_builtin_macro);
+
+	ts->addTestCase(check_incr_pointer);
+
+	ts->addTestCase(check_function_macro);
+
+	ts->addTestCase(check_range_based_for_loop);
+
+	ts->addTestCase(check_overloaded_operator);
+
+	ts->addTestCase(check_extern_overloaded_operator);
+
+	ts->addTestCase(check_lib_porting_pair);
+
+	ts->addTestCase(check_union);
+
+	ts->addTestCase(check_lambda);
+
+	ts->addTestCase(check_struct_default_ctor);
+
+	ts->addTestCase(check_struct_ctor_call);
+
+	ts->addTestCase(check_class_ctor_call);
+
+	ts->addTestCase(check_exception);
+
+	ts->addTestCase(check_exception2);
+
+	ts->addTestCase(check_for_loop);
+
+	ts->addTestCase(check_while_loop);
+
+	ts->addTestCase(check_dowhile_loop);
+
+	ts->addTestCase(check_multidecl_line);
+
+	ts->addTestCase(check_std_array);
+
+	ts->addTestCase(check_implicit_ctor);
+
+	ts->addTestCase(check_extern_methode);
+
+	ts->addTestCase(check_std_unordered_map);
+
+	ts->addTestCase(check_struct_containing_scooped_class);
+
+	ts->addTestCase(check_not_copyable_class);
+
+	ts->addTestCase(check_break);
+
+	ts->addTestCase(check_continue);
+
+	ts->addTestCase(check_switch);
+
+	ts->addTestCase(check_ext_vat);
+
+	ts->addTestCase(check_tmpl_sized_array);
+
+	ts->addTestCase(check_rethrow);
+
+	ts->addTestCase(check_shared_ptr);
+
+	ts->addTestCase(check_unique_ptr);
+
+	tf.addTestSuite(std::move(ts));
 }
