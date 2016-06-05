@@ -59,6 +59,10 @@ public:
 	//! clang::Stmt which match. [clang::Type] -> matchername
 	std::unordered_multimap<clang::Type const*, std::string> typeTags;
 
+	typedef std::unordered_map<std::string, StmtPrinter> ClassPrinter;
+	//! How to print a call to this method. methodPrinters[method_name][class_name] => printer
+	std::unordered_map<std::string, ClassPrinter> methodPrinters;
+
 private:
 	//! When match is find, excecute on*Match or add the node to *Tags
 	void run(clang::ast_matchers::MatchFinder::MatchResult const& Result) override;

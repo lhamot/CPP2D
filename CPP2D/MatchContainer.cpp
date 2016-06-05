@@ -170,17 +170,11 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 		[newName](DPrinter & pr, Type*) {pr.stream() << newName; });
 	};
 
-	auto methodPrinter = [this](clang::ast_matchers::MatchFinder & finder,
-	                            std::string const & classRegexpr,
-	                            std::string const & methodRegexpr,
-	                            std::string const & tag,
+	auto methodPrinter = [this](std::string const & className,
+	                            std::string const & methodName,
 	                            auto && printer)
 	{
-		finder.addMatcher(cxxMemberCallExpr(
-		                    thisPointerType(cxxRecordDecl(isSameOrDerivedFrom(matchesName(classRegexpr)))),
-		                    callee(cxxMethodDecl(matchesName(methodRegexpr)))
-		                  ).bind(tag), this);
-		stmtPrinters.emplace(tag, printer);
+		methodPrinters[methodName].emplace(className, printer);
 	};
 
 	auto globalFuncPrinter = [this](clang::ast_matchers::MatchFinder & finder,
@@ -194,13 +188,29 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 		stmtPrinters.emplace(tag, printer);
 	};
 
+	auto tmplTypePrinter = [this](clang::ast_matchers::MatchFinder & finder,
+	                              std::string const & name,
+	                              auto && printer)
+	{
+		finder.addMatcher(templateSpecializationType(hasDeclaration(namedDecl(hasName(name)))).bind(name), this);
+		typePrinters.emplace(name, printer);
+	};
+
+	auto memberPrinter = [this](clang::ast_matchers::MatchFinder & finder,
+	                            std::string const & regexpr,
+	                            std::string const & tag,
+	                            auto && printer)
+	{
+		finder.addMatcher(memberExpr(member(matchesName(regexpr))).bind(tag), this);
+		stmtPrinters.emplace(tag, printer);
+	};
+
 	// std::exception
 	rewriteType(finder, "std::exception", "Throwable");
 	rewriteType(finder, "std::logic_error", "Error");
 	rewriteType(finder, "std::runtime_error", "Exception");
 
-	methodPrinter(finder, "^::std::exception$", "::what$", "std::exception::what",
-	              [this](DPrinter & pr, Stmt * s)
+	methodPrinter("std::exception", "what", [this](DPrinter & pr, Stmt * s)
 	{
 		if(auto* memCall = dyn_cast<CXXMemberCallExpr>(s))
 		{
@@ -218,16 +228,6 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 	std::string const containers =
 	  "^::(boost|std)::(vector|array|set|map|multiset|multimap|unordered_set|unordered_map|"
 	  "unordered_multiset|unordered_multimap|queue|stack|list|forcard_list)";
-
-	auto tmplTypePrinter = [this](clang::ast_matchers::MatchFinder & finder,
-	                              std::string const & name,
-	                              auto && printer)
-	{
-		finder.addMatcher(
-		  templateSpecializationType(hasDeclaration(namedDecl(hasName(name)))).bind(name),
-		  this);
-		typePrinters.emplace(name, printer);
-	};
 
 	tmplTypePrinter(finder, "std::map", [this](DPrinter & printer, Type * Type)
 	{
@@ -268,66 +268,90 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 		}
 	});
 
-	methodPrinter(finder, containers, "::(assign|fill)$", "std::vector::assign",
-	              [this](DPrinter & pr, Stmt * s)
-	{
-		if(auto* memCall = dyn_cast<CXXMemberCallExpr>(s))
-		{
-			if(auto* memExpr = dyn_cast<MemberExpr>(memCall->getCallee()))
-			{
-				pr.TraverseStmt(memExpr->isImplicitAccess() ? nullptr : memExpr->getBase());
-				pr.stream() << "[] = ";
-				pr.TraverseStmt(*memCall->arg_begin());
-			}
-		}
-	});
 
-	methodPrinter(finder, containers + "\\<.*\\>", "::swap$", "std::vector::swap",
-	              [this](DPrinter & pr, Stmt * s)
+	char const* containerTab[] =
 	{
-		if(auto* memCall = dyn_cast<CXXMemberCallExpr>(s))
-		{
-			if(auto* memExpr = dyn_cast<MemberExpr>(memCall->getCallee()))
-			{
-				pr.stream() << "std.algorithm.swap(";
-				pr.TraverseStmt(memExpr->isImplicitAccess() ? nullptr : memExpr->getBase());
-				pr.stream() << ", ";
-				pr.TraverseStmt(*memCall->arg_begin());
-				pr.stream() << ')';
-				pr.addExternInclude("std.algorithm", "std.algorithm.swap");
-			}
-		}
-	});
+		"std::vector", "std::array", "boost::array", "std::set", "std::map", "std::multiset", "std::multimap",
+		"std::unordered_set", "boost::unordered_set", "std::unordered_map", "boost::unordered_map",
+		"std::unordered_multiset", "boost::unordered_multiset",
+		"std::unordered_multimap", "boost::unordered_multimap",
+		"std::queue", "std::stack", "std::list", "std::forcard_list"
+	};
 
-	methodPrinter(finder, containers + "\\<.*\\>", "::(push_back|emplace_back)$", "std::vector::push_back",
-	              [this](DPrinter & pr, Stmt * s)
+	for(char const* container : containerTab)
 	{
-		if(auto* memCall = dyn_cast<CXXMemberCallExpr>(s))
+		for(char const* meth : { "assign", "fill" })
 		{
-			if(auto* memExpr = dyn_cast<MemberExpr>(memCall->getCallee()))
+			methodPrinter(container, meth, [this](DPrinter & pr, Stmt * s)
 			{
-				pr.TraverseStmt(memExpr->isImplicitAccess() ? nullptr : memExpr->getBase());
-				pr.stream() << ".insertBack(";
-				pr.TraverseStmt(*memCall->arg_begin());
-				pr.stream() << ')';
-			}
+				if(auto* memCall = dyn_cast<CXXMemberCallExpr>(s))
+				{
+					if(auto* memExpr = dyn_cast<MemberExpr>(memCall->getCallee()))
+					{
+						pr.TraverseStmt(memExpr->isImplicitAccess() ? nullptr : memExpr->getBase());
+						pr.stream() << "[] = ";
+						pr.TraverseStmt(*memCall->arg_begin());
+					}
+				}
+			});
 		}
-	});
+	}
 
-	methodPrinter(finder, containers + "\\<.*\\>", "::push_front$", "std::vector::push_front",
-	              [this](DPrinter & pr, Stmt * s)
+	for(char const* container : containerTab)
 	{
-		if(auto* memCall = dyn_cast<CXXMemberCallExpr>(s))
+		methodPrinter(container, "swap", [this](DPrinter & pr, Stmt * s)
 		{
-			if(auto* memExpr = dyn_cast<MemberExpr>(memCall->getCallee()))
+			if(auto* memCall = dyn_cast<CXXMemberCallExpr>(s))
 			{
-				pr.TraverseStmt(memExpr->isImplicitAccess() ? nullptr : memExpr->getBase());
-				pr.stream() << ".insertFront(";
-				pr.TraverseStmt(*memCall->arg_begin());
-				pr.stream() << ')';
+				if(auto* memExpr = dyn_cast<MemberExpr>(memCall->getCallee()))
+				{
+					pr.stream() << "std.algorithm.swap(";
+					pr.TraverseStmt(memExpr->isImplicitAccess() ? nullptr : memExpr->getBase());
+					pr.stream() << ", ";
+					pr.TraverseStmt(*memCall->arg_begin());
+					pr.stream() << ')';
+					pr.addExternInclude("std.algorithm", "std.algorithm.swap");
+				}
 			}
+		});
+	}
+
+	for(char const* container : containerTab)
+	{
+		for(char const* meth : {"push_back", "emplace_back"})
+		{
+			methodPrinter(container, meth, [this](DPrinter & pr, Stmt * s)
+			{
+				if(auto* memCall = dyn_cast<CXXMemberCallExpr>(s))
+				{
+					if(auto* memExpr = dyn_cast<MemberExpr>(memCall->getCallee()))
+					{
+						pr.TraverseStmt(memExpr->isImplicitAccess() ? nullptr : memExpr->getBase());
+						pr.stream() << ".insertBack(";
+						pr.TraverseStmt(*memCall->arg_begin());
+						pr.stream() << ')';
+					}
+				}
+			});
 		}
-	});
+	}
+
+	for(char const* container : containerTab)
+	{
+		methodPrinter(container, "push_front", [this](DPrinter & pr, Stmt * s)
+		{
+			if(auto* memCall = dyn_cast<CXXMemberCallExpr>(s))
+			{
+				if(auto* memExpr = dyn_cast<MemberExpr>(memCall->getCallee()))
+				{
+					pr.TraverseStmt(memExpr->isImplicitAccess() ? nullptr : memExpr->getBase());
+					pr.stream() << ".insertFront(";
+					pr.TraverseStmt(*memCall->arg_begin());
+					pr.stream() << ')';
+				}
+			}
+		});
+	}
 
 	finder.addMatcher(cxxOperatorCallExpr(
 	                    hasArgument(0, hasType(cxxRecordDecl(isSameOrDerivedFrom(matchesName("^::std::basic_string\\<.*\\>"))))),
@@ -379,22 +403,24 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 		}
 	});
 
-	methodPrinter(finder, "^::(std|boost)::shared_ptr\\<.*\\>", "::reset$", "std::shared_ptr::reset",
-	              [this](DPrinter & pr, Stmt * s)
+	for(char const* className : { "std::shared_ptr", "boost::shared_ptr" })
 	{
-		if(auto* memCall = dyn_cast<CXXMemberCallExpr>(s))
+		methodPrinter(className, "reset", [this](DPrinter & pr, Stmt * s)
 		{
-			if(auto* memExpr = dyn_cast<MemberExpr>(memCall->getCallee()))
+			if(auto* memCall = dyn_cast<CXXMemberCallExpr>(s))
 			{
-				pr.TraverseStmt(memExpr->isImplicitAccess() ? nullptr : memExpr->getBase());
-				pr.stream() << " = ";
-				if(memCall->getNumArgs() == 0)
-					pr.stream() << "null";
-				else
-					pr.TraverseStmt(*memCall->arg_begin());
+				if(auto* memExpr = dyn_cast<MemberExpr>(memCall->getCallee()))
+				{
+					pr.TraverseStmt(memExpr->isImplicitAccess() ? nullptr : memExpr->getBase());
+					pr.stream() << " = ";
+					if(memCall->getNumArgs() == 0)
+						pr.stream() << "null";
+					else
+						pr.TraverseStmt(*memCall->arg_begin());
+				}
 			}
-		}
-	});
+		});
+	}
 
 	finder.addMatcher(cxxOperatorCallExpr(
 	                    hasArgument(0, hasType(cxxRecordDecl(isSameOrDerivedFrom(matchesName("^::std::shared_ptr\\<.*\\>"))))),
@@ -481,8 +507,7 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 		}
 	});
 
-	methodPrinter(finder, "^::(std|boost)::unique_ptr\\<.*\\>", "::reset$", "std::unique_ptr::reset$",
-	              [this](DPrinter & pr, Stmt * s)
+	methodPrinter("std::unique_ptr", "reset", [this](DPrinter & pr, Stmt * s)
 	{
 		if(auto* memCall = dyn_cast<CXXMemberCallExpr>(s))
 		{
@@ -565,11 +590,13 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 	});
 
 	//********************************* std::function *********************************************
-	tmplTypePrinter(finder, "std::function", [this](DPrinter & printer, Type * Type)
+	auto function_print = [this](DPrinter & printer, Type * Type)
 	{
 		auto* TSType = dyn_cast<TemplateSpecializationType>(Type);
 		printer.printTemplateArgument(TSType->getArg(0));
-	});
+	};
+	tmplTypePrinter(finder, "std::function", function_print);
+	tmplTypePrinter(finder, "boost::function", function_print);
 
 	//********************** std::stream **********************************************************
 	finder.addMatcher(
@@ -581,10 +608,7 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 	});
 
 	// std::option
-	methodPrinter(finder,
-	              "^::(std|boost)::optional\\<.*\\>", "::operator bool$",
-	              "std::optional::operator bool",
-	              [this](DPrinter & pr, Stmt * s)
+	auto optional_to_bool = [this](DPrinter & pr, Stmt * s)
 	{
 		if(auto* memCall = dyn_cast<CXXMemberCallExpr>(s))
 		{
@@ -595,8 +619,9 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 				pr.stream() << ".isNull";
 			}
 		}
-	});
-
+	};
+	methodPrinter("std::optional", "operator bool", optional_to_bool);
+	methodPrinter("boost::optional", "operator bool", optional_to_bool);
 
 	// *********************************** <utils> **************************
 	// pair
@@ -610,15 +635,6 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 		printer.printTemplateArgument(TSType->getArg(1));
 		printer.stream() << ", \"value\")";
 	});
-
-	auto memberPrinter = [this](clang::ast_matchers::MatchFinder & finder,
-	                            std::string const & regexpr,
-	                            std::string const & tag,
-	                            auto && printer)
-	{
-		finder.addMatcher(memberExpr(member(matchesName(regexpr))).bind(tag), this);
-		stmtPrinters.emplace(tag, printer);
-	};
 
 	memberPrinter(finder,
 	              "^::std::pair\\<.*\\>::second",
@@ -669,6 +685,21 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 		}
 	});
 
+	//************************** C libraries ******************************************************
+	auto cFuncPrinter = [&](std::string const & lib, std::string const & func)
+	{
+		globalFuncPrinter(finder, "^(::std)?::" + func, "std::" + func, [ = ](DPrinter & pr, Stmt * s)
+		{
+			if(auto* call = dyn_cast<CallExpr>(s))
+			{
+				pr.stream() << "core.stdc." << lib << "." << func;
+				pr.printCallExprArgument(call);
+				pr.addExternInclude("core.stdc." + lib, "core.stdc." + lib + "." + func);
+			}
+		});
+	};
+
+	// <string>
 	globalFuncPrinter(finder, "^(::std)?::strlen", "std::strlen", [this](DPrinter & pr, Stmt * s)
 	{
 		if(auto* call = dyn_cast<CallExpr>(s))
@@ -680,29 +711,34 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 		}
 	});
 
-	globalFuncPrinter(finder, "^(::std)?::rand", "std::rand", [this](DPrinter & pr, Stmt * s)
+	// <stdlib>
+	cFuncPrinter("stdlib", "rand");
+
+	// <cmath>
+	char const* mathFuncs[] =
 	{
-		if(auto* call = dyn_cast<CallExpr>(s))
-		{
-			pr.stream() << "core.stdc.stdlib.rand";
-			pr.printCallExprArgument(call);
-			pr.addExternInclude("core.stdc.stdlib", "core.stdc.stdlib.rand");
-		}
-	});
+		"cos", "sin", "tan", "acos", "asin", "atan", "atan2",
+		"cosh", "sinh", "tanh", "acosh", "asinh", "atanh",
+		"exp", "frexp", "ldexp", "log", "log10", "modf", "exp2", "expm1", "ilogb", "log1p", "log2", "logb", "scalbn", "scalbln",
+		"pow", "sqrt", "cbrt", "hypot",
+		"erf", "erfc", "tgamma", "lgamma",
+		"ceil", "floor", "fmod", "trunc", "round", "lround", "llround", "rint", "lrint", "llrint", "nearbyint", "remainder", "remquo",
+		"copysign", "nan", "nextafter", "nexttoward",
+		"fdim", "fmax", "fmin",
+		"fabs", "abs", "fma",
+		"fpclassify", "isfinite", "isinf", "isnan", "isnormal", "signbit",
+		"isgreater", "isgreaterequal", "isless", "islessequal", "islessgreater", "isunordered",
+	};
+	for(char const* func : mathFuncs)
+		cFuncPrinter("math", func);
 
 	// <ctime>
-	globalFuncPrinter(finder, "^(::std)?::time$", "std::time", [this](DPrinter & pr, Stmt * s)
-	{
-		if(auto* call = dyn_cast<CallExpr>(s))
-		{
-			pr.stream() << "core.stdc.time.time";
-			pr.printCallExprArgument(call);
-			pr.addExternInclude("core.stdc.time", "core.stdc.time.time");
-		}
-	});
+	cFuncPrinter("time", "time");
 
 	//<assert>
 	globalFuncPrinter(finder, "^(::std)?::_wassert", "_wassert", [this](DPrinter&, Stmt*) {});
+
+	//**************************** boost **********************************************************
 
 	//BOOST_THROW_EXCEPTION
 	globalFuncPrinter(

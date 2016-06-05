@@ -3160,11 +3160,56 @@ bool DPrinter::traverseMemberExprImpl(ME* Stmt)
 	return true;
 }
 
-bool DPrinter::TraverseCXXMemberCallExpr(CXXMemberCallExpr* Stmt)
+//! @brief Is decl or parent of decl present in classes
+//! @return The printer method found in classes
+MatchContainer::ClassPrinter::const_iterator::value_type::second_type
+isAnyOfThoseTypes(CXXRecordDecl* decl, MatchContainer::ClassPrinter const& classes)
 {
-	if(passStmt(Stmt)) return true;
-	TraverseStmt(Stmt->getCallee());
-	printCallExprArgument(Stmt);
+	std::string declName = decl->getQualifiedNameAsString();
+	size_t pos = declName.find('<');
+	if(pos != std::string::npos)
+		declName = declName.substr(0, pos);
+
+	auto classIter = classes.find(declName);
+	if(classIter != classes.end())
+		return classIter->second;
+	for(CXXBaseSpecifier const& baseSpec : decl->bases())
+	{
+		CXXRecordDecl* base = baseSpec.getType()->getAsCXXRecordDecl();
+		assert(base);
+		if(auto func = isAnyOfThoseTypes(base, classes))
+			return func;
+	}
+	for(CXXBaseSpecifier const& baseSpec : decl->vbases())
+	{
+		CXXRecordDecl* base = baseSpec.getType()->getAsCXXRecordDecl();
+		assert(base);
+		if(auto func = isAnyOfThoseTypes(base, classes))
+			return func;
+	}
+	return nullptr;
+};
+
+bool DPrinter::TraverseCXXMemberCallExpr(CXXMemberCallExpr* expr)
+{
+	if(passStmt(expr)) return true;
+	if(auto* meth = dyn_cast<CXXMethodDecl>(expr->getCalleeDecl()))
+	{
+		std::string methName = meth->getNameAsString();
+
+		CXXRecordDecl* thisType = expr->getRecordDecl();
+		auto methIter = receiver.methodPrinters.find(methName);
+		if(methIter != receiver.methodPrinters.end())
+		{
+			if(auto func = isAnyOfThoseTypes(thisType, methIter->second))
+			{
+				func(*this, expr);
+				return true;
+			}
+		}
+	}
+	TraverseStmt(expr->getCallee());
+	printCallExprArgument(expr);
 	return true;
 }
 

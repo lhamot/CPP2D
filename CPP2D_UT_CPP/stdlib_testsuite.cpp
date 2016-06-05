@@ -1,4 +1,5 @@
 #include <unordered_map>
+#include <array>
 #include "framework.h"
 
 
@@ -169,6 +170,15 @@ void check_unique_ptr()
 	return;
 }
 
+void check_stdarray()
+{
+	std::array<int, 4> a;
+	a.fill(2);
+	CHECK(a[3] == 2);
+	std::array<int, 4> b = {0, 1, 2, 3};
+	CHECK(b[1] == 1);
+}
+
 void stdlib_register(TestFrameWork& tf)
 {
 	auto ts = std::make_unique<TestSuite>();
@@ -178,6 +188,8 @@ void stdlib_register(TestFrameWork& tf)
 	ts->addTestCase(check_shared_ptr);
 
 	ts->addTestCase(check_unique_ptr);
+
+	ts->addTestCase(check_stdarray);
 
 	tf.addTestSuite(std::move(ts));
 }
