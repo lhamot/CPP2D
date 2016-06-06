@@ -205,6 +205,19 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 		stmtPrinters.emplace(tag, printer);
 	};
 
+	auto operatorCallPrinter = [this](clang::ast_matchers::MatchFinder & finder,
+	                                  std::string const & classRegexpr,
+	                                  std::string const & op,
+	                                  std::string const & tag,
+	                                  auto && printer)
+	{
+		finder.addMatcher(cxxOperatorCallExpr(
+		                    hasArgument(0, hasType(cxxRecordDecl(isSameOrDerivedFrom(matchesName(classRegexpr))))),
+		                    hasOverloadedOperatorName(op)
+		                  ).bind(tag), this);
+		stmtPrinters.emplace(tag, printer);
+	};
+
 	// std::exception
 	rewriteType(finder, "std::exception", "Throwable");
 	rewriteType(finder, "std::logic_error", "Error");
@@ -353,11 +366,8 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 		});
 	}
 
-	finder.addMatcher(cxxOperatorCallExpr(
-	                    hasArgument(0, hasType(cxxRecordDecl(isSameOrDerivedFrom(matchesName("^::std::basic_string\\<.*\\>"))))),
-	                    hasOverloadedOperatorName("+=")
-	                  ).bind("std::string::operator +="), this);
-	stmtPrinters.emplace("std::string::operator +=", [this](DPrinter & pr, Stmt * s)
+	operatorCallPrinter(finder, "^::std::basic_string(<|$)", "+=", "std::string::operator +=",
+	                    [this](DPrinter & pr, Stmt * s)
 	{
 		if(auto* opCall = dyn_cast<CXXOperatorCallExpr>(s))
 		{
@@ -387,7 +397,8 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 			printer.printTemplateArgument(TSType->getArg(0));
 	});
 
-	globalFuncPrinter(finder, "^::(std|boost)::make_shared", "std::make_shared", [this](DPrinter & pr, Stmt * s)
+	globalFuncPrinter(finder, "^::(std|boost)::make_shared", "std::make_shared",
+	                  [this](DPrinter & pr, Stmt * s)
 	{
 		if(auto* call = dyn_cast<CallExpr>(s))
 		{
@@ -403,7 +414,8 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 		}
 	});
 
-	for(char const* className : { "std::shared_ptr", "boost::shared_ptr" })
+	for(char const * className
+	: { "std::__shared_ptr", "std::shared_ptr", "boost::shared_ptr", "std::unique_ptr"})
 	{
 		methodPrinter(className, "reset", [this](DPrinter & pr, Stmt * s)
 		{
@@ -422,11 +434,8 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 		});
 	}
 
-	finder.addMatcher(cxxOperatorCallExpr(
-	                    hasArgument(0, hasType(cxxRecordDecl(isSameOrDerivedFrom(matchesName("^::std::shared_ptr\\<.*\\>"))))),
-	                    hasOverloadedOperatorName("==")
-	                  ).bind("std::shared_ptr::operator=="), this);
-	stmtPrinters.emplace("std::shared_ptr::operator==", [this](DPrinter & pr, Stmt * s)
+	operatorCallPrinter(finder, "^::std::(__)?shared_ptr(<|$)", "==", "std::shared_ptr::operator==",
+	                    [this](DPrinter & pr, Stmt * s)
 	{
 		if(auto* opCall = dyn_cast<CXXOperatorCallExpr>(s))
 		{
@@ -448,11 +457,8 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 		}
 	});
 
-	finder.addMatcher(cxxOperatorCallExpr(
-	                    hasArgument(0, hasType(cxxRecordDecl(isSameOrDerivedFrom(matchesName("^::std::shared_ptr\\<.*\\>"))))),
-	                    hasOverloadedOperatorName("!=")
-	                  ).bind("std::shared_ptr::operator!="), this);
-	stmtPrinters.emplace("std::shared_ptr::operator!=", [this](DPrinter & pr, Stmt * s)
+	operatorCallPrinter(finder, "^::std::(__)?shared_ptr(<|$)", "!=", "std::shared_ptr::operator!=",
+	                    [this](DPrinter & pr, Stmt * s)
 	{
 		if(auto* opCall = dyn_cast<CXXOperatorCallExpr>(s))
 		{
@@ -491,7 +497,8 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 			printer.printTemplateArgument(TSType->getArg(0));
 	});
 
-	globalFuncPrinter(finder, "^::(std|boost)::make_unique", "std::make_unique", [this](DPrinter & pr, Stmt * s)
+	globalFuncPrinter(finder, "^::(std|boost)::make_unique", "std::make_unique",
+	                  [this](DPrinter & pr, Stmt * s)
 	{
 		if(auto* call = dyn_cast<CallExpr>(s))
 		{
@@ -507,24 +514,8 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 		}
 	});
 
-	methodPrinter("std::unique_ptr", "reset", [this](DPrinter & pr, Stmt * s)
-	{
-		if(auto* memCall = dyn_cast<CXXMemberCallExpr>(s))
-		{
-			if(auto* memExpr = dyn_cast<MemberExpr>(memCall->getCallee()))
-			{
-				pr.TraverseStmt(memExpr->isImplicitAccess() ? nullptr : memExpr->getBase());
-				pr.stream() << " = ";
-				pr.TraverseStmt(*memCall->arg_begin());
-			}
-		}
-	});
-
-	finder.addMatcher(cxxOperatorCallExpr(
-	                    hasArgument(0, hasType(cxxRecordDecl(isSameOrDerivedFrom(matchesName("^::std::unique_ptr\\<.*\\>"))))),
-	                    hasOverloadedOperatorName("==")
-	                  ).bind("std::unique_ptr::operator=="), this);
-	stmtPrinters.emplace("std::unique_ptr::operator==", [this](DPrinter & pr, Stmt * s)
+	operatorCallPrinter(finder, "^::std::unique_ptr(<|$)", "==", "std::unique_ptr::operator==",
+	                    [this](DPrinter & pr, Stmt * s)
 	{
 		if(auto* opCall = dyn_cast<CXXOperatorCallExpr>(s))
 		{
@@ -546,11 +537,8 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 		}
 	});
 
-	finder.addMatcher(cxxOperatorCallExpr(
-	                    hasArgument(0, hasType(cxxRecordDecl(isSameOrDerivedFrom(matchesName("^::std::unique_ptr\\<.*\\>"))))),
-	                    hasOverloadedOperatorName("!=")
-	                  ).bind("std::unique_ptr::operator!="), this);
-	stmtPrinters.emplace("std::unique_ptr::operator!=", [this](DPrinter & pr, Stmt * s)
+	operatorCallPrinter(finder, "^::std::unique_ptr(<|$)", "!=", "std::unique_ptr::operator!=",
+	                    [this](DPrinter & pr, Stmt * s)
 	{
 		if(auto* opCall = dyn_cast<CXXOperatorCallExpr>(s))
 		{
