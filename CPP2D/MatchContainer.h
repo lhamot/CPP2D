@@ -52,6 +52,56 @@ public:
 	DeclPrinter getPrinter(clang::Decl const*) const; //!< Get the custom printer for this decl
 	TypePrinter getPrinter(clang::Type const*) const; //!< Get the custom printer for this type
 
+	//! Change the name of a C++ type
+	void rewriteType(
+	  clang::ast_matchers::MatchFinder& finder,
+	  std::string const& oldName,  //!< Old type name in C++ (no regex)
+	  std::string const& newName   //!< New type name in D
+	);
+
+	//! Custom print a method call
+	void methodPrinter(
+	  std::string const& className,		//!< Class of this method (no regex)
+	  std::string const& methodName,	//!< Metod name (no regex)
+	  StmtPrinter const& printer		//!< Custom printer
+	);
+
+	//! Custom print a global function call
+	void globalFuncPrinter(
+	  clang::ast_matchers::MatchFinder& finder,
+	  std::string const& funcName,	//!< Function name (regex)
+	  StmtPrinter const& printer	//!< Custom printer
+	);
+
+	//! Custom print a template type
+	void tmplTypePrinter(
+	  clang::ast_matchers::MatchFinder& finder,
+	  std::string const& name,		//!< Type name (no regex)
+	  TypePrinter const& printer	//!< Custom printer
+	);
+
+	//! Custom print a member call
+	void memberPrinter(
+	  clang::ast_matchers::MatchFinder& finder,
+	  std::string const& regexpr,	//!< Fully qualified member name (regex)
+	  StmtPrinter const& printer	//!< Custom printer
+	);
+
+	//! Custom print an operator call
+	void operatorCallPrinter(
+	  clang::ast_matchers::MatchFinder& finder,
+	  std::string const& classRegexpr,	//!< class name (regex)
+	  std::string const& op,			//!< operator (like "==")
+	  StmtPrinter const& printer		//!< Custom printer
+	);
+
+	//! Port a C standard library function to D
+	void cFuncPrinter(
+	  clang::ast_matchers::MatchFinder& finder,
+	  std::string const& lib,	//!< include name
+	  std::string const& func	//!< function name (no regex)
+	);
+
 	//! clang::Stmt which match. [clang::Stmt] -> matchername
 	std::unordered_multimap<clang::Stmt const*, std::string> stmtTags;
 	//! clang::Stmt which match. [clang::Decl] -> matchername
