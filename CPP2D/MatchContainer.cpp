@@ -76,8 +76,7 @@ void MatchContainer::rewriteType(clang::ast_matchers::MatchFinder& finder,
 	using namespace clang::ast_matchers;
 	finder.addMatcher(recordType(hasDeclaration(namedDecl(hasName(oldName))))
 	                  .bind(oldName), this);
-	typePrinters.emplace(oldName,
-	[newName](DPrinter & pr, Type*) {pr.stream() << newName; });
+	typePrinters.emplace(oldName, [newName](DPrinter & pr, Type*) {pr.stream() << newName; });
 };
 
 void MatchContainer::methodPrinter(std::string const& className,
@@ -135,7 +134,7 @@ void MatchContainer::cFuncPrinter(
   std::string const& lib,
   std::string const& func)
 {
-	globalFuncPrinter(finder, "^(::std)?::" + func, [ = ](DPrinter & pr, Stmt * s)
+	globalFuncPrinter(finder, "^(::std)?::" + func, [lib, func](DPrinter & pr, Stmt * s)
 	{
 		if(auto* call = dyn_cast<CallExpr>(s))
 		{
@@ -152,10 +151,10 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 	MatchFinder finder;
 
 	// Some debug bind slot
-	onStmtMatch.emplace("dump", [this](Stmt const * d) {d->dump(); });
-	onTypeMatch.emplace("dump", [this](Type const * d) {d->dump(); });
-	onDeclMatch.emplace("dump", [this](Decl const * d) {d->dump(); });
-	onDeclMatch.emplace("print_name", [this](Decl const * d)
+	onStmtMatch.emplace("dump", [](Stmt const * d) {d->dump(); });
+	onTypeMatch.emplace("dump", [](Type const * d) {d->dump(); });
+	onDeclMatch.emplace("dump", [](Decl const * d) {d->dump(); });
+	onDeclMatch.emplace("print_name", [](Decl const * d)
 	{
 		if(auto* nd = dyn_cast<NamedDecl>(d))
 			llvm::errs() << nd->getNameAsString() << "\n";
@@ -178,7 +177,7 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 	    )
 	  );
 	finder.addMatcher(hash_trait, this);
-	declPrinters.emplace("dont_print_this_decl", [this](DPrinter&, Decl*) {});
+	declPrinters.emplace("dont_print_this_decl", [](DPrinter&, Decl*) {});
 	onDeclMatch.emplace("hash_method", [this](Decl const * d)
 	{
 		if(auto* methDecl = dyn_cast<CXXMethodDecl>(d))
@@ -200,7 +199,7 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 	    matchesName("operator[\\+-\\*\\^\\[\\(\\!\\&\\|\\~\\=\\/\\%\\<\\>]")
 	  ).bind("free_operator");
 	finder.addMatcher(out_stream_op, this);
-	declPrinters.emplace("free_operator", [this](DPrinter&, Decl*) {});
+	declPrinters.emplace("free_operator", [](DPrinter&, Decl*) {});
 	onDeclMatch.emplace("free_operator", [this](Decl const * d)
 	{
 		if(auto* funcDecl = dyn_cast<FunctionDecl>(d))
@@ -232,7 +231,7 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 	rewriteType(finder, "std::logic_error", "Error");
 	rewriteType(finder, "std::runtime_error", "Exception");
 
-	methodPrinter("std::exception", "what", [this](DPrinter & pr, Stmt * s)
+	methodPrinter("std::exception", "what", [](DPrinter & pr, Stmt * s)
 	{
 		if(auto* memCall = dyn_cast<CXXMemberCallExpr>(s))
 		{
@@ -251,7 +250,7 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 	  "^::(boost|std)::(vector|array|set|map|multiset|multimap|unordered_set|unordered_map|"
 	  "unordered_multiset|unordered_multimap|queue|stack|list|forcard_list)";
 
-	tmplTypePrinter(finder, "std::map", [this](DPrinter & printer, Type * Type)
+	tmplTypePrinter(finder, "std::map", [](DPrinter & printer, Type * Type)
 	{
 		auto* TSType = dyn_cast<TemplateSpecializationType>(Type);
 		printer.addExternInclude("cpp_std", "cpp_std.map");
@@ -270,7 +269,7 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 	                               hasObjectExpression(hasType(namedDecl(matchesName(containers))))
 	                             )))
 	                  ).bind("std::vector::size"), this);
-	stmtPrinters.emplace("std::vector::size", [this](DPrinter & pr, Stmt * s)
+	stmtPrinters.emplace("std::vector::size", [](DPrinter & pr, Stmt * s)
 	{
 		if(auto* memCall = dyn_cast<CallExpr>(s))
 		{
@@ -304,7 +303,7 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 	{
 		for(char const* meth : { "assign", "fill" })
 		{
-			methodPrinter(container, meth, [this](DPrinter & pr, Stmt * s)
+			methodPrinter(container, meth, [](DPrinter & pr, Stmt * s)
 			{
 				if(auto* memCall = dyn_cast<CXXMemberCallExpr>(s))
 				{
@@ -321,7 +320,7 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 
 	for(char const* container : containerTab)
 	{
-		methodPrinter(container, "swap", [this](DPrinter & pr, Stmt * s)
+		methodPrinter(container, "swap", [](DPrinter & pr, Stmt * s)
 		{
 			if(auto* memCall = dyn_cast<CXXMemberCallExpr>(s))
 			{
@@ -342,7 +341,7 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 	{
 		for(char const* meth : {"push_back", "emplace_back"})
 		{
-			methodPrinter(container, meth, [this](DPrinter & pr, Stmt * s)
+			methodPrinter(container, meth, [](DPrinter & pr, Stmt * s)
 			{
 				if(auto* memCall = dyn_cast<CXXMemberCallExpr>(s))
 				{
@@ -360,7 +359,7 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 
 	for(char const* container : containerTab)
 	{
-		methodPrinter(container, "push_front", [this](DPrinter & pr, Stmt * s)
+		methodPrinter(container, "push_front", [](DPrinter & pr, Stmt * s)
 		{
 			if(auto* memCall = dyn_cast<CXXMemberCallExpr>(s))
 			{
@@ -376,7 +375,7 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 	}
 
 	operatorCallPrinter(finder, "^::std::basic_string(<|$)", "+=",
-	                    [this](DPrinter & pr, Stmt * s)
+	                    [](DPrinter & pr, Stmt * s)
 	{
 		if(auto* opCall = dyn_cast<CXXOperatorCallExpr>(s))
 		{
@@ -390,7 +389,7 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 
 
 	// shared_ptr
-	tmplTypePrinter(finder, "std::shared_ptr", [this](DPrinter & printer, Type * Type)
+	tmplTypePrinter(finder, "std::shared_ptr", [](DPrinter & printer, Type * Type)
 	{
 		auto* TSType = dyn_cast<TemplateSpecializationType>(Type);
 		TemplateArgument const& arg = TSType->getArg(0);
@@ -406,7 +405,7 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 			printer.printTemplateArgument(TSType->getArg(0));
 	});
 
-	globalFuncPrinter(finder, "^::(std|boost)::make_shared", [this](DPrinter & pr, Stmt * s)
+	globalFuncPrinter(finder, "^::(std|boost)::make_shared", [](DPrinter & pr, Stmt * s)
 	{
 		if(auto* call = dyn_cast<CallExpr>(s))
 		{
@@ -425,7 +424,7 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 	for(char const * className
 	: { "std::__shared_ptr", "std::shared_ptr", "boost::shared_ptr", "std::unique_ptr"})
 	{
-		methodPrinter(className, "reset", [this](DPrinter & pr, Stmt * s)
+		methodPrinter(className, "reset", [](DPrinter & pr, Stmt * s)
 		{
 			if(auto* memCall = dyn_cast<CXXMemberCallExpr>(s))
 			{
@@ -443,7 +442,7 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 	}
 
 	operatorCallPrinter(finder, "^::std::(__)?shared_ptr(<|$)", "==",
-	                    [this](DPrinter & pr, Stmt * s)
+	                    [](DPrinter & pr, Stmt * s)
 	{
 		if(auto* opCall = dyn_cast<CXXOperatorCallExpr>(s))
 		{
@@ -466,7 +465,7 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 	});
 
 	operatorCallPrinter(finder, "^::std::(__)?shared_ptr(<|$)", "!=",
-	                    [this](DPrinter & pr, Stmt * s)
+	                    [](DPrinter & pr, Stmt * s)
 	{
 		if(auto* opCall = dyn_cast<CXXOperatorCallExpr>(s))
 		{
@@ -489,7 +488,7 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 	});
 
 	// unique_ptr
-	tmplTypePrinter(finder, "std::unique_ptr", [this](DPrinter & printer, Type * Type)
+	tmplTypePrinter(finder, "std::unique_ptr", [](DPrinter & printer, Type * Type)
 	{
 		auto* TSType = dyn_cast<TemplateSpecializationType>(Type);
 		TemplateArgument const& arg = TSType->getArg(0);
@@ -505,7 +504,7 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 			printer.printTemplateArgument(TSType->getArg(0));
 	});
 
-	globalFuncPrinter(finder, "^::(std|boost)::make_unique", [this](DPrinter & pr, Stmt * s)
+	globalFuncPrinter(finder, "^::(std|boost)::make_unique", [](DPrinter & pr, Stmt * s)
 	{
 		if(auto* call = dyn_cast<CallExpr>(s))
 		{
@@ -521,7 +520,7 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 		}
 	});
 
-	operatorCallPrinter(finder, "^::std::unique_ptr(<|$)", "==", [this](DPrinter & pr, Stmt * s)
+	operatorCallPrinter(finder, "^::std::unique_ptr(<|$)", "==", [](DPrinter & pr, Stmt * s)
 	{
 		if(auto* opCall = dyn_cast<CXXOperatorCallExpr>(s))
 		{
@@ -543,7 +542,7 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 		}
 	});
 
-	operatorCallPrinter(finder, "^::std::unique_ptr(<|$)", "!=", [this](DPrinter & pr, Stmt * s)
+	operatorCallPrinter(finder, "^::std::unique_ptr(<|$)", "!=", [](DPrinter & pr, Stmt * s)
 	{
 		if(auto* opCall = dyn_cast<CXXOperatorCallExpr>(s))
 		{
@@ -565,7 +564,7 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 		}
 	});
 
-	globalFuncPrinter(finder, "^::std::move", [this](DPrinter & pr, Stmt * s)
+	globalFuncPrinter(finder, "^::std::move", [](DPrinter & pr, Stmt * s)
 	{
 		if(auto* memCall = dyn_cast<CallExpr>(s))
 		{
@@ -576,14 +575,14 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 		}
 	});
 
-	globalFuncPrinter(finder, "^::std::forward", [this](DPrinter & pr, Stmt * s)
+	globalFuncPrinter(finder, "^::std::forward", [](DPrinter & pr, Stmt * s)
 	{
 		if(auto* memCall = dyn_cast<CallExpr>(s))
 			pr.TraverseStmt(memCall->getArg(0));
 	});
 
 	//********************************* std::function *********************************************
-	auto function_print = [this](DPrinter & printer, Type * Type)
+	auto function_print = [](DPrinter & printer, Type * Type)
 	{
 		auto* TSType = dyn_cast<TemplateSpecializationType>(Type);
 		printer.printTemplateArgument(TSType->getArg(0));
@@ -594,14 +593,14 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 	//********************** std::stream **********************************************************
 	finder.addMatcher(
 	  declRefExpr(hasDeclaration(namedDecl(matchesName("cout")))).bind("std::cout"), this);
-	stmtPrinters.emplace("std::cout", [this](DPrinter & pr, Stmt*)
+	stmtPrinters.emplace("std::cout", [](DPrinter & pr, Stmt*)
 	{
 		pr.stream() << "std.stdio.stdout";
 		pr.addExternInclude("std.stdio", "std.stdio.stdout");
 	});
 
 	// std::option
-	auto optional_to_bool = [this](DPrinter & pr, Stmt * s)
+	auto optional_to_bool = [](DPrinter & pr, Stmt * s)
 	{
 		if(auto* memCall = dyn_cast<CXXMemberCallExpr>(s))
 		{
@@ -618,7 +617,7 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 
 	// *********************************** <utils> **************************
 	// pair
-	tmplTypePrinter(finder, "std::pair", [this](DPrinter & printer, Type * Type)
+	tmplTypePrinter(finder, "std::pair", [](DPrinter & printer, Type * Type)
 	{
 		auto* TSType = dyn_cast<TemplateSpecializationType>(Type);
 		printer.addExternInclude("std.typecons", "Tuple");
@@ -629,7 +628,7 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 		printer.stream() << ", \"value\")";
 	});
 
-	memberPrinter(finder, "^::std::pair\\<.*\\>::second", [this](DPrinter & pr, Stmt * s)
+	memberPrinter(finder, "^::std::pair\\<.*\\>::second", [](DPrinter & pr, Stmt * s)
 	{
 		if(auto* memExpr = dyn_cast<MemberExpr>(s))
 		{
@@ -639,7 +638,7 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 		}
 	});
 
-	memberPrinter(finder, "^::std::pair\\<.*\\>::first", [this](DPrinter & pr, Stmt * s)
+	memberPrinter(finder, "^::std::pair\\<.*\\>::first", [](DPrinter & pr, Stmt * s)
 	{
 		if(auto* memExpr = dyn_cast<MemberExpr>(s))
 		{
@@ -649,7 +648,7 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 		}
 	});
 
-	globalFuncPrinter(finder, "^::std::swap$", [this](DPrinter & pr, Stmt * s)
+	globalFuncPrinter(finder, "^::std::swap$", [](DPrinter & pr, Stmt * s)
 	{
 		if(auto* memCall = dyn_cast<CallExpr>(s))
 		{
@@ -662,7 +661,7 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 		}
 	});
 
-	globalFuncPrinter(finder, "^::std::max$", [this](DPrinter & pr, Stmt * s)
+	globalFuncPrinter(finder, "^::std::max$", [](DPrinter & pr, Stmt * s)
 	{
 		if(auto* call = dyn_cast<CallExpr>(s))
 		{
@@ -676,14 +675,14 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 	// <stdio>
 	finder.addMatcher(
 	  declRefExpr(hasDeclaration(functionDecl(hasName("::printf")))).bind("printf"), this);
-	stmtPrinters.emplace("printf", [this](DPrinter & printer, Stmt*)
+	stmtPrinters.emplace("printf", [](DPrinter & printer, Stmt*)
 	{
 		printer.addExternInclude("std.stdio", "writef");
 		printer.stream() << "writef";
 	});
 
 	// <string>
-	globalFuncPrinter(finder, "^(::std)?::strlen", [this](DPrinter & pr, Stmt * s)
+	globalFuncPrinter(finder, "^(::std)?::strlen", [](DPrinter & pr, Stmt * s)
 	{
 		if(auto* call = dyn_cast<CallExpr>(s))
 		{
@@ -719,12 +718,12 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 	cFuncPrinter(finder, "time", "time");
 
 	//<assert>
-	globalFuncPrinter(finder, "^(::std)?::_wassert", [this](DPrinter&, Stmt*) {});
+	globalFuncPrinter(finder, "^(::std)?::_wassert", [](DPrinter&, Stmt*) {});
 
 	//**************************** boost **********************************************************
 
 	//BOOST_THROW_EXCEPTION
-	globalFuncPrinter(finder, "throw_exception_", [this](DPrinter & pr, Stmt * s)
+	globalFuncPrinter(finder, "throw_exception_", [](DPrinter & pr, Stmt * s)
 	{
 		if(auto* memCall = dyn_cast<CallExpr>(s))
 		{
@@ -742,7 +741,7 @@ clang::ast_matchers::MatchFinder MatchContainer::getMatcher()
 	    hasLoopInit(declStmt(hasSingleDecl(varDecl(hasType(namedDecl(matchesName("record"))))))))
 	  .bind("boost::log"),
 	  this);
-	stmtPrinters.emplace("boost::log", [this](DPrinter & pr, Stmt * s)
+	stmtPrinters.emplace("boost::log", [](DPrinter & pr, Stmt * s)
 	{
 		if(auto* forSt = dyn_cast<ForStmt>(s))
 		{
