@@ -52,6 +52,11 @@ public:
 	DeclPrinter getPrinter(clang::Decl const*) const; //!< Get the custom printer for this decl
 	TypePrinter getPrinter(clang::Type const*) const; //!< Get the custom printer for this type
 
+	//! Get the nth template argument of type tmplType
+	static clang::TemplateArgument const* getTemplateTypeArgument(
+	  clang::Expr const* tmplType,
+	  size_t nth);
+
 	//! Change the name of a C++ type
 	void rewriteType(
 	  clang::ast_matchers::MatchFinder& finder,
@@ -113,10 +118,6 @@ public:
 	//! How to print a call to this method. methodPrinters[method_name][class_name] => printer
 	std::unordered_map<std::string, ClassPrinter> methodPrinters;
 
-private:
-	//! When match is find, excecute on*Match or add the node to *Tags
-	void run(clang::ast_matchers::MatchFinder::MatchResult const& Result) override;
-
 	//! Custom printer for clang::Type matchers. [matchername] -> printer
 	std::unordered_map<std::string, TypePrinter> typePrinters;
 	//! Custom printer for clang::Stmt matchers. [matchername] -> printer
@@ -130,4 +131,8 @@ private:
 	std::unordered_map<std::string, std::function<void(clang::Decl const*)>> onDeclMatch;
 	//! Function excecuted when a clang::Type match. [matchername] -> function
 	std::unordered_map<std::string, std::function<void(clang::Type const*)>> onTypeMatch;
+
+private:
+	//! When match is find, excecute on*Match or add the node to *Tags
+	void run(clang::ast_matchers::MatchFinder::MatchResult const& Result) override;
 };

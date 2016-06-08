@@ -1,7 +1,14 @@
+//
+// Copyright (c) 2016 Loïc HAMOT
+//
+// Distributed under the Boost Software License, Version 1.0. (See accompanying
+// file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
+//
 #include <unordered_map>
 #include <array>
 #include "framework.h"
-
+#include <cmath>
+#include "math.h"
 
 struct ContainHashMap
 {
@@ -32,6 +39,11 @@ struct ContainHashMap3
 	}
 };
 
+void check_cmath()
+{
+	CHECK(std::sqrt(4.) == 2.);
+	CHECK(pow(2, 2) == 4);
+}
 
 void check_std_unordered_map()
 {
@@ -182,6 +194,8 @@ void check_stdarray()
 void stdlib_register(TestFrameWork& tf)
 {
 	auto ts = std::make_unique<TestSuite>();
+
+	ts->addTestCase(check_cmath);
 
 	ts->addTestCase(check_std_unordered_map);
 

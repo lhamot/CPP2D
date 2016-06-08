@@ -13,6 +13,9 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Fichiers sources\CustomPrinters">
+      <UniqueIdentifier>{c9043405-1f6f-43e7-9a06-6f2f16c20117}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <Text Include="ReadMe.txt" />
@@ -39,6 +42,18 @@
     <ClCompile Include="CPP2DTools.cpp">
       <Filter>Fichiers sources</Filter>
     </ClCompile>
+    <ClCompile Include="CustomPrinters.cpp">
+      <Filter>Fichiers sources</Filter>
+    </ClCompile>
+    <ClCompile Include="CustomPrinters\c_stdlib_port.cpp">
+      <Filter>Fichiers sources\CustomPrinters</Filter>
+    </ClCompile>
+    <ClCompile Include="CustomPrinters\cpp_stdlib_port.cpp">
+      <Filter>Fichiers sources\CustomPrinters</Filter>
+    </ClCompile>
+    <ClCompile Include="CustomPrinters\boost_port.cpp">
+      <Filter>Fichiers sources\CustomPrinters</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="MatchContainer.h">
@@ -57,6 +72,9 @@
       <Filter>Fichiers d%27en-tête</Filter>
     </ClInclude>
     <ClInclude Include="CPP2DTools.h">
+      <Filter>Fichiers d%27en-tête</Filter>
+    </ClInclude>
+    <ClInclude Include="CustomPrinters.h">
       <Filter>Fichiers d%27en-tête</Filter>
     </ClInclude>
   </ItemGroup>

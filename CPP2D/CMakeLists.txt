@@ -20,6 +20,10 @@ add_executable(
     CPP2DTools.cpp
     DPrinter.cpp
     MatchContainer.cpp
+    CustomPrinters.cpp
+    CustomPrinters/boost_port.cpp
+    CustomPrinters/c_stdlib_port.cpp
+    CustomPrinters/cpp_stdlib_port.cpp
 )
 
 target_link_libraries(cpp2d
