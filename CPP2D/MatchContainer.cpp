@@ -10,6 +10,7 @@
 #include <iostream>
 #include <ciso646>
 #include "CustomPrinters.h"
+#include "Spliter.h"
 
 namespace clang
 {
@@ -139,7 +140,21 @@ void MatchContainer::cFuncPrinter(
 		if(auto* call = dyn_cast<CallExpr>(s))
 		{
 			pr.stream() << "core.stdc." << lib << "." << func;
-			pr.printCallExprArgument(call);
+			//pr.printCallExprArgument(call);
+			pr.stream() << "(";
+			Spliter spliter(pr, ", ");
+			for(Expr* arg : call->arguments())
+			{
+				if(arg->getStmtClass() == Stmt::StmtClass::CXXDefaultArgExprClass)
+					break;
+				spliter.split();
+				pr.TraverseStmt(arg);
+				std::string const argType = arg->getType().getAsString();
+				if(argType == "const char *" || argType == "char *")  // Get pointer of D strings
+					pr.stream() << ".ptr";
+			}
+			pr.stream() << ")";
+
 			pr.addExternInclude("core.stdc." + lib, "core.stdc." + lib + "." + func);
 		}
 	});

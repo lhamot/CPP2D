@@ -19,15 +19,20 @@ using namespace clang::ast_matchers;
 
 void c_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 {
-	//************************** C libraries ******************************************************
 	// <stdio>
-	finder.addMatcher(
-	  declRefExpr(hasDeclaration(functionDecl(hasName("::printf")))).bind("printf"), &mc);
-	mc.stmtPrinters.emplace("printf", [](DPrinter & printer, Stmt*)
+	char const* stdioFuncs[] =
 	{
-		printer.addExternInclude("std.stdio", "writef");
-		printer.stream() << "writef";
-	});
+		"remove", "rename", "tmpfile", "tmpnam",
+		"fclose", "fflush", "fopen", "freopen", "setbuf", "setvbuf",
+		"fprintf", "fscanf", "printf", "scanf", "snprintf", "sprintf",
+		"sscanf", "vfprintf", "vfscanf", "vprintf", "vscanf", "vsnprintf", "vsprintf", "vsscanf",
+		"fgetc", "fgets", "fputc", "fputs", "getc", "getchar", "gets", "putc", "putchar", "puts", "ungetc",
+		"fread", "fwrite",
+		"fgetpos", "fseek", "fsetpos", "ftell", "rewind",
+		"clearerr", "feof", "ferror", "perror",
+	};
+	for(char const* func : stdioFuncs)
+		mc.cFuncPrinter(finder, "stdio", func);
 
 	// <string>
 	mc.globalFuncPrinter(finder, "^(::std)?::strlen", [](DPrinter & pr, Stmt * s)
