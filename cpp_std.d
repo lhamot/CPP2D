@@ -1,5 +1,6 @@
 import std.container.rbtree;
 import std.container.array;
+import std.typecons;
 
 //******************************  map *****************************************
 struct pair(K, V)
@@ -82,4 +83,11 @@ auto move(T)(auto ref T ptr) if(is(T == class))
 	auto newPtr = ptr;
 	ptr = null;
 	return newPtr;
+}
+
+// ******************************** <utility> *********************************
+
+auto make_pair(A, B)(auto ref A a, auto ref B b)
+{
+	return Tuple!(A, "key", B, "value")(a, b);
 }

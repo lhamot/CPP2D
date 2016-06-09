@@ -191,6 +191,22 @@ void check_stdarray()
 	CHECK(b[1] == 1);
 }
 
+void check_stdpair()
+{
+	std::pair<int, float> p1;
+	p1.first = 3;
+	p1.second = 3.141f;
+	CHECK(p1.first == 3);
+	CHECK(p1.second == 3.141f);
+	auto p2 = std::pair<int, float>(4, 4.44444f);
+	CHECK(p2.first == 4);
+	auto p3 = std::make_pair(6, 6.66666f);
+	CHECK(p3.first == 6);
+
+	std::get<0>(p1) = 7;
+	CHECK(std::get<0>(p1) == 7);
+}
+
 void stdlib_register(TestFrameWork& tf)
 {
 	auto ts = std::make_unique<TestSuite>();
@@ -204,6 +220,8 @@ void stdlib_register(TestFrameWork& tf)
 	ts->addTestCase(check_unique_ptr);
 
 	ts->addTestCase(check_stdarray);
+
+	ts->addTestCase(check_stdpair);
 
 	tf.addTestSuite(std::move(ts));
 }

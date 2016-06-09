@@ -495,6 +495,32 @@ void cpp_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 		}
 	});
 
+	mc.globalFuncPrinter(finder, "^::std::make_pair", [](DPrinter & pr, Stmt * s)
+	{
+		if(auto* memCall = dyn_cast<CallExpr>(s))
+		{
+			pr.stream() << "cpp_std.make_pair(";
+			pr.TraverseStmt(memCall->getArg(0));
+			pr.stream() << ", ";
+			pr.TraverseStmt(memCall->getArg(1));
+			pr.stream() << ")";
+			pr.addExternInclude("cpp_std", "cpp_std.make_pair");
+		}
+	});
+
+	mc.globalFuncPrinter(finder, "^::std::get", [](DPrinter & pr, Stmt * s)
+	{
+		if(auto* memCall = dyn_cast<CallExpr>(s))
+		{
+			pr.TraverseStmt(memCall->getArg(0));
+			pr.stream() << "[";
+			TemplateArgument const* index =
+			  MatchContainer::getTemplateTypeArgument(memCall->getCallee(), 0);
+			pr.printTemplateArgument(*index);
+			pr.stream() << "]";
+		}
+	});
+
 	// ************************************ <algorithm> *******************************************
 	mc.globalFuncPrinter(finder, "^::std::max$", [](DPrinter & pr, Stmt * s)
 	{
