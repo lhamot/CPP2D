@@ -192,6 +192,7 @@
     <ClInclude Include="CustomPrinters.h" />
     <ClInclude Include="MatchContainer.h" />
     <ClInclude Include="DPrinter.h" />
+    <ClInclude Include="Spliter.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -27,6 +27,7 @@
 
 #include "MatchContainer.h"
 #include "CPP2DTools.h"
+#include "Spliter.h"
 
 using namespace llvm;
 using namespace clang;
@@ -135,22 +136,6 @@ bool needSemiComma(Decl* decl)
 	else
 		return noSemiCommaDeclKind.count(kind) == 0;
 }
-
-struct Spliter
-{
-	std::string const str;
-	bool first = true;
-
-	Spliter(std::string const& s) : str(s) {}
-
-	void split()
-	{
-		if(first)
-			first = false;
-		else
-			out() << str;
-	}
-};
 
 std::string mangleName(std::string const& name)
 {
@@ -330,7 +315,7 @@ void DPrinter::printStmtComment(SourceLocation& locStart,
 	                      ).str();
 	std::vector<std::string> comments = split_lines(comment);
 	//if (comments.back() == std::string())
-	Spliter split(indentStr());
+	Spliter split(*this, indentStr());
 	if(comments.empty())
 		out() << std::endl;
 	if(not comments.empty())
@@ -369,7 +354,7 @@ void DPrinter::printStmtComment(SourceLocation& locStart,
 
 void DPrinter::printMacroArgs(CallExpr* macro_args)
 {
-	Spliter split(", ");
+	Spliter split(*this, ", ");
 	for(Expr* arg : macro_args->arguments())
 	{
 		split.split();
@@ -673,7 +658,7 @@ bool DPrinter::TraverseTemplateSpecializationType(TemplateSpecializationType* Ty
 	}
 	out() << mangleType(Type->getTemplateName().getAsTemplateDecl());
 	auto const argNum = Type->getNumArgs();
-	Spliter spliter(", ");
+	Spliter spliter(*this, ", ");
 	pushStream();
 	for(unsigned int i = 0; i < argNum; ++i)
 	{
@@ -835,7 +820,7 @@ bool DPrinter::TraverseAccessSpecDecl(AccessSpecDecl* Decl)
 
 void DPrinter::printBasesClass(CXXRecordDecl* decl)
 {
-	Spliter splitBase(", ");
+	Spliter splitBase(*this, ", ");
 	if(decl->getNumBases() + decl->getNumVBases() != 0)
 	{
 		pushStream();
@@ -1061,7 +1046,7 @@ void DPrinter::printTemplateParameterList(TemplateParameterList* tmpParams,
     std::string const& prevTmplParmsStr)
 {
 	out() << "(";
-	Spliter spliter1(", ");
+	Spliter spliter1(*this, ", ");
 	if(prevTmplParmsStr.empty() == false)
 	{
 		spliter1.split();
@@ -1161,7 +1146,7 @@ void DPrinter::printTemplateSpec_TmpArgsAndParms(
 {
 	assert(tmpArgs.size() == primaryTmpParams.size());
 	out() << '(';
-	Spliter spliter2(", ");
+	Spliter spliter2(*this, ", ");
 	if(prevTmplParmsStr.empty() == false)
 	{
 		spliter2.split();
@@ -1285,7 +1270,7 @@ bool DPrinter::TraverseCXXUnresolvedConstructExpr(CXXUnresolvedConstructExpr*  E
 {
 	if(passStmt(Expr)) return true;
 	printType(Expr->getTypeAsWritten());
-	Spliter spliter(", ");
+	Spliter spliter(*this, ", ");
 	out() << "(";
 	for(decltype(Expr->arg_size()) i = 0; i < Expr->arg_size(); ++i)
 	{
@@ -1447,7 +1432,7 @@ void DPrinter::printCXXConstructExprParams(CXXConstructExpr* Init)
 	}
 	printType(Init->getType());
 	out() << '(';
-	Spliter spliter(", ");
+	Spliter spliter(*this, ", ");
 	size_t counter = 0;
 	Semantic const sem = getSemantic(Init->getType());
 	for(auto arg : Init->arguments())
@@ -1468,7 +1453,7 @@ bool DPrinter::TraverseCXXConstructExpr(CXXConstructExpr* Init)
 	if(Init->isListInitialization() && !Init->isStdInitListInitialization())
 		out() << '{';
 
-	Spliter spliter(", ");
+	Spliter spliter(*this, ", ");
 	size_t count = 0;
 	for(unsigned i = 0, e = Init->getNumArgs(); i != e; ++i)
 	{
@@ -2520,7 +2505,7 @@ bool DPrinter::TraverseDeclStmt(DeclStmt* Stmt)
 		}
 		else
 		{
-			Spliter split(", ");
+			Spliter split(*this, ", ");
 			for(auto d : Stmt->decls())
 			{
 				doPrintType = split.first;
@@ -2573,7 +2558,7 @@ bool DPrinter::TraverseCXXOperatorCallExpr(CXXOperatorCallExpr* Stmt)
 	{
 		auto iter = Stmt->arg_begin(), end = Stmt->arg_end();
 		TraverseStmt(*iter);
-		Spliter spliter(", ");
+		Spliter spliter(*this, ", ");
 		out() << opStr[0];
 		for(++iter; iter != end; ++iter)
 		{
@@ -2808,7 +2793,7 @@ bool DPrinter::TraverseFunctionProtoType(FunctionProtoType* Type)
 	if(passType(Type)) return false;
 	printType(Type->getReturnType());
 	out() << " function(";
-	Spliter spliter(", ");
+	Spliter spliter(*this, ", ");
 	for(auto const& p : Type->getParamTypes())
 	{
 		spliter.split();
@@ -2981,7 +2966,7 @@ bool DPrinter::TraverseLambdaExpr(LambdaExpr* Node)
 		out() << "(";
 		inFuncParams = true;
 		refAccepted = true;
-		Spliter split(", ");
+		Spliter split(*this, ", ");
 		for(ParmVarDecl* P : Method->params())
 		{
 			split.split();
@@ -3010,7 +2995,7 @@ bool DPrinter::TraverseLambdaExpr(LambdaExpr* Node)
 void DPrinter::printCallExprArgument(CallExpr* Stmt)
 {
 	out() << "(";
-	Spliter spliter(", ");
+	Spliter spliter(*this, ", ");
 	for(Expr* arg : Stmt->arguments())
 	{
 		if(arg->getStmtClass() == Stmt::StmtClass::CXXDefaultArgExprClass)
@@ -3145,7 +3130,7 @@ bool DPrinter::traverseMemberExprImpl(ME* Stmt)
 	}
 	auto TAL = Stmt->getTemplateArgs();
 	auto const tmpArgCount = Stmt->getNumTemplateArgs();
-	Spliter spliter(", ");
+	Spliter spliter(*this, ", ");
 	if(tmpArgCount != 0)
 	{
 		pushStream();
@@ -3415,7 +3400,7 @@ void DPrinter::traverseDeclRefExprImpl(TDeclRefExpr* Expr)
 	if(argNum != 0)
 	{
 		TemplateArgumentLoc const* tmpArgs = Expr->getTemplateArgs();
-		Spliter split(", ");
+		Spliter split(*this, ", ");
 		pushStream();
 		for(size_t i = 0; i < argNum; ++i)
 		{
@@ -3489,7 +3474,7 @@ bool DPrinter::TraverseRecordType(RecordType* Type)
 		auto* tmpSpec = llvm::dyn_cast<ClassTemplateSpecializationDecl>(decl);
 		TemplateArgumentList const& tmpArgsSpec = tmpSpec->getTemplateInstantiationArgs();
 		pushStream();
-		Spliter spliter2(", ");
+		Spliter spliter2(*this, ", ");
 		for(unsigned int i = 0, size = tmpArgsSpec.size(); i != size; ++i)
 		{
 			spliter2.split();
@@ -3623,7 +3608,7 @@ bool DPrinter::TraverseImplicitValueInitExpr(ImplicitValueInitExpr* expr)
 bool DPrinter::TraverseParenListExpr(clang::ParenListExpr* expr)
 {
 	if(passStmt(expr)) return true;
-	Spliter split(", ");
+	Spliter split(*this, ", ");
 	for(Expr* arg : expr->exprs())
 	{
 		split.split();
