@@ -23,9 +23,11 @@ using namespace clang::ast_matchers;
 void cpp_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 {
 	// ********************************* <exception> **********************************************
-	mc.rewriteType(finder, "std::exception", "Throwable");
-	mc.rewriteType(finder, "std::logic_error", "Error");
-	mc.rewriteType(finder, "std::runtime_error", "Exception");
+	mc.rewriteType(finder, "std::exception", "Throwable", "");
+	mc.rewriteType(finder, "std::logic_error", "Error", "");
+	mc.rewriteType(finder, "std::runtime_error", "Exception", "");
+	mc.rewriteType(finder, "std::out_of_range", "core.exception.RangeError", "core.exception");
+	mc.rewriteType(finder, "std::bad_alloc", "core.exception.OutOfMemoryError", "core.exception");
 
 	mc.methodPrinter("std::exception", "what", [](DPrinter & pr, Stmt * s)
 	{
@@ -201,7 +203,7 @@ void cpp_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 			printer.printTemplateArgument(TSType->getArg(0));
 	});
 
-	mc.globalFuncPrinter(finder, "^::(std|boost)::make_shared", [](DPrinter & pr, Stmt * s)
+	mc.globalFuncPrinter(finder, "^::(std|boost)::make_shared(<|$)", [](DPrinter & pr, Stmt * s)
 	{
 		if(auto* call = dyn_cast<CallExpr>(s))
 		{
@@ -300,7 +302,7 @@ void cpp_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 			printer.printTemplateArgument(TSType->getArg(0));
 	});
 
-	mc.globalFuncPrinter(finder, "^::(std|boost)::make_unique", [](DPrinter & pr, Stmt * s)
+	mc.globalFuncPrinter(finder, "^::(std|boost)::make_unique(<|$)", [](DPrinter & pr, Stmt * s)
 	{
 		if(auto* call = dyn_cast<CallExpr>(s))
 		{
@@ -432,7 +434,7 @@ void cpp_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 
 	// ************************************** <utility> *******************************************
 
-	mc.globalFuncPrinter(finder, "^::std::move", [](DPrinter & pr, Stmt * s)
+	mc.globalFuncPrinter(finder, "^::std::move(<|$)", [](DPrinter & pr, Stmt * s)
 	{
 		if(auto* memCall = dyn_cast<CallExpr>(s))
 		{
@@ -443,7 +445,7 @@ void cpp_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 		}
 	});
 
-	mc.globalFuncPrinter(finder, "^::std::forward", [](DPrinter & pr, Stmt * s)
+	mc.globalFuncPrinter(finder, "^::std::forward(<|$)", [](DPrinter & pr, Stmt * s)
 	{
 		if(auto* memCall = dyn_cast<CallExpr>(s))
 			pr.TraverseStmt(memCall->getArg(0));
@@ -482,7 +484,7 @@ void cpp_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 		}
 	});
 
-	mc.globalFuncPrinter(finder, "^::std::swap$", [](DPrinter & pr, Stmt * s)
+	mc.globalFuncPrinter(finder, "^::std::swap(<|$)", [](DPrinter & pr, Stmt * s)
 	{
 		if(auto* memCall = dyn_cast<CallExpr>(s))
 		{
@@ -495,7 +497,7 @@ void cpp_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 		}
 	});
 
-	mc.globalFuncPrinter(finder, "^::std::make_pair", [](DPrinter & pr, Stmt * s)
+	mc.globalFuncPrinter(finder, "^::std::make_pair(<|$)", [](DPrinter & pr, Stmt * s)
 	{
 		if(auto* memCall = dyn_cast<CallExpr>(s))
 		{
@@ -508,7 +510,7 @@ void cpp_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 		}
 	});
 
-	mc.globalFuncPrinter(finder, "^::std::get", [](DPrinter & pr, Stmt * s)
+	mc.globalFuncPrinter(finder, "^::std::get(<|$)", [](DPrinter & pr, Stmt * s)
 	{
 		if(auto* memCall = dyn_cast<CallExpr>(s))
 		{
@@ -516,13 +518,16 @@ void cpp_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 			pr.stream() << "[";
 			TemplateArgument const* index =
 			  MatchContainer::getTemplateTypeArgument(memCall->getCallee(), 0);
-			pr.printTemplateArgument(*index);
+			if(index)
+				pr.printTemplateArgument(*index);
+			else
+				pr.stream() << "<tmpl arg is null!>";
 			pr.stream() << "]";
 		}
 	});
 
 	// ************************************ <algorithm> *******************************************
-	mc.globalFuncPrinter(finder, "^::std::max$", [](DPrinter & pr, Stmt * s)
+	mc.globalFuncPrinter(finder, "^::std::max(<|$)", [](DPrinter & pr, Stmt * s)
 	{
 		if(auto* call = dyn_cast<CallExpr>(s))
 		{

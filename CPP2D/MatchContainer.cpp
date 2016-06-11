@@ -53,7 +53,7 @@ TemplateArgument const* MatchContainer::getTemplateTypeArgument(Expr const* e, s
 				{
 					if(auto* TSType = dyn_cast<TemplateSpecializationType>(elType->getNamedType()))
 					{
-						assert(TSType->getNumTemplateArgs() > tmplArgIndex);
+						assert(TSType->getNumArgs() > tmplArgIndex);
 						return &TSType->getArg((unsigned int)tmplArgIndex);
 					}
 					else
@@ -72,12 +72,18 @@ TemplateArgument const* MatchContainer::getTemplateTypeArgument(Expr const* e, s
 
 void MatchContainer::rewriteType(clang::ast_matchers::MatchFinder& finder,
                                  std::string const& oldName,
-                                 std::string const& newName)
+                                 std::string const& newName,
+                                 std::string const& newImport)
 {
 	using namespace clang::ast_matchers;
 	finder.addMatcher(recordType(hasDeclaration(namedDecl(hasName(oldName))))
 	                  .bind(oldName), this);
-	typePrinters.emplace(oldName, [newName](DPrinter & pr, Type*) {pr.stream() << newName; });
+	typePrinters.emplace(oldName, [newName, newImport](DPrinter & pr, Type*)
+	{
+		pr.stream() << newName;
+		if(not newImport.empty())
+			pr.addExternInclude(newImport, newName);
+	});
 };
 
 void MatchContainer::methodPrinter(std::string const& className,
@@ -135,7 +141,7 @@ void MatchContainer::cFuncPrinter(
   std::string const& lib,
   std::string const& func)
 {
-	globalFuncPrinter(finder, "^(::std)?::" + func, [lib, func](DPrinter & pr, Stmt * s)
+	globalFuncPrinter(finder, "^(::std)?::" + func + "(<|$)", [lib, func](DPrinter & pr, Stmt * s)
 	{
 		if(auto* call = dyn_cast<CallExpr>(s))
 		{

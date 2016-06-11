@@ -60,8 +60,9 @@ public:
 	//! Change the name of a C++ type
 	void rewriteType(
 	  clang::ast_matchers::MatchFinder& finder,
-	  std::string const& oldName,  //!< Old type name in C++ (no regex)
-	  std::string const& newName   //!< New type name in D
+	  std::string const& oldName,	//!< Old type name in C++ (no regex)
+	  std::string const& newName,	//!< New type name in D
+	  std::string const& newImport	//!< import to get this type in **D**
 	);
 
 	//! Custom print a method call

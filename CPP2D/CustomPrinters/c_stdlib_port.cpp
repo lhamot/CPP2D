@@ -35,7 +35,7 @@ void c_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 		mc.cFuncPrinter(finder, "stdio", func);
 
 	// <string>
-	mc.globalFuncPrinter(finder, "^(::std)?::strlen", [](DPrinter & pr, Stmt * s)
+	mc.globalFuncPrinter(finder, "^(::std)?::strlen(<|$)", [](DPrinter & pr, Stmt * s)
 	{
 		if(auto* call = dyn_cast<CallExpr>(s))
 		{
@@ -69,9 +69,11 @@ void c_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 
 	// <ctime>
 	mc.cFuncPrinter(finder, "time", "time");
+	mc.cFuncPrinter(finder, "clock", "clock");
+	mc.rewriteType(finder, "clock_t", "core.stdc.time.clock_t", "core.stdc.time");
 
 	//<assert>
-	mc.globalFuncPrinter(finder, "^(::std)?::_wassert", [](DPrinter&, Stmt*) {});
+	mc.globalFuncPrinter(finder, "^(::std)?::_wassert$", [](DPrinter&, Stmt*) {});
 }
 
 REG_CUSTOM_PRINTER(c_stdlib_port);

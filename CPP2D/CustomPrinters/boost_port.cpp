@@ -25,7 +25,7 @@ void boost_port(MatchContainer& mc, MatchFinder& finder)
 	//**************************** boost **********************************************************
 
 	//BOOST_THROW_EXCEPTION
-	mc.globalFuncPrinter(finder, "throw_exception_", [](DPrinter & pr, Stmt * s)
+	mc.globalFuncPrinter(finder, "throw_exception_(<|$)", [](DPrinter & pr, Stmt * s)
 	{
 		if(auto* memCall = dyn_cast<CallExpr>(s))
 		{
@@ -35,7 +35,7 @@ void boost_port(MatchContainer& mc, MatchFinder& finder)
 	});
 
 	//boost::serialisation
-	mc.rewriteType(finder, "boost::serialization::access", "int");
+	mc.rewriteType(finder, "boost::serialization::access", "int", "");
 
 	finder.addMatcher(
 	  forStmt(
