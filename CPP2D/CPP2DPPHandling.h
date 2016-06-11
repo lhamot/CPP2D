@@ -82,5 +82,4 @@ private:
 
 	std::string predefines;
 	std::set<std::string> new_macros;
-	std::set<std::string> new_macros_name;
 };

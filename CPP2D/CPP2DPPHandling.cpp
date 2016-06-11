@@ -110,7 +110,7 @@ auto print_macro_args(MacroInfo const* MI,
 
 //! Print arguments of the macro MI into a std::stringstream,
 //!  in a way they are compilable in C++, and convertible to D
-auto print_macro_args_expand(MacroInfo const* MI,
+void print_macro_args_expand(MacroInfo const* MI,
                              std::stringstream& new_macro,
                              std::string args)
 {
@@ -231,6 +231,11 @@ std::string make_d_macro(MacroInfo const* MI, std::string const& name)
 	return d_templ_str;
 }
 
+namespace
+{
+static std::string const MemFileSuffix = "_MemFileSuffix";
+}
+
 void CPP2DPPHandling::inject_macro(
   MacroDirective const* MD,
   std::string const& name,
@@ -239,7 +244,7 @@ void CPP2DPPHandling::inject_macro(
 	// TODO : Find a better way if it exists
 	auto iter_inserted = new_macros.insert(new_macro);
 	std::unique_ptr<MemoryBuffer> membuf =
-	  MemoryBuffer::getMemBuffer(*iter_inserted.first, "<" + name + "_macro_override>");
+	  MemoryBuffer::getMemBuffer(*iter_inserted.first, "<" + name + MemFileSuffix + ">");
 	assert(membuf);
 	FileID fileID = pp.getSourceManager().createFileID(
 	                  std::move(membuf), clang::SrcMgr::C_User, 0, 0, MD->getLocation());
@@ -258,10 +263,6 @@ void CPP2DPPHandling::TransformMacroExpr(
 {
 	clang::MacroInfo const* MI = MD->getMacroInfo();
 
-	pp.appendMacroDirective(MacroNameTok.getIdentifierInfo(),
-	                        new UndefMacroDirective(MacroNameTok.getLocation()));
-
-	new_macros_name.insert(macro_options.name);
 	std::stringstream new_macro;
 	new_macro << "\n#define " + macro_options.name;
 
@@ -279,6 +280,12 @@ void CPP2DPPHandling::TransformMacroExpr(
 		new_macro << macro_options.cppReplace;
 	new_macro << + "))\n";
 
+	SourceLocation const location = MacroNameTok.getLocation();
+	if(location.printToString(sourceManager).find(MemFileSuffix) != std::string::npos)
+		return;
+
+	pp.appendMacroDirective(MacroNameTok.getIdentifierInfo(), new UndefMacroDirective(location));
+
 	inject_macro(MD, macro_options.name, new_macro.str());
 }
 
@@ -289,10 +296,6 @@ void CPP2DPPHandling::TransformMacroStmt(
 {
 	clang:: MacroInfo const* MI = MD->getMacroInfo();
 
-	pp.appendMacroDirective(MacroNameTok.getIdentifierInfo(),
-	                        new UndefMacroDirective(MacroNameTok.getLocation()));
-
-	new_macros_name.insert(macro_options.name);
 	std::stringstream new_macro;
 	new_macro << "\n#define " + macro_options.name;
 
@@ -309,6 +312,12 @@ void CPP2DPPHandling::TransformMacroStmt(
 	new_macro << print_macro(MI) << "\\\n";
 	new_macro << "int CPP2D_ADD(CPP2D_MACRO_STMT_END, __COUNTER__);";
 
+	SourceLocation const location = MacroNameTok.getLocation();
+	if(location.printToString(sourceManager).find(MemFileSuffix) != std::string::npos)
+		return;
+
+	pp.appendMacroDirective(MacroNameTok.getIdentifierInfo(), new UndefMacroDirective(location));
+
 	inject_macro(MD, macro_options.name, new_macro.str());
 }
 
@@ -317,7 +326,7 @@ void CPP2DPPHandling::MacroDefined(const Token& MacroNameTok, const MacroDirecti
 {
 	std::string const& name = MacroNameTok.getIdentifierInfo()->getName();
 	clang::MacroInfo const* MI = MD->getMacroInfo();
-	if(new_macros_name.count(name) || MI->isBuiltinMacro())
+	if(MI->isBuiltinMacro())
 		return;
 	auto macro_expr_iter = macro_expr.find(name);
 	if(macro_expr_iter != macro_expr.end())

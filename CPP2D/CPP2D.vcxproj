@@ -111,7 +111,7 @@
       <AdditionalIncludeDirectories>I:\C_libs\llvm_bin\include;I:\C_libs\llvm\include;I:\C_libs\llvm\tools\clang\include;I:\C_libs\llvm_bin\tools\clang\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <RuntimeTypeInfo>true</RuntimeTypeInfo>
-      <DisableSpecificWarnings>4503;4820;4371;4710;4514;5027;4626;5026;4625;4996;4702;4714;4711</DisableSpecificWarnings>
+      <DisableSpecificWarnings>4548;4503;4820;4371;4710;4514;5027;4626;5026;4625;4996;4702;4714;4711</DisableSpecificWarnings>
       <TreatWarningAsError>true</TreatWarningAsError>
     </ClCompile>
     <Link>
@@ -155,7 +155,7 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>I:\C_libs\llvm_bin\include;I:\C_libs\llvm\include;I:\C_libs\llvm\tools\clang\include;I:\C_libs\llvm_bin\tools\clang\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeTypeInfo>true</RuntimeTypeInfo>
-      <DisableSpecificWarnings>4503;4820;4371;4710;4514;5027;4626;5026;4625;4996;4702;4714;4711</DisableSpecificWarnings>
+      <DisableSpecificWarnings>4548;4503;4820;4371;4710;4514;5027;4626;5026;4625;4996;4702;4714;4711</DisableSpecificWarnings>
       <TreatWarningAsError>true</TreatWarningAsError>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
     </ClCompile>
