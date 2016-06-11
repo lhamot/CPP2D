@@ -7,12 +7,14 @@
 #include "framework.h"
 #include "test.h"
 #include "stdlib_testsuite.h"
+#include "template_testsuite.h"
 
 int main()
 {
 	TestFrameWork testFrameWork;
 	test_register(testFrameWork); 
 	stdlib_register(testFrameWork);
+	template_register(testFrameWork);
 	testFrameWork.run();
 
 	testFrameWork.print_results();

@@ -340,6 +340,10 @@ public:
 
 	bool TraverseTemplateTypeParmType(clang::TemplateTypeParmType* Type);
 
+	bool TraversePackExpansionType(clang::PackExpansionType* Type);
+
+	bool TraversePackExpansionExpr(clang::PackExpansionExpr* expr);
+
 	bool TraverseTemplateTypeParmDecl(clang::TemplateTypeParmDecl* Decl);
 
 	bool TraverseNonTypeTemplateParmDecl(clang::NonTypeTemplateParmDecl* Decl);
@@ -555,5 +559,6 @@ private:
 	bool portConst = false;          //!< True to port **const** keyword.
 	bool printDefaultValue = true;
 	bool isThisFunctionUsefull = false; //!< To keep usefull implicit function
+	bool inTemplateParamList = false;
 	std::stack<std::string> catchedExceptNames;
 };

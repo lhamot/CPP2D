@@ -13,6 +13,7 @@ add_executable(
     main.cpp
     test.cpp
 	stdlib_testsuite.cpp
+	template_testsuite.cpp
 )
 if(CMAKE_COMPILER_IS_GNUCXX)
     SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -fno-rtti")

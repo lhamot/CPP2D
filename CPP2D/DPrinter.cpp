@@ -196,6 +196,7 @@ void DPrinter::includeFile(std::string const& inclFile, std::string const& typeN
 			[](char c) {return static_cast<char>(tolower(c)); });
 			std::replace(std::begin(include), std::end(include), '/', '.');
 			std::replace(std::begin(include), std::end(include), '\\', '.');
+			std::replace(std::begin(include), std::end(include), '-', '_');
 			externIncludes[include].insert(typeName);
 			break;
 		}
@@ -1056,7 +1057,9 @@ void DPrinter::printTemplateParameterList(TemplateParameterList* tmpParams,
 	{
 		spliter1.split();
 		NamedDecl* param = tmpParams->getParam(i);
+		inTemplateParamList = true;
 		TraverseDecl(param);
+		inTemplateParamList = false;
 		// Print default template arguments
 		if(auto* FTTP = dyn_cast<TemplateTypeParmDecl>(param))
 		{
@@ -2455,6 +2458,18 @@ bool DPrinter::TraverseTemplateTypeParmType(TemplateTypeParmType* Type)
 	return true;
 }
 
+bool DPrinter::TraversePackExpansionType(clang::PackExpansionType* type)
+{
+	printType(type->getPattern());
+	return true;
+}
+
+bool DPrinter::TraversePackExpansionExpr(clang::PackExpansionExpr* expr)
+{
+	TraverseStmt(expr->getPattern());
+	return true;
+}
+
 bool DPrinter::TraverseTemplateTypeParmDecl(TemplateTypeParmDecl* Decl)
 {
 	if(passDecl(Decl)) return true;
@@ -2467,6 +2482,9 @@ bool DPrinter::TraverseTemplateTypeParmDecl(TemplateTypeParmDecl* Decl)
 		else
 			out() << identifier->getName().str();
 	}
+	if(Decl->isParameterPack() && inTemplateParamList)
+		out() << "...";
+
 	// A template type without name is a auto param of a lambda
 	// Add "else" to handle it
 	return true;
