@@ -163,6 +163,19 @@ std::string print_macro(MacroInfo const* MI)
 	return new_macro;
 }
 
+std::string replaceString(std::string subject,
+                          const std::string& search,
+                          const std::string& replace)
+{
+	size_t pos = 0;
+	while((pos = subject.find(search, pos)) != std::string::npos)
+	{
+		subject.replace(pos, search.length(), replace);
+		pos += replace.length();
+	}
+	return subject;
+}
+
 //! Print the macro as a D mixin
 std::string make_d_macro(MacroInfo const* MI, std::string const& name)
 {
@@ -197,26 +210,30 @@ std::string make_d_macro(MacroInfo const* MI, std::string const& name)
 				d_templ << std::string(1, '"') + Punc + '"';
 		}
 		else if(Tok.isLiteral() && Tok.getLiteralData())
-			d_templ << '"' + std::string(Tok.getLiteralData(), Tok.getLength()) + '"';
+		{
+			std::string const literal = replaceString(std::string(Tok.getLiteralData(), Tok.getLength()), "\"", "\\\"");
+			d_templ << '"' + literal + '"';
+		}
 		else if(auto* II = Tok.getIdentifierInfo())
 		{
-			if(arg_names.count(II->getName()))
+			std::string const identifierName = replaceString(II->getName(), "\"", "\\\"");
+			if(arg_names.count(identifierName))
 			{
 				if(next_is_str)
 				{
-					d_templ << "\"q{\" ~ " + std::string(II->getName()) + " ~ \"}\"";
+					d_templ << "\"q{\" ~ " + identifierName + " ~ \"}\"";
 					next_is_str = false;
 				}
 				else if(next_is_pasted)
 				{
-					d_templ << " ~ " + II->getName().str() + " ~ ";
+					d_templ << " ~ " + identifierName + " ~ ";
 					next_is_pasted = false;
 				}
 				else
-					d_templ << "\" \" ~ " + II->getName().str() + " ~ \" \"";
+					d_templ << "\" \" ~ " + identifierName + " ~ \" \"";
 			}
 			else
-				d_templ << '"' + II->getName().str() + '"';
+				d_templ << '"' + identifierName + '"';
 		}
 		else
 			d_templ << std::string(1, '"') + Tok.getName() + '"';
