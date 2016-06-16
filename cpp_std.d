@@ -91,3 +91,37 @@ auto make_pair(A, B)(auto ref A a, auto ref B b)
 {
 	return Tuple!(A, "key", B, "value")(a, b);
 }
+
+// ******************************* other **************************************
+
+struct Ref(T)
+{
+	T* ptr;
+
+	this(U)(auto ref U other)
+	{
+		ptr = &other;
+	}
+
+	ref T opCast()
+	{
+		return *ptr;
+	}
+
+	bool opBinary(string op, U)(auto ref U other)
+	{
+		return mixin("*ptr" ~ op ~ "other");
+	}
+
+	bool opBinary(string op, U = Ref!U)(auto ref Ref!U other)
+	{
+		return mixin("*ptr" ~ op ~ "*other.ptr");
+	}
+
+	alias ptr this;
+}
+
+auto makeRef(T)(ref auto T val)
+{
+	return Ref!T(val);
+}

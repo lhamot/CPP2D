@@ -151,6 +151,8 @@ std::string mangleName(std::string const& name)
 		return "debug_";
 	if(name == "function")
 		return "function_";
+	if(name == "cast")
+		return "cast_";
 	else if(name == "Exception")
 		return "Exception_";
 	else
@@ -2418,9 +2420,18 @@ bool DPrinter::TraverseLValueReferenceType(LValueReferenceType* Type)
 	}
 	else
 	{
-		printType(Type->getPointeeType());
+		QualType const pt = Type->getPointeeType();
 		if(getSemantic(Type->getPointeeType()) == Value)
-			out() << "[]";
+		{
+			out() << "Ref!(";
+			if(pt->castAs<AutoType>())
+				printType(pt.getDesugaredType(*Context));
+			else
+				printType(pt);
+			out() << ")";
+		}
+		else
+			printType(pt);
 	}
 	return true;
 }
@@ -3686,6 +3697,16 @@ void DPrinter::traverseVarDeclImpl(VarDecl* Decl)
 	else if(Decl->getOutOfLineDefinition())
 		Decl = Decl->getOutOfLineDefinition();
 	QualType varType = Decl->getType();
+	bool const isRef = [&]()
+	{
+		if(auto* refType = varType->getAs<LValueReferenceType>())
+		{
+			if(not refAccepted && getSemantic(refType->getPointeeType()) == Value)
+				return true;  //Have to call "makeRef" to handle to storage of a ref
+		}
+		return false;
+	}();
+
 	if(doPrintType)
 	{
 		if(Decl->isStaticDataMember() || Decl->isStaticLocal())
@@ -3695,7 +3716,10 @@ void DPrinter::traverseVarDeclImpl(VarDecl* Decl)
 			if(NestedNameSpecifier* nns = Decl->getQualifier())
 				TraverseNestedNameSpecifier(nns);
 		}
-		printType(varType);
+		if(isRef)
+			out() << "auto";
+		else
+			printType(varType);
 		out() << " ";
 	}
 	out() << mangleName(varName);
@@ -3713,7 +3737,11 @@ void DPrinter::traverseVarDeclImpl(VarDecl* Decl)
 					if(constr->getNumArgs() != 0)
 					{
 						out() << " = ";
+						if(isRef)
+							out() << "makeRef(";
 						printCXXConstructExprParams(constr);
+						if(isRef)
+							out() << ")";
 					}
 				}
 				else if(getSemantic(varType) == Semantic::AssocArray)
@@ -3739,7 +3767,11 @@ void DPrinter::traverseVarDeclImpl(VarDecl* Decl)
 		else
 		{
 			out() << " = ";
+			if(isRef)
+				out() << "makeRef(";
 			TraverseStmt(init);
+			if(isRef)
+				out() << ")";
 		}
 	}
 }
