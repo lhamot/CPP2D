@@ -19,6 +19,16 @@ void check(bool ok, char const* message, int line)
 	}
 }
 
+void check_equal(int a, int b, char const* message, int line)
+{
+	++testCount;
+	if (a != b)
+	{
+		printf("%s    ->Failed at line %u, because %s != %s\n",
+			message, line, std::to_string(a).c_str(), std::to_string(b).c_str());
+	}
+}
+
 void TestSuite::run() const noexcept
 {
 	for (TestCase const& testcase : testCases)

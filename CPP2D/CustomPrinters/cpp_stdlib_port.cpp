@@ -536,6 +536,26 @@ void cpp_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 			pr.addExternInclude("std.algorithm.comparison", "std.algorithm.comparison.max");
 		}
 	});
+
+	// ************************************ <string> *******************************************
+	mc.globalFuncPrinter(finder, "::to_string(<|$)", [](DPrinter & pr, Stmt * s)
+	{
+		if(auto* call = dyn_cast<CallExpr>(s))
+		{
+			pr.stream() << "std.conv.to!string";
+			pr.printCallExprArgument(call);
+			pr.addExternInclude("std.conv", "std.conv.to!string");
+		}
+	});
+
+	mc.methodPrinter("std::basic_string", "c_str", [](DPrinter & pr, Stmt * s)
+	{
+		if(auto* memCall = dyn_cast<CXXMemberCallExpr>(s))
+		{
+			if(auto* memExpr = dyn_cast<MemberExpr>(memCall->getCallee()))
+				pr.TraverseStmt(memExpr->isImplicitAccess() ? nullptr : memExpr->getBase());
+		}
+	});
 }
 
 REG_CUSTOM_PRINTER(cpp_stdlib_port);

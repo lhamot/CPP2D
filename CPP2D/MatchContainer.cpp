@@ -146,7 +146,6 @@ void MatchContainer::cFuncPrinter(
 		if(auto* call = dyn_cast<CallExpr>(s))
 		{
 			pr.stream() << "core.stdc." << lib << "." << func;
-			//pr.printCallExprArgument(call);
 			pr.stream() << "(";
 			Spliter spliter(pr, ", ");
 			for(Expr* arg : call->arguments())
@@ -154,10 +153,17 @@ void MatchContainer::cFuncPrinter(
 				if(arg->getStmtClass() == Stmt::StmtClass::CXXDefaultArgExprClass)
 					break;
 				spliter.split();
-				pr.TraverseStmt(arg);
+
 				std::string const argType = arg->getType().getAsString();
-				if(argType == "const char *" || argType == "char *")  // Get pointer of D strings
-					pr.stream() << ".ptr";
+				bool const passCString = (argType == "const char *" || argType == "char *");
+				if(passCString)
+				{
+					pr.addExternInclude("std.string", "std.string.toStringz");
+					pr.stream() << "std.string.toStringz(";
+				}
+				pr.TraverseStmt(arg);
+				if(passCString)
+					pr.stream() << ")";
 			}
 			pr.stream() << ")";
 

@@ -9,10 +9,15 @@
 #include <functional>
 #include <vector>
 #include <memory>
+#include <string>
+
+extern unsigned int testCount;
 
 void check(bool ok, char const* message, int line);
+void check_equal(int a, int b, char const* message, int line);
 
 #define CHECK(COND) check(COND, #COND, __LINE__) //if(!(COND)) error(#COND)
+#define CHECK_EQUAL(A, B) check_equal(A, B, #A " == " #B, __LINE__) //if(!(COND)) error(#COND)
 
 typedef void(*TestCase)(); //!< One small test independant of others
 

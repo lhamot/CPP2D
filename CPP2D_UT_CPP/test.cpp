@@ -1008,7 +1008,9 @@ void check_range_based_for_loop()
 
 	for (int& i : tab)
 		i = i + 1;
-	CHECK(tab[0] == 2 && tab[1] == 3 && tab[2] == 4);
+	CHECK_EQUAL(tab[0], 2);
+	CHECK_EQUAL(tab[1], 3);
+	CHECK_EQUAL(tab[2], 4);
 
 	for (auto& i : tab)
 		i = i + 1;
