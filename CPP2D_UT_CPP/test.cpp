@@ -15,37 +15,7 @@
 #include <cassert>
 #include <vector>
 #include <memory>
-
-size_t equal_len(char const* a, char const* b)
-{
-	size_t pos = 0;
-	while (*a == *b && *a != 0 && *b != 0)
-	{
-		++a;
-		++b;
-		++pos;
-	}
-	return pos;
-}
-
-int find_string(char const* str, char const* sub)
-{
-	int pos = 0;
-	while (str[pos] != 0)
-	{
-		size_t len = equal_len(str + pos, sub);
-		if (sub[len] == 0)
-			return pos;
-		++pos;
-	}
-	return -1;
-}
-
-bool cmp_string(char const* a, char const* b)
-{
-	size_t pos = equal_len(a, b);
-	return a[pos] == b[pos];
-}
+#include <cstring>
 
 
 class noncopyable
@@ -710,7 +680,6 @@ void check_variadic()
 {
 	char buffer[1000];
 	var_func(buffer, "dcff", 3, 'a', 1.999, 42.5);
-	//CHECK(cmp_string("3 a 1.999000 42.500000 ", buffer));
 }
 
 template<int I>
@@ -924,9 +893,9 @@ struct UninstantiatedStruct
 void check_builtin_macro()
 {
 	auto l = __LINE__;
-	CHECK(find_string(__FILE__, "test") != -1);
-	CHECK(find_string(__FUNCTION__, "check_builtin_macro") != -1);
-	CHECK(find_string(__func__, "check_builtin_macro") != -1);
+	CHECK(strstr(__FILE__, "test") != nullptr);
+	CHECK(strstr(__FUNCTION__, "check_builtin_macro") != nullptr);
+	CHECK(strstr(__func__, "check_builtin_macro") != nullptr);
 	CHECK(__LINE__ == l + 4);
 	assert(2 * 3 == 6);
 }
@@ -1938,7 +1907,7 @@ void check_exception()
 	}
 	catch (std::runtime_error& ex)
 	{
-		CHECK(cmp_string(ex.what(), "error test"));
+		CHECK(strcmp(ex.what(), "error test") == 0);
 		catched = true;
 	}
 	catch (std::exception&)
@@ -1961,7 +1930,7 @@ catch (std::logic_error&)
 }
 catch (std::runtime_error& ex)
 {
-	CHECK(cmp_string(ex.what(), "error test"));
+	CHECK(strcmp(ex.what(), "error test") == 0);
 }
 catch (std::exception&)
 {

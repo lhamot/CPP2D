@@ -2921,7 +2921,7 @@ bool DPrinter::TraverseStringLiteral(StringLiteral* Stmt)
 		}
 	}
 	out() << literal;
-	out() << "\\0\"";
+	out() << "\"";
 	return true;
 }
 
