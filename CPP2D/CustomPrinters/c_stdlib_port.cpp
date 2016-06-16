@@ -35,16 +35,15 @@ void c_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 		mc.cFuncPrinter(finder, "stdio", func);
 
 	// <string>
-	mc.globalFuncPrinter(finder, "^(::std)?::strlen(<|$)", [](DPrinter & pr, Stmt * s)
+	char const* stringFuncs[] =
 	{
-		if(auto* call = dyn_cast<CallExpr>(s))
-		{
-			pr.stream() << "core.stdc.string.strlen(";
-			pr.TraverseStmt(call->getArg(0));
-			pr.stream() << ".ptr)";
-			pr.addExternInclude("core.stdc.string", "core.stdc.string.strlen");
-		}
-	});
+		"memcpy", "memmove", "strcpy", "strncpy", "strcat", "strncat",
+		"memcmp", "strcmp", "strcoll", "strncmp", "strxfrm",
+		"memchr", "strchr", "strcspn", "strpbrk", "strrchr", "strspn", "strstr", "strtok",
+		"memset", "strerror", "strlen"
+	};
+	for(char const* func : stringFuncs)
+		mc.cFuncPrinter(finder, "string", func);
 
 	// <stdlib>
 	mc.cFuncPrinter(finder, "stdlib", "rand");
