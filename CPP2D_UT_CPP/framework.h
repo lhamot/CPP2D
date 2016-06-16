@@ -13,11 +13,11 @@
 
 extern unsigned int testCount;
 
-void check(bool ok, char const* message, int line);
-void check_equal(int a, int b, char const* message, int line);
+void check(bool ok, char const* message, int line, char const* file);
+void check_equal(int a, int b, char const* message, int line, char const* file);
 
-#define CHECK(COND) check(COND, #COND, __LINE__) //if(!(COND)) error(#COND)
-#define CHECK_EQUAL(A, B) check_equal(A, B, #A " == " #B, __LINE__) //if(!(COND)) error(#COND)
+#define CHECK(COND) check(COND, #COND, __LINE__, __FILE__)
+#define CHECK_EQUAL(A, B) check_equal(A, B, #A " == " #B, __LINE__, __FILE__)
 
 typedef void(*TestCase)(); //!< One small test independant of others
 
