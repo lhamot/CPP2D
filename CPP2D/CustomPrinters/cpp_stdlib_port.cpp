@@ -537,8 +537,18 @@ void cpp_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 		}
 	});
 
+	mc.globalFuncPrinter(finder, "^::std::min(<|$)", [](DPrinter & pr, Stmt * s)
+	{
+		if(auto* call = dyn_cast<CallExpr>(s))
+		{
+			pr.stream() << "std.algorithm.comparison.min";
+			pr.printCallExprArgument(call);
+			pr.addExternInclude("std.algorithm.comparison", "std.algorithm.comparison.min");
+		}
+	});
+
 	// ************************************ <string> *******************************************
-	mc.globalFuncPrinter(finder, "::to_string(<|$)", [](DPrinter & pr, Stmt * s)
+	mc.globalFuncPrinter(finder, "^::std::to_string(<|$)", [](DPrinter & pr, Stmt * s)
 	{
 		if(auto* call = dyn_cast<CallExpr>(s))
 		{
@@ -555,6 +565,14 @@ void cpp_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 			if(auto* memExpr = dyn_cast<MemberExpr>(memCall->getCallee()))
 				pr.TraverseStmt(memExpr->isImplicitAccess() ? nullptr : memExpr->getBase());
 		}
+	});
+
+	mc.tmplTypePrinter(finder, "std::basic_string", [](DPrinter & printer, Type * Type)
+	{
+		auto* TSType = dyn_cast<TemplateSpecializationType>(Type);
+		printer.stream() << "immutable(";
+		printer.printTemplateArgument(TSType->getArg(0));
+		printer.stream() << ")[]";
 	});
 }
 

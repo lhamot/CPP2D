@@ -66,6 +66,29 @@ void check_return_ref()
 	CHECK_EQUAL(a.val, 43);
 }
 
+struct QA
+{
+	struct B
+	{
+
+	};
+};
+
+template<typename T>
+struct QC;
+
+template<>
+struct QC<QA::B>
+{
+	static const int U = 18;
+};
+
+void check_qualifier()
+{
+	CHECK_EQUAL(QC<QA::B>::U, 18);
+}
+
+
 void template_register(TestFrameWork& tf)
 {
 	auto ts = std::make_unique<TestSuite>();
@@ -73,6 +96,8 @@ void template_register(TestFrameWork& tf)
 	ts->addTestCase(check_variadic_tmpl);
 
 	ts->addTestCase(check_return_ref);
+
+	ts->addTestCase(check_qualifier);
 
 	ts->addTestCase(check_return_ref_tmpl<int>);
 

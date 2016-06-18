@@ -484,8 +484,11 @@ private:
 	//! Add the import of for this file if it was included in the C++ file
 	void includeFile(std::string const& inclFile, std::string const& typeName);
 
+	//! Print the context (namespace, class, function) to **D**
+	void printDeclContext(clang::DeclContext* DC);
+
 	//! Get type name and transform it for **D** printing
-	std::string mangleType(clang::NamedDecl const* decl);
+	std::string printDeclName(clang::NamedDecl* decl);
 
 	//! Print the comment preceding this clang::Decl
 	void printCommentBefore(clang::Decl* t);

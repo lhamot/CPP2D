@@ -205,15 +205,53 @@ void DPrinter::includeFile(std::string const& inclFile, std::string const& typeN
 	}
 }
 
-std::string DPrinter::mangleType(NamedDecl const* decl)
+void DPrinter::printDeclContext(DeclContext* DC)
 {
-	NamedDecl const* canDecl = nullptr;
-	std::string const& name = decl->getNameAsString();
-	std::string qualName = name;
-	if(Decl const* canDeclNotype = decl->getCanonicalDecl())
+	if(DC->isTranslationUnit()) return;
+	if(DC->isFunctionOrMethod()) return;
+	printDeclContext(DC->getParent());
+
+	if(NamespaceDecl* NS = dyn_cast<NamespaceDecl>(DC))
+		return;
+	else if(ClassTemplateSpecializationDecl* Spec = dyn_cast<ClassTemplateSpecializationDecl>(DC))
 	{
-		if((canDecl = dyn_cast<NamedDecl>(canDeclNotype)) != nullptr)
-			qualName = canDecl->getQualifiedNameAsString();
+		out() << Spec->getIdentifier()->getName().str();
+		out() << "!(";
+		const TemplateArgumentList& tmpArgsSpec = Spec->getTemplateArgs();
+		Spliter spliter2(*this, ", ");
+		for(unsigned int i = 0, size = tmpArgsSpec.size(); i != size; ++i)
+		{
+			spliter2.split();
+			TemplateArgument const& tmpArg = tmpArgsSpec.get(i);
+			printTemplateArgument(tmpArg);
+		}
+		out() << ").";
+	}
+	else if(TagDecl* Tag = dyn_cast<TagDecl>(DC))
+	{
+		if(TypedefNameDecl* Typedef = Tag->getTypedefNameForAnonDecl())
+			out() << Typedef->getIdentifier()->getName().str() << ".";
+		else if(Tag->getIdentifier())
+			out() << Tag->getIdentifier()->getName().str() << ".";
+		else
+			return;
+	}
+}
+
+std::string DPrinter::printDeclName(NamedDecl* decl)
+{
+	NamedDecl* canDecl = nullptr;
+	std::string const& name = decl->getNameAsString();
+	if(name.empty())
+		return std::string();
+	std::string qualName = name;
+	std::string result;
+	if(DeclContext* ctx = decl->getDeclContext())
+	{
+		pushStream();
+		printDeclContext(ctx);
+		result = popStream();
+		qualName = decl->getQualifiedNameAsString();
 	}
 
 	auto qualTypeToD = type2type.find(qualName);
@@ -227,13 +265,13 @@ std::string DPrinter::mangleType(NamedDecl const* decl)
 		                    dQualType.substr(0, dotPos);
 		if(not module.empty())  //Need an import
 			externIncludes[module].insert(qualName);
-		return dQualType.substr(dotPos + 1);
+		return result + dQualType.substr(dotPos + 1);
 	}
 	else
 	{
 		NamedDecl const* usedDecl = canDecl ? canDecl : decl;
 		includeFile(CPP2DTools::getFile(Context->getSourceManager(), usedDecl), qualName);
-		return mangleName(name);
+		return result + mangleName(name);
 	}
 }
 
@@ -592,8 +630,6 @@ bool DPrinter::TraverseDecayedType(DecayedType* Type)
 bool DPrinter::TraverseElaboratedType(ElaboratedType* Type)
 {
 	if(passType(Type)) return false;
-	if(NestedNameSpecifier* nns = Type->getQualifier())
-		TraverseNestedNameSpecifier(nns);
 	printType(Type->getNamedType());
 	return true;
 }
@@ -659,7 +695,7 @@ bool DPrinter::TraverseTemplateSpecializationType(TemplateSpecializationType* Ty
 		out() << ']';
 		return true;
 	}
-	out() << mangleType(Type->getTemplateName().getAsTemplateDecl());
+	out() << printDeclName(Type->getTemplateName().getAsTemplateDecl());
 	auto const argNum = Type->getNumArgs();
 	Spliter spliter(*this, ", ");
 	pushStream();
@@ -675,7 +711,7 @@ bool DPrinter::TraverseTemplateSpecializationType(TemplateSpecializationType* Ty
 bool DPrinter::TraverseTypedefType(TypedefType* Type)
 {
 	if(passType(Type)) return false;
-	out() << mangleType(Type->getDecl());
+	out() << printDeclName(Type->getDecl());
 	return true;
 }
 
@@ -3491,7 +3527,7 @@ bool DPrinter::TraverseUnresolvedLookupExpr(UnresolvedLookupExpr*  Expr)
 bool DPrinter::TraverseRecordType(RecordType* Type)
 {
 	if(passType(Type)) return false;
-	out() << mangleType(Type->getDecl());
+	out() << printDeclName(Type->getDecl());
 	RecordDecl* decl = Type->getDecl();
 	switch(decl->getKind())
 	{

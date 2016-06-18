@@ -68,8 +68,9 @@ void c_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 
 	// <ctime>
 	mc.cFuncPrinter(finder, "time", "time");
-	mc.cFuncPrinter(finder, "clock", "clock");
+	mc.cFuncPrinter(finder, "clock", "time");
 	mc.rewriteType(finder, "clock_t", "core.stdc.time.clock_t", "core.stdc.time");
+	mc.rewriteType(finder, "std::clock_t", "core.stdc.time.clock_t", "core.stdc.time");
 
 	//<assert>
 	mc.globalFuncPrinter(finder, "^(::std)?::_wassert$", [](DPrinter&, Stmt*) {});
