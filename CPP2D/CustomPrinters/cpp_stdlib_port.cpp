@@ -16,6 +16,23 @@
 #include "../MatchContainer.h"
 #include "../CustomPrinters.h"
 
+namespace clang
+{
+namespace ast_matchers
+{
+const internal::VariadicDynCastAllOfMatcher<Stmt, UnresolvedLookupExpr>
+unresolvedLookupExpr;
+
+#pragma warning(push)
+#pragma warning(disable: 4100)
+AST_MATCHER_P(CastExpr, hasCastKind, CastKind, Kind)
+{
+	return Node.getCastKind() == Kind;
+}
+#pragma warning(pop)
+}
+}
+
 using namespace clang;
 using namespace clang::ast_matchers;
 
@@ -203,6 +220,19 @@ void cpp_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 			printer.printTemplateArgument(TSType->getArg(0));
 	});
 
+	finder.addMatcher(implicitCastExpr(
+	                    castExpr(hasCastKind(CK_ConstructorConversion)),
+	                    hasImplicitDestinationType(hasDeclaration(namedDecl(matchesName("^::std::(__)?shared_ptr(<|$)"))))
+	                  ).bind("shared_ptr_implicit_cast"), &mc);
+	mc.stmtPrinters.emplace("shared_ptr_implicit_cast", [](DPrinter & pr, Stmt * s)
+	{
+		if(auto* cast = dyn_cast<ImplicitCastExpr>(s))
+		{
+			pr.TraverseStmt(cast->getSubExpr());
+		}
+	});
+
+
 	mc.globalFuncPrinter(finder, "^::(std|boost)::make_shared(<|$)", [](DPrinter & pr, Stmt * s)
 	{
 		if(auto* call = dyn_cast<CallExpr>(s))
@@ -212,9 +242,20 @@ void cpp_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 			{
 				DPrinter::Semantic const sem = DPrinter::getSemantic(tmpArg->getAsType());
 				if(sem != DPrinter::Value)
+				{
 					pr.stream() << "new ";
-				pr.printTemplateArgument(*tmpArg);
-				pr.printCallExprArgument(call);
+					pr.printTemplateArgument(*tmpArg);
+					pr.printCallExprArgument(call);
+				}
+				else
+				{
+					pr.stream() << "std.typecons.RefCounted!(";
+					pr.printTemplateArgument(*tmpArg);
+					pr.stream() << ")(";
+					pr.printTemplateArgument(*tmpArg);
+					pr.printCallExprArgument(call);
+					pr.stream() << ")";
+				}
 			}
 		}
 	});
