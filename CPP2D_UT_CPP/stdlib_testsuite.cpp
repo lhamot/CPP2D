@@ -218,7 +218,7 @@ void check_vector()
 	std::vector<int> a;
 	a.push_back(2);
 	CHECK_EQUAL(a[0], 2);
-	CHECK_EQUAL(a.size(), 1);
+	CHECK_EQUAL(static_cast<int>(a.size()), 1);
 
 	enum Blu
 	{
@@ -227,21 +227,21 @@ void check_vector()
 	std::vector<Blu> b;
 	b.push_back(A1);
 	CHECK_EQUAL(b[0], A1);
-	CHECK_EQUAL(b.size(), size_t(1));
+	CHECK_EQUAL(static_cast<int>(b.size()), 1);
 
 	std::vector<std::shared_ptr<Struct781>> c;
 	c.push_back(std::make_shared<Struct781>());
 	CHECK_EQUAL(c[0]->i, 0);
-	CHECK_EQUAL(c.size(), 1);
+	CHECK_EQUAL(static_cast<int>(c.size()), 1);
 
 	std::vector<std::shared_ptr<Class781>> d;
 	d.push_back(std::make_shared<Class781>());
 	CHECK_EQUAL(d[0]->i, 0);
-	CHECK_EQUAL(d.size(), 1);
+	CHECK_EQUAL(static_cast<int>(d.size()), 1);
 
 	d.push_back(std::make_shared<Class783>());
 	CHECK_EQUAL(d[1]->i, 12);
-	CHECK_EQUAL(d.size(), 2);
+	CHECK_EQUAL(static_cast<int>(d.size()), 2);
 }
 
 void stdlib_register(TestFrameWork& tf)
