@@ -649,9 +649,6 @@ bool DPrinter::TraverseSubstTemplateTypeParmType(SubstTemplateTypeParmType* Type
 
 bool DPrinter::TraverseNestedNameSpecifier(NestedNameSpecifier* NNS)
 {
-	if(NNS->getPrefix())
-		TraverseNestedNameSpecifier(NNS->getPrefix());
-
 	NestedNameSpecifier::SpecifierKind const kind = NNS->getKind();
 	switch(kind)
 	{
@@ -665,6 +662,8 @@ bool DPrinter::TraverseNestedNameSpecifier(NestedNameSpecifier* NNS)
 		out() << ".";
 		break;
 	case NestedNameSpecifier::Identifier:
+		if(NNS->getPrefix())
+			TraverseNestedNameSpecifier(NNS->getPrefix());
 		out() << NNS->getAsIdentifier()->getName().str() << ".";
 		break;
 	}
@@ -2336,7 +2335,7 @@ bool DPrinter::TraverseEnumDecl(EnumDecl* Decl)
 bool DPrinter::TraverseEnumType(EnumType* Type)
 {
 	if(passType(Type)) return false;
-	out() << mangleName(Type->getDecl()->getNameAsString());
+	out() << printDeclName(Type->getDecl());
 	return true;
 }
 
@@ -3480,21 +3479,26 @@ bool DPrinter::TraverseDeclRefExpr(DeclRefExpr* Expr)
 {
 	if(passStmt(Expr)) return true;
 	QualType nnsQualType;
-	if(NestedNameSpecifier* nns = Expr->getQualifier())
+	NestedNameSpecifier* nns = Expr->getQualifier();
+	if(nns != nullptr)
 	{
 		if(nns->getKind() == NestedNameSpecifier::SpecifierKind::TypeSpec)
 			nnsQualType = nns->getAsType()->getCanonicalTypeUnqualified();
-		TraverseNestedNameSpecifier(nns);
 	}
 	auto decl = Expr->getDecl();
 	if(decl->getKind() == Decl::Kind::EnumConstant)
 	{
 		if(nnsQualType != decl->getType().getUnqualifiedType())
 		{
-			printType(decl->getType());
+			printType(decl->getType().getUnqualifiedType());
 			out() << '.';
 		}
+		else if(nns)
+			TraverseNestedNameSpecifier(nns);
 	}
+	else if(nns)
+		TraverseNestedNameSpecifier(nns);
+
 	std::string name = getName(Expr->getNameInfo().getName());
 	if(char const* filename = CPP2DTools::getFile(Context->getSourceManager(), Expr->getDecl()))
 		includeFile(filename, name);
@@ -3747,11 +3751,6 @@ void DPrinter::traverseVarDeclImpl(VarDecl* Decl)
 	{
 		if(Decl->isStaticDataMember() || Decl->isStaticLocal())
 			out() << "static ";
-		if(!Decl->isOutOfLine())
-		{
-			if(NestedNameSpecifier* nns = Decl->getQualifier())
-				TraverseNestedNameSpecifier(nns);
-		}
 		if(isRef)
 			out() << "auto";
 		else

@@ -2303,9 +2303,36 @@ void check_rethrow()
 	CHECK(status == 5);
 }
 
+
+struct Z
+{
+	enum Y : char
+	{
+		A,
+		B,
+		C
+	};
+};
+
+void check_enum()
+{
+	CHECK_EQUAL(Z::Y::A, 0);
+	CHECK_EQUAL(Z::Y::B, 1);
+	CHECK_EQUAL(Z::Y::C, 2);
+
+	CHECK_EQUAL(Z::A, 0);
+	CHECK_EQUAL(Z::B, 1);
+	CHECK_EQUAL(Z::C, 2);
+
+	Z::Y y = Z::B;
+	CHECK_EQUAL(y, Z::B);
+}
+
 void test_register(TestFrameWork& tf)
 {
 	auto ts = std::make_unique<TestSuite>();
+
+	ts->addTestCase(check_enum);
 
 	ts->addTestCase(check_operators);
 
