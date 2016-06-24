@@ -94,15 +94,11 @@ void MatchContainer::methodPrinter(std::string const& className,
 };
 
 void MatchContainer::globalFuncPrinter(
-  clang::ast_matchers::MatchFinder& finder,
   std::string const& funcName,
-  StmtPrinter const& printer)
+  StmtPrinter const& printer
+)
 {
-	std::string const tag = "globalFuncPrinter_" + funcName;
-	finder.addMatcher(callExpr(callee(functionDecl(matchesName(funcName)))).bind(tag), this);
-	finder.addMatcher(
-	  callExpr(callee(unresolvedLookupExpr(uleMatchesName(funcName)))).bind(tag), this);
-	stmtPrinters.emplace(tag, printer);
+	globalFuncPrinters[funcName] = printer;
 };
 
 void MatchContainer::tmplTypePrinter(clang::ast_matchers::MatchFinder& finder,
@@ -137,11 +133,10 @@ void MatchContainer::operatorCallPrinter(
 };
 
 void MatchContainer::cFuncPrinter(
-  clang::ast_matchers::MatchFinder& finder,
   std::string const& lib,
   std::string const& func)
 {
-	globalFuncPrinter(finder, "^(::std)?::" + func + "(<|$)", [lib, func](DPrinter & pr, Stmt * s)
+	globalFuncPrinter("^(::std)?::" + func + "(<|$)", [lib, func](DPrinter & pr, Stmt * s)
 	{
 		if(auto* call = dyn_cast<CallExpr>(s))
 		{

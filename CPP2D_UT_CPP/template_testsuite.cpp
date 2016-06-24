@@ -12,6 +12,7 @@
 //
 #include "framework.h"
 #include <iostream>
+#include <algorithm>
 
 template<typename T>
 auto sum(T value)
@@ -56,6 +57,9 @@ void check_return_ref_tmpl()
 	CHECK_EQUAL(a.val, 43);
 	StatStruct.val = 44;
 	CHECK_EQUAL(a.val, 44);
+
+	CHECK(std::min(2, 3) == 2);
+	CHECK(std::min(T(2), T(3)) == 2);
 }
 
 void check_return_ref()
@@ -99,7 +103,7 @@ void template_register(TestFrameWork& tf)
 
 	ts->addTestCase(check_qualifier);
 
-	ts->addTestCase(check_return_ref_tmpl<int>);
+	ts->addTestCase(check_return_ref_tmpl<char>);
 
 	tf.addTestSuite(std::move(ts));
 }

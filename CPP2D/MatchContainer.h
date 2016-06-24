@@ -74,7 +74,6 @@ public:
 
 	//! Custom print a global function call
 	void globalFuncPrinter(
-	  clang::ast_matchers::MatchFinder& finder,
 	  std::string const& funcName,	//!< Function name (regex)
 	  StmtPrinter const& printer	//!< Custom printer
 	);
@@ -103,7 +102,6 @@ public:
 
 	//! Port a C standard library function to D
 	void cFuncPrinter(
-	  clang::ast_matchers::MatchFinder& finder,
 	  std::string const& lib,	//!< include name
 	  std::string const& func	//!< function name (no regex)
 	);
@@ -118,6 +116,8 @@ public:
 	typedef std::unordered_map<std::string, StmtPrinter> ClassPrinter;
 	//! How to print a call to this method. methodPrinters[method_name][class_name] => printer
 	std::unordered_map<std::string, ClassPrinter> methodPrinters;
+
+	std::unordered_map<std::string, StmtPrinter> globalFuncPrinters;
 
 	//! Custom printer for clang::Type matchers. [matchername] -> printer
 	std::unordered_map<std::string, TypePrinter> typePrinters;

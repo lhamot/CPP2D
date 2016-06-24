@@ -25,7 +25,7 @@ void boost_port(MatchContainer& mc, MatchFinder& finder)
 	//**************************** boost **********************************************************
 
 	//BOOST_THROW_EXCEPTION
-	mc.globalFuncPrinter(finder, "throw_exception_(<|$)", [](DPrinter & pr, Stmt * s)
+	mc.globalFuncPrinter("throw_exception_(<|$)", [](DPrinter & pr, Stmt * s)
 	{
 		if(auto* memCall = dyn_cast<CallExpr>(s))
 		{

@@ -233,7 +233,7 @@ void cpp_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 	});
 
 
-	mc.globalFuncPrinter(finder, "^::(std|boost)::make_shared(<|$)", [](DPrinter & pr, Stmt * s)
+	mc.globalFuncPrinter("^::(std|boost)::make_shared(<|$)", [](DPrinter & pr, Stmt * s)
 	{
 		if(auto* call = dyn_cast<CallExpr>(s))
 		{
@@ -343,7 +343,7 @@ void cpp_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 			printer.printTemplateArgument(TSType->getArg(0));
 	});
 
-	mc.globalFuncPrinter(finder, "^::(std|boost)::make_unique(<|$)", [](DPrinter & pr, Stmt * s)
+	mc.globalFuncPrinter("^::(std|boost)::make_unique(<|$)", [](DPrinter & pr, Stmt * s)
 	{
 		if(auto* call = dyn_cast<CallExpr>(s))
 		{
@@ -475,7 +475,7 @@ void cpp_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 
 	// ************************************** <utility> *******************************************
 
-	mc.globalFuncPrinter(finder, "^::std::move(<|$)", [](DPrinter & pr, Stmt * s)
+	mc.globalFuncPrinter("^::std::move(<|$)", [](DPrinter & pr, Stmt * s)
 	{
 		if(auto* memCall = dyn_cast<CallExpr>(s))
 		{
@@ -486,7 +486,7 @@ void cpp_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 		}
 	});
 
-	mc.globalFuncPrinter(finder, "^::std::forward(<|$)", [](DPrinter & pr, Stmt * s)
+	mc.globalFuncPrinter("^::std::forward(<|$)", [](DPrinter & pr, Stmt * s)
 	{
 		if(auto* memCall = dyn_cast<CallExpr>(s))
 			pr.TraverseStmt(memCall->getArg(0));
@@ -525,7 +525,7 @@ void cpp_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 		}
 	});
 
-	mc.globalFuncPrinter(finder, "^::std::swap(<|$)", [](DPrinter & pr, Stmt * s)
+	mc.globalFuncPrinter("^::std::swap(<|$)", [](DPrinter & pr, Stmt * s)
 	{
 		if(auto* memCall = dyn_cast<CallExpr>(s))
 		{
@@ -538,7 +538,7 @@ void cpp_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 		}
 	});
 
-	mc.globalFuncPrinter(finder, "^::std::make_pair(<|$)", [](DPrinter & pr, Stmt * s)
+	mc.globalFuncPrinter("^::std::make_pair(<|$)", [](DPrinter & pr, Stmt * s)
 	{
 		if(auto* memCall = dyn_cast<CallExpr>(s))
 		{
@@ -551,7 +551,7 @@ void cpp_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 		}
 	});
 
-	mc.globalFuncPrinter(finder, "^::std::get(<|$)", [](DPrinter & pr, Stmt * s)
+	mc.globalFuncPrinter("^::std::get(<|$)", [](DPrinter & pr, Stmt * s)
 	{
 		if(auto* memCall = dyn_cast<CallExpr>(s))
 		{
@@ -568,7 +568,7 @@ void cpp_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 	});
 
 	// ************************************ <algorithm> *******************************************
-	mc.globalFuncPrinter(finder, "^::std::max(<|$)", [](DPrinter & pr, Stmt * s)
+	mc.globalFuncPrinter("^::std::max(<|$)", [](DPrinter & pr, Stmt * s)
 	{
 		if(auto* call = dyn_cast<CallExpr>(s))
 		{
@@ -578,7 +578,7 @@ void cpp_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 		}
 	});
 
-	mc.globalFuncPrinter(finder, "^::std::min(<|$)", [](DPrinter & pr, Stmt * s)
+	mc.globalFuncPrinter("^::std::min(<|$)", [](DPrinter & pr, Stmt * s)
 	{
 		if(auto* call = dyn_cast<CallExpr>(s))
 		{
@@ -589,7 +589,7 @@ void cpp_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 	});
 
 	// ************************************ <string> *******************************************
-	mc.globalFuncPrinter(finder, "^::std::to_string(<|$)", [](DPrinter & pr, Stmt * s)
+	mc.globalFuncPrinter("^::std::to_string(<|$)", [](DPrinter & pr, Stmt * s)
 	{
 		if(auto* call = dyn_cast<CallExpr>(s))
 		{

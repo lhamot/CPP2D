@@ -3072,11 +3072,43 @@ void DPrinter::printCallExprArgument(CallExpr* Stmt)
 
 bool DPrinter::TraverseCallExpr(CallExpr* Stmt)
 {
+	auto matchesName = [&](std::string const calleeName)
+	{
+		for(auto const& name_printer : receiver.globalFuncPrinters)
+		{
+			llvm::Regex RE(name_printer.first);
+			if(RE.match("::" + calleeName))
+			{
+				name_printer.second(*this, Stmt);
+				return true;
+			}
+		}
+		return false;
+	};
+	if(Decl* calleeDecl = Stmt->getCalleeDecl())
+	{
+		if(auto* func = dyn_cast<FunctionDecl>(calleeDecl))
+		{
+			if(matchesName(func->getQualifiedNameAsString()))
+				return true;
+		}
+	}
+	Expr* callee = Stmt->getCallee();
+	if(auto* lockup = dyn_cast<UnresolvedLookupExpr>(callee))
+	{
+		std::string name;
+		llvm::raw_string_ostream ss(name);
+		LangOptions lo;
+		PrintingPolicy pp(lo);
+		lockup->printPretty(ss, nullptr, pp);
+		if(matchesName(ss.str()))
+			return true;
+	}
+
 	if(passStmt(Stmt)) return true;
-	Expr* func = Stmt->getCallee();
-	dontTakePtr.insert(func);
-	TraverseStmt(func);
-	dontTakePtr.erase(func);
+	dontTakePtr.insert(callee);
+	TraverseStmt(callee);
+	dontTakePtr.erase(callee);
 	// Are parentezis on zero argument needed?
 	//if (Stmt->getNumArgs() == 0)
 	//	return true;

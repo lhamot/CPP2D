@@ -32,7 +32,7 @@ void c_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 		"clearerr", "feof", "ferror", "perror",
 	};
 	for(char const* func : stdioFuncs)
-		mc.cFuncPrinter(finder, "stdio", func);
+		mc.cFuncPrinter("stdio", func);
 
 	// <string>
 	char const* stringFuncs[] =
@@ -43,10 +43,10 @@ void c_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 		"memset", "strerror", "strlen"
 	};
 	for(char const* func : stringFuncs)
-		mc.cFuncPrinter(finder, "string", func);
+		mc.cFuncPrinter("string", func);
 
 	// <stdlib>
-	mc.cFuncPrinter(finder, "stdlib", "rand");
+	mc.cFuncPrinter("stdlib", "rand");
 
 	// <cmath>
 	char const* mathFuncs[] =
@@ -64,16 +64,16 @@ void c_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 		"isgreater", "isgreaterequal", "isless", "islessequal", "islessgreater", "isunordered",
 	};
 	for(char const* func : mathFuncs)
-		mc.cFuncPrinter(finder, "math", func);
+		mc.cFuncPrinter("math", func);
 
 	// <ctime>
-	mc.cFuncPrinter(finder, "time", "time");
-	mc.cFuncPrinter(finder, "clock", "time");
+	mc.cFuncPrinter("time", "time");
+	mc.cFuncPrinter("clock", "time");
 	mc.rewriteType(finder, "clock_t", "core.stdc.time.clock_t", "core.stdc.time");
 	mc.rewriteType(finder, "std::clock_t", "core.stdc.time.clock_t", "core.stdc.time");
 
 	//<assert>
-	mc.globalFuncPrinter(finder, "^(::std)?::_wassert$", [](DPrinter&, Stmt*) {});
+	mc.globalFuncPrinter("^(::std)?::_wassert$", [](DPrinter&, Stmt*) {});
 }
 
 REG_CUSTOM_PRINTER(c_stdlib_port);
