@@ -452,6 +452,18 @@ void DPrinter::printStmtMacro(std::string const& varName, Expr* init)
 	}
 }
 
+static PrintingPolicy getPrintingPolicy()
+{
+	LangOptions lo;
+	lo.CPlusPlus14 = true;
+	lo.DelayedTemplateParsing = false;
+	PrintingPolicy printingPolicy(lo);
+	printingPolicy.ConstantArraySizeAsWritten = true;
+	return printingPolicy;
+}
+
+clang::PrintingPolicy DPrinter::printingPolicy = getPrintingPolicy();
+
 DPrinter::DPrinter(
   ASTContext* Context,
   MatchContainer const& receiver,
@@ -498,11 +510,6 @@ bool DPrinter::TraverseTranslationUnitDecl(TranslationUnitDecl* Decl)
 
 	std::error_code ec;
 	llvm::raw_fd_ostream file(StringRef(modulename + ".print.cpp"), ec, sys::fs::OpenFlags());
-	LangOptions lo;
-	lo.CPlusPlus14 = true;
-	lo.DelayedTemplateParsing = false;
-	PrintingPolicy pp(lo);
-	pp.ConstantArraySizeAsWritten = true;
 	Decl->print(file);
 
 	std::ofstream file2(modulename + ".source.cpp");
@@ -2130,10 +2137,8 @@ bool DPrinter::TraverseFunctionTemplateDecl(FunctionTemplateDecl* Decl)
 bool DPrinter::TraverseBuiltinType(BuiltinType* Type)
 {
 	if(passType(Type)) return false;
-	out() << [Type]
+	out() << [this, Type]
 	{
-		LangOptions op;
-		PrintingPolicy pp(op);
 		BuiltinType::Kind k = Type->getKind();
 		switch(k)
 		{
@@ -2172,7 +2177,7 @@ bool DPrinter::TraverseBuiltinType(BuiltinType* Type)
 		case BuiltinType::ObjCId: return "id";
 		case BuiltinType::ObjCClass: return "Class";
 		case BuiltinType::ObjCSel: return "SEL";
-		default: return Type->getNameAsCString(pp);
+		default: return Type->getNameAsCString(printingPolicy);
 		}
 	}();
 	return true;
@@ -2183,9 +2188,7 @@ DPrinter::Semantic DPrinter::getSemantic(QualType qt)
 	Type const* type = qt.getTypePtr();
 	std::string empty;
 	raw_string_ostream os(empty);
-	LangOptions lo;
-	PrintingPolicy pp(lo);
-	qt.getCanonicalType().getUnqualifiedType().print(os, pp);
+	qt.getCanonicalType().getUnqualifiedType().print(os, printingPolicy);
 	std::string const name = os.str();
 	// TODO : Externalize the semantic customization
 	if(name.find("class SafeInt<") == 0)
@@ -3098,9 +3101,7 @@ bool DPrinter::TraverseCallExpr(CallExpr* Stmt)
 	{
 		std::string name;
 		llvm::raw_string_ostream ss(name);
-		LangOptions lo;
-		PrintingPolicy pp(lo);
-		lockup->printPretty(ss, nullptr, pp);
+		lockup->printPretty(ss, nullptr, printingPolicy);
 		if(matchesName(ss.str()))
 			return true;
 	}

@@ -11,6 +11,7 @@
 #pragma warning(push, 0)
 #pragma warning(disable: 4265)
 #include <clang/AST/RecursiveASTVisitor.h>
+#include <clang/AST/PrettyPrinter.h>
 #pragma warning(pop)
 
 class MatchContainer;
@@ -564,4 +565,5 @@ private:
 	bool isThisFunctionUsefull = false; //!< To keep usefull implicit function
 	bool inTemplateParamList = false;
 	std::stack<std::string> catchedExceptNames;
+	static clang::PrintingPolicy printingPolicy;  //!< Policy for print to C++ (sometimes useful)
 };
