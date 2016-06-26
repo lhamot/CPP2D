@@ -452,8 +452,9 @@ void cpp_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 	  declRefExpr(hasDeclaration(namedDecl(matchesName("cout")))).bind("std::cout"), &mc);
 	mc.stmtPrinters.emplace("std::cout", [](DPrinter & pr, Stmt*)
 	{
-		pr.stream() << "std.stdio.stdout";
+		pr.stream() << "OStream(std.stdio.stdout)";
 		pr.addExternInclude("std.stdio", "std.stdio.stdout");
+		pr.addExternInclude("cpp_std", "OStream");
 	});
 
 	// ********************** <optional> **********************************************************

@@ -7,6 +7,9 @@
 #pragma once
 
 #include <unordered_map>
+#include <stack>
+#include <map>
+#include <set>
 
 #pragma warning(push, 0)
 #pragma warning(disable: 4265)

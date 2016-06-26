@@ -1,6 +1,7 @@
 import std.container.rbtree;
 import std.container.array;
 import std.typecons;
+import std.stdio;
 
 //******************************  map *****************************************
 struct pair(K, V)
@@ -125,3 +126,17 @@ auto makeRef(T)(ref auto T val)
 {
 	return Ref!T(val);
 }
+
+//************************* iostream ******************************************
+
+struct OStream
+{
+	File file;
+
+	ref OStream opBinary(string op = "<<", T)(auto ref T arg)
+	{
+		file.write(arg);
+		return this;
+	}
+}
+

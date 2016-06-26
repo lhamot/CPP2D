@@ -10,11 +10,22 @@
 #include <vector>
 #include <memory>
 #include <string>
+#include <iostream>
 
 extern unsigned int testCount;
 
 void check(bool ok, char const* message, int line, char const* file);
-void check_equal(int a, int b, char const* message, int line, char const* file);
+
+template<typename A, typename B>
+void check_equal(A a, B b, char const* message, int line, char const* file)
+{
+	++testCount;
+	if (a != b)
+	{
+		std::cout << message << "    ->Failed at line " << line << ", in file " << file 
+			      << ", because " << a << " != " << b << '\n';
+	}
+}
 
 #define CHECK(COND) check(COND, #COND, __LINE__, __FILE__)
 #define CHECK_EQUAL(A, B) check_equal(A, B, #A " == " #B, __LINE__, __FILE__)

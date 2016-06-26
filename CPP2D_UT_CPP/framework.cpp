@@ -19,16 +19,6 @@ void check(bool ok, char const* message, int line, char const* file)
 	}
 }
 
-void check_equal(int a, int b, char const* message, int line, char const* file)
-{
-	++testCount;
-	if (a != b)
-	{
-		printf("%s    ->Failed at line %u, in file %s, because %s != %s\n",
-			message, line, file, std::to_string(a).c_str(), std::to_string(b).c_str());
-	}
-}
-
 void TestSuite::run() const noexcept
 {
 	for (TestCase const& testcase : testCases)

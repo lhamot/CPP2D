@@ -45,7 +45,7 @@ Some samples here : https://github.com/lhamot/CPP2D/wiki/Conversion-samples
 ## Requirements
 * cmake >= 2.6
 * Tested with **gcc** 4.9.2 (**Ubuntu** 15.04) and **Visual Studio** 2015 (**Windows** seven)
-* Tested with **clang** r268594 and **llvm** r268845
+* Tested with **LLVM/clang** **3.8.0** and **3.8.1**
 
 ## How to install it?
 1. Install **clang** : http://clang.llvm.org/get_started.html
