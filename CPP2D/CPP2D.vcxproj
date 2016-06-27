@@ -183,6 +183,7 @@
     <ClCompile Include="CustomPrinters\c_stdlib_port.cpp" />
     <ClCompile Include="MatchContainer.cpp" />
     <ClCompile Include="DPrinter.cpp" />
+    <ClCompile Include="Options.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CPP2DConsumer.h" />
@@ -193,6 +194,7 @@
     <ClInclude Include="MatchContainer.h" />
     <ClInclude Include="DPrinter.h" />
     <ClInclude Include="Spliter.h" />
+    <ClInclude Include="Options.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

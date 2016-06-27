@@ -603,7 +603,7 @@ bool DPrinter::TraverseFieldDecl(FieldDecl* Decl)
 		out() << " = ";
 		TraverseStmt(Decl->getInClassInitializer());
 	}
-	else if(getSemantic(Decl->getType()) == Reference)
+	else if(getSemantic(Decl->getType()) == TypeOptions::Reference)
 	{
 		out() << " = new ";
 		printType(Decl->getType());
@@ -1481,11 +1481,11 @@ void DPrinter::printCXXConstructExprParams(CXXConstructExpr* Init)
 	out() << '(';
 	Spliter spliter(*this, ", ");
 	size_t counter = 0;
-	Semantic const sem = getSemantic(Init->getType());
+	TypeOptions::Semantic const sem = getSemantic(Init->getType());
 	for(auto arg : Init->arguments())
 	{
 		if(arg->getStmtClass() == Stmt::StmtClass::CXXDefaultArgExprClass
-		   && ((counter != 0) || sem != Semantic::Value))
+		   && ((counter != 0) || sem != TypeOptions::Value))
 			break;
 		spliter.split();
 		TraverseStmt(arg);
@@ -1552,10 +1552,10 @@ bool DPrinter::TraverseConstructorInitializer(CXXCtorInitializer* Init)
 			return true;
 
 		FieldDecl* fieldDecl = Init->getAnyMember();
-		Semantic const sem = getSemantic(fieldDecl->getType());
+		TypeOptions::Semantic const sem = getSemantic(fieldDecl->getType());
 		out() << fieldDecl->getNameAsString();
 		out() << " = ";
-		if(sem == Semantic::Value)
+		if(sem == TypeOptions::Value)
 		{
 			Expr* init = Init->getInit();
 			if(auto* parenListExpr = dyn_cast<ParenListExpr>(init))
@@ -1602,7 +1602,7 @@ bool DPrinter::TraverseConstructorInitializer(CXXCtorInitializer* Init)
 						return true;
 					}
 				}
-				if(sem == Semantic::AssocArray)
+				if(sem == TypeOptions::AssocArray)
 				{
 					if(ctor->getNumArgs() == 0 || isa<CXXDefaultArgExpr>(*ctor->arg_begin()))
 						return true;
@@ -1882,17 +1882,17 @@ bool DPrinter::printFuncBegin(CXXDestructorDecl* decl,
 }
 
 template<typename Decl>
-DPrinter::Semantic getThisSemantic(Decl* decl, ASTContext& context)
+TypeOptions::Semantic getThisSemantic(Decl* decl, ASTContext& context)
 {
 	if(decl->isStatic())
-		return DPrinter::Semantic::Reference;
+		return TypeOptions::Reference;
 	auto* recordPtrType = dyn_cast<PointerType>(decl->getThisType(context));
 	return DPrinter::getSemantic(recordPtrType->getPointeeType());
 }
 
-DPrinter::Semantic getThisSemantic(FunctionDecl*, ASTContext&)
+TypeOptions::Semantic getThisSemantic(FunctionDecl*, ASTContext&)
 {
-	return DPrinter::Semantic::Reference;
+	return TypeOptions::Reference;
 }
 
 template<typename D>
@@ -1957,7 +1957,7 @@ void DPrinter::traverseFunctionDeclImpl(
 	bool isConstMethod = false;
 	auto* ctorDecl = dyn_cast<CXXConstructorDecl>(Decl);
 	bool const isCopyCtor = ctorDecl && ctorDecl->isCopyConstructor();
-	Semantic const sem = getThisSemantic(Decl, *Context);
+	TypeOptions::Semantic const sem = getThisSemantic(Decl, *Context);
 	if(Decl->getNumParams() != 0)
 	{
 		TypeSourceInfo* declSourceInfo = Decl->getTypeSourceInfo();
@@ -2005,12 +2005,12 @@ void DPrinter::traverseFunctionDeclImpl(
 					                 decl->getLocEnd().getLocWithOffset(1));
 					out() << indentStr();
 				}
-				if(isCopyCtor && sem == Semantic::Value)
+				if(isCopyCtor && sem == TypeOptions::Value)
 					out() << "this";
 				else
 				{
 					if(index == 0
-					   && sem == Semantic::Value
+					   && sem == TypeOptions::Value
 					   && (ctorDecl != nullptr))
 						printDefaultValue = false;
 					TraverseDecl(decl);
@@ -2047,7 +2047,7 @@ void DPrinter::traverseFunctionDeclImpl(
 	{
 		//Stmt* body = Decl->getBody();
 		out() << std::endl << std::flush;
-		if(isCopyCtor && sem == Semantic::Value)
+		if(isCopyCtor && sem == TypeOptions::Value)
 			arg_become_this = 0;
 		auto alias_this = [Decl, arg_become_this, this]
 		{
@@ -2183,7 +2183,7 @@ bool DPrinter::TraverseBuiltinType(BuiltinType* Type)
 	return true;
 }
 
-DPrinter::Semantic DPrinter::getSemantic(QualType qt)
+TypeOptions::Semantic DPrinter::getSemantic(QualType qt)
 {
 	Type const* type = qt.getTypePtr();
 	std::string empty;
@@ -2192,44 +2192,51 @@ DPrinter::Semantic DPrinter::getSemantic(QualType qt)
 	std::string const name = os.str();
 	// TODO : Externalize the semantic customization
 	if(name.find("class SafeInt<") == 0)
-		return Value;
+		return TypeOptions::Value;
 	if(isStdArray(qt))
-		return Value;
+		return TypeOptions::Value;
 	if(name.find("class std::basic_string<") == 0)
-		return Value;
+		return TypeOptions::Value;
 	if(name.find("class boost::optional<") == 0)
-		return Value;
+		return TypeOptions::Value;
 	if(name.find("class boost::property_tree::basic_ptree<") == 0)
-		return Value;
+		return TypeOptions::Value;
 	if(name.find("class std::vector<") == 0)
-		return Value;
+		return TypeOptions::Value;
 	if(name.find("class std::shared_ptr<") == 0)
-		return Value;
+		return TypeOptions::Value;
 	if(name.find("class boost::scoped_ptr<") == 0)
-		return Value;
+		return TypeOptions::Value;
 	if(name.find("class std::unique_ptr<") == 0)
-		return Value;
+		return TypeOptions::Value;
 	if(isStdUnorderedMap(qt))
-		return AssocArray;
+		return TypeOptions::AssocArray;
 	if(name.find("class std::set<") == 0)
-		return Value;
+		return TypeOptions::Value;
 	if(name.find("class std::unordered_set<") == 0)
-		return Value;
+		return TypeOptions::Value;
 	if(name.find("class std::map<") == 0)
-		return Value;
+		return TypeOptions::Value;
 	if(name.find("class std::multiset<") == 0)
-		return Value;
+		return TypeOptions::Value;
 	if(name.find("class std::unordered_multiset<") == 0)
-		return Value;
+		return TypeOptions::Value;
 	if(name.find("class std::multimap<") == 0)
-		return Value;
+		return TypeOptions::Value;
 	if(name.find("class std::unordered_multimap<") == 0)
-		return Value;
+		return TypeOptions::Value;
+
+	for(auto& nvp : Options::getInstance().types)
+	{
+		if(name.find(nvp.first) == 0)
+			return nvp.second.semantic;
+	}
+
 	Type::TypeClass const cla = type->getTypeClass();
 	return
-	  cla == Type::TypeClass::Auto ? Value :
-	  (type->isClassType() || type->isFunctionType()) ? Reference :
-	  Value;
+	  cla == Type::TypeClass::Auto ? TypeOptions::Value :
+	  (type->isClassType() || type->isFunctionType()) ? TypeOptions::Reference :
+	  TypeOptions::Value;
 }
 
 bool DPrinter::isPointer(QualType const& type)
@@ -2274,7 +2281,7 @@ void DPrinter::traversePointerTypeImpl(PType* Type)
 		}
 	}
 	printType(pointee);
-	out() << ((getSemantic(pointee) == Value) ? "[]" : ""); //'*';
+	out() << ((getSemantic(pointee) == TypeOptions::Value) ? "[]" : ""); //'*';
 }
 
 bool DPrinter::TraverseMemberPointerType(MemberPointerType* Type)
@@ -2442,7 +2449,7 @@ bool DPrinter::TraverseLValueReferenceType(LValueReferenceType* Type)
 	if(passType(Type)) return false;
 	if(refAccepted)
 	{
-		if(getSemantic(Type->getPointeeType()) == Value)
+		if(getSemantic(Type->getPointeeType()) == TypeOptions::Value)
 		{
 			if(inFuncParams)
 			{
@@ -2459,7 +2466,7 @@ bool DPrinter::TraverseLValueReferenceType(LValueReferenceType* Type)
 	else
 	{
 		QualType const pt = Type->getPointeeType();
-		if(getSemantic(Type->getPointeeType()) == Value)
+		if(getSemantic(Type->getPointeeType()) == TypeOptions::Value)
 		{
 			out() << "Ref!(";
 			if(pt->castAs<AutoType>())
@@ -2647,12 +2654,12 @@ bool DPrinter::TraverseCXXOperatorCallExpr(CXXOperatorCallExpr* Stmt)
 		bool const lo_ptr = isPointer(lo->getType());
 		bool const ro_ptr = isPointer(ro->getType());
 
-		Semantic const lo_sem = getSemantic(lo->getType());
-		Semantic const ro_sem = getSemantic(ro->getType());
+		TypeOptions::Semantic const lo_sem = getSemantic(lo->getType());
+		TypeOptions::Semantic const ro_sem = getSemantic(ro->getType());
 
 		bool const dup = //both operands will be transformed to pointer
-		  (ro_ptr == false && ro_sem != Semantic::Value) &&
-		  (lo_ptr == false && lo_sem != Semantic::Value);
+		  (ro_ptr == false && ro_sem != TypeOptions::Value) &&
+		  (lo_ptr == false && lo_sem != TypeOptions::Value);
 
 		if(dup)
 		{
@@ -2838,7 +2845,7 @@ bool DPrinter::TraverseCXXFunctionalCastExpr(CXXFunctionalCastExpr* Stmt)
 {
 	if(passStmt(Stmt)) return true;
 	QualType qt = Stmt->getTypeInfoAsWritten()->getType();
-	if(getSemantic(qt) == Semantic::Reference)
+	if(getSemantic(qt) == TypeOptions::Reference)
 		out() << "new ";
 	printType(qt);
 	out() << '(';
@@ -3125,7 +3132,7 @@ bool DPrinter::TraverseImplicitCastExpr(ImplicitCastExpr* Stmt)
 	if(Stmt->getCastKind() == CK_ConstructorConversion)
 	{
 		QualType const type = Stmt->getType();
-		if(getSemantic(type) == Semantic::Reference)
+		if(getSemantic(type) == TypeOptions::Reference)
 			out() << "new ";
 		printType(type);
 		out() << '(';
@@ -3140,7 +3147,7 @@ bool DPrinter::TraverseCXXThisExpr(CXXThisExpr* expr)
 {
 	if(passStmt(expr)) return true;
 	QualType pointee = expr->getType()->getPointeeType();
-	if(getSemantic(pointee) == Semantic::Value)
+	if(getSemantic(pointee) == TypeOptions::Value)
 		out() << "(&this)[0..1]";
 	else
 		out() << "this";
@@ -3461,12 +3468,12 @@ bool DPrinter::TraverseUnaryOperator(UnaryOperator* Stmt)
 		bool showOp = true;
 
 		QualType exprType = expr->getType();
-		Semantic operSem =
+		TypeOptions::Semantic operSem =
 		  exprType->hasPointerRepresentation() ?
 		  getSemantic(exprType->getPointeeType()) :
 		  getSemantic(exprType);
 
-		if(operSem != Value)
+		if(operSem != TypeOptions::Value)
 		{
 			if(Stmt->getOpcode() == UnaryOperatorKind::UO_AddrOf
 			   || Stmt->getOpcode() == UnaryOperatorKind::UO_Deref)
@@ -3774,7 +3781,7 @@ void DPrinter::traverseVarDeclImpl(VarDecl* Decl)
 	{
 		if(auto* refType = varType->getAs<LValueReferenceType>())
 		{
-			if(not refAccepted && getSemantic(refType->getPointeeType()) == Value)
+			if(not refAccepted && getSemantic(refType->getPointeeType()) == TypeOptions::Value)
 				return true;  //Have to call "makeRef" to handle to storage of a ref
 		}
 		return false;
@@ -3800,7 +3807,7 @@ void DPrinter::traverseVarDeclImpl(VarDecl* Decl)
 		{
 			if(auto* constr = dynCastAcrossCleanup<CXXConstructExpr>(init))
 			{
-				if(getSemantic(varType) == Value)
+				if(getSemantic(varType) == TypeOptions::Value)
 				{
 					if(constr->getNumArgs() != 0)
 					{
@@ -3812,7 +3819,7 @@ void DPrinter::traverseVarDeclImpl(VarDecl* Decl)
 							out() << ")";
 					}
 				}
-				else if(getSemantic(varType) == Semantic::AssocArray)
+				else if(getSemantic(varType) == TypeOptions::AssocArray)
 				{
 					if(constr->getNumArgs() != 0 && not isa<CXXDefaultArgExpr>(*constr->arg_begin()))
 					{

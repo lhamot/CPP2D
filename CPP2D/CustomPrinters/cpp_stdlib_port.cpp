@@ -208,8 +208,8 @@ void cpp_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 	{
 		auto* TSType = dyn_cast<TemplateSpecializationType>(Type);
 		TemplateArgument const& arg = TSType->getArg(0);
-		DPrinter::Semantic const sem = DPrinter::getSemantic(arg.getAsType());
-		if(sem == DPrinter::Value)
+		TypeOptions::Semantic const sem = DPrinter::getSemantic(arg.getAsType());
+		if(sem == TypeOptions::Value)
 		{
 			printer.addExternInclude("std.typecons", "RefCounted");
 			printer.stream() << "std.typecons.RefCounted!(";
@@ -240,8 +240,8 @@ void cpp_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 			TemplateArgument const* tmpArg = MatchContainer::getTemplateTypeArgument(call->getCallee(), 0);
 			if(tmpArg)
 			{
-				DPrinter::Semantic const sem = DPrinter::getSemantic(tmpArg->getAsType());
-				if(sem != DPrinter::Value)
+				TypeOptions::Semantic const sem = DPrinter::getSemantic(tmpArg->getAsType());
+				if(sem != TypeOptions::Value)
 				{
 					pr.stream() << "new ";
 					pr.printTemplateArgument(*tmpArg);
@@ -287,13 +287,13 @@ void cpp_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 		{
 			Expr* leftOp = opCall->getArg(0);
 			TemplateArgument const* tmpArg = MatchContainer::getTemplateTypeArgument(leftOp, 0);
-			DPrinter::Semantic const sem = tmpArg ?
-			                               DPrinter::getSemantic(tmpArg->getAsType()) :
-			                               DPrinter::Reference;
+			TypeOptions::Semantic const sem = tmpArg ?
+			                                  DPrinter::getSemantic(tmpArg->getAsType()) :
+			                                  TypeOptions::Reference;
 
 			pr.TraverseStmt(leftOp);
 			Expr* rightOp = opCall->getArg(1);
-			if(sem == DPrinter::Value and isa<CXXNullPtrLiteralExpr>(rightOp))
+			if(sem == TypeOptions::Value and isa<CXXNullPtrLiteralExpr>(rightOp))
 				pr.stream() << ".refCountedStore.isInitialized == false";
 			else
 			{
@@ -310,13 +310,13 @@ void cpp_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 		{
 			Expr* leftOp = opCall->getArg(0);
 			TemplateArgument const* tmpArg = MatchContainer::getTemplateTypeArgument(leftOp, 0);
-			DPrinter::Semantic const sem = tmpArg ?
-			                               DPrinter::getSemantic(tmpArg->getAsType()) :
-			                               DPrinter::Reference;
+			TypeOptions::Semantic const sem = tmpArg ?
+			                                  DPrinter::getSemantic(tmpArg->getAsType()) :
+			                                  TypeOptions::Reference;
 
 			pr.TraverseStmt(leftOp);
 			Expr* rightOp = opCall->getArg(1);
-			if(sem == DPrinter::Value and isa<CXXNullPtrLiteralExpr>(rightOp))
+			if(sem == TypeOptions::Value and isa<CXXNullPtrLiteralExpr>(rightOp))
 				pr.stream() << ".refCountedStore.isInitialized";
 			else
 			{
@@ -331,8 +331,8 @@ void cpp_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 	{
 		auto* TSType = dyn_cast<TemplateSpecializationType>(Type);
 		TemplateArgument const& arg = TSType->getArg(0);
-		DPrinter::Semantic const sem = DPrinter::getSemantic(arg.getAsType());
-		if(sem == DPrinter::Value)
+		TypeOptions::Semantic const sem = DPrinter::getSemantic(arg.getAsType());
+		if(sem == TypeOptions::Value)
 		{
 			printer.addExternInclude("std.typecons", "RefCounted");
 			printer.stream() << "std.typecons.RefCounted!(";
@@ -350,8 +350,8 @@ void cpp_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 			TemplateArgument const* tmpArg = MatchContainer::getTemplateTypeArgument(call->getCallee(), 0);
 			if(tmpArg)
 			{
-				DPrinter::Semantic const sem = DPrinter::getSemantic(tmpArg->getAsType());
-				if(sem != DPrinter::Value)
+				TypeOptions::Semantic const sem = DPrinter::getSemantic(tmpArg->getAsType());
+				if(sem != TypeOptions::Value)
 					pr.stream() << "new ";
 				pr.printTemplateArgument(*tmpArg);
 				pr.printCallExprArgument(call);
@@ -365,13 +365,13 @@ void cpp_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 		{
 			Expr* leftOp = opCall->getArg(0);
 			TemplateArgument const* tmpArg = MatchContainer::getTemplateTypeArgument(leftOp, 0);
-			DPrinter::Semantic const sem = tmpArg ?
-			                               DPrinter::getSemantic(tmpArg->getAsType()) :
-			                               DPrinter::Reference;
+			TypeOptions::Semantic const sem = tmpArg ?
+			                                  DPrinter::getSemantic(tmpArg->getAsType()) :
+			                                  TypeOptions::Reference;
 
 			pr.TraverseStmt(leftOp);
 			Expr* rightOp = opCall->getArg(1);
-			if(sem == DPrinter::Value and isa<CXXNullPtrLiteralExpr>(rightOp))
+			if(sem == TypeOptions::Value and isa<CXXNullPtrLiteralExpr>(rightOp))
 				pr.stream() << ".refCountedStore.isInitialized == false";
 			else
 			{
@@ -387,13 +387,13 @@ void cpp_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 		{
 			Expr* leftOp = opCall->getArg(0);
 			TemplateArgument const* tmpArg = MatchContainer::getTemplateTypeArgument(leftOp, 0);
-			DPrinter::Semantic const sem = tmpArg ?
-			                               DPrinter::getSemantic(tmpArg->getAsType()) :
-			                               DPrinter::Reference;
+			TypeOptions::Semantic const sem = tmpArg ?
+			                                  DPrinter::getSemantic(tmpArg->getAsType()) :
+			                                  TypeOptions::Reference;
 
 			pr.TraverseStmt(leftOp);
 			Expr* rightOp = opCall->getArg(1);
-			if(sem == DPrinter::Value and isa<CXXNullPtrLiteralExpr>(rightOp))
+			if(sem == TypeOptions::Value and isa<CXXNullPtrLiteralExpr>(rightOp))
 				pr.stream() << ".refCountedStore.isInitialized";
 			else
 			{

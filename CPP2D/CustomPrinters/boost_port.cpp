@@ -15,6 +15,7 @@
 #include "../DPrinter.h"
 #include "../MatchContainer.h"
 #include "../CustomPrinters.h"
+#include "../Options.h"
 
 using namespace clang;
 using namespace clang::ast_matchers;
@@ -50,6 +51,9 @@ void boost_port(MatchContainer& mc, MatchFinder& finder)
 			pr.stream() << ';';
 		}
 	});
+
+	//boost::format
+	Options::getInstance().types["class boost::basic_format<"].semantic = TypeOptions::Value;
 }
 
 REG_CUSTOM_PRINTER(boost_port);

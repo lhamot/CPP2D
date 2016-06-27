@@ -17,6 +17,8 @@
 #include <clang/AST/PrettyPrinter.h>
 #pragma warning(pop)
 
+#include "Options.h"
+
 class MatchContainer;
 
 //! Visit all the AST and print the compilation unit into **D** language file
@@ -144,21 +146,14 @@ public:
 	template<typename D>
 	void traverseFunctionDeclImpl(D* Decl, int thisArgIndex = -1);
 
-	//! Semantic of an object (Value or Reference)
-	enum Semantic
-	{
-		Value,      //!< Like **D** struct and everything in <b>C++</b>
-		Reference,  //!< Garbage collected like **D** class
-		AssocArray, //!< Special case for hashmap. Created without new, but reference semantic.
-	};
 	//! Get the semantic of the passed type
-	static Semantic getSemantic(clang::QualType qt);
+	static TypeOptions::Semantic getSemantic(clang::QualType qt);
 
 	//! Is this type a pointer, or a smart pointer
 	static bool isPointer(clang::QualType const&);
 
 	//! @brief Print a <b>C++</b> pointer type to **D**
-	//! Pointer to Semantic::Value become T[], and Semantic::Reference become just T.
+	//! Pointer to TypeOptions::Value become T[], and Semantic::Reference become just T.
 	template<typename PType>
 	void traversePointerTypeImpl(PType* Type);
 
