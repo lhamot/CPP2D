@@ -68,7 +68,7 @@ void c_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 
 	// <ctime>
 	mc.cFuncPrinter("time", "time");
-	mc.cFuncPrinter("clock", "time");
+	mc.cFuncPrinter("time", "clock");
 	mc.rewriteType(finder, "clock_t", "core.stdc.time.clock_t", "core.stdc.time");
 	mc.rewriteType(finder, "std::clock_t", "core.stdc.time.clock_t", "core.stdc.time");
 

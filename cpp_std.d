@@ -21,12 +21,16 @@ struct pair(K, V)
 	{
 		return 
 			first < s.first? -1:
-		first > s.first? 1:
-		0;
+			first > s.first? 1:
+			0;
 	}
+
+	ref first_type key() {return first;}
+	ref second_type value() {return second;}
 }
 
-alias map(K, V, alias less = "a < b") = RedBlackTree!(pair!(K, V), less, true);
+alias map(K, V, alias less = "a < b") = RedBlackTree!(pair!(K, V), less, false);
+alias multimap(K, V, alias less = "a < b") = RedBlackTree!(pair!(K, V), less, true);
 
 
 //**************************  boost::serialization ****************************
@@ -46,6 +50,21 @@ template class_version(T: double)
 struct allocator(T){}
 
 alias vector(T, A = allocator!T) = Array!T;
+
+//************************** std::set **************************************
+
+struct set(T, alias less = "a < b", A = allocator!T)
+{
+	RedBlackTree!(T, less) data = new RedBlackTree!(T, less);
+
+	auto length() {return data.length;}
+
+	this()(auto this)
+	{
+		data = data.dup;
+	}
+}
+
 
 //************************** unordered_map **************************************
 

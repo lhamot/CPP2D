@@ -20,6 +20,23 @@
 using namespace clang;
 using namespace clang::ast_matchers;
 
+void printFormatFuncOrOpCall(DPrinter& pr, Expr* leftOp)
+{
+	if(auto* funcCast = dyn_cast<CXXFunctionalCastExpr>(leftOp))
+		pr.TraverseStmt(funcCast->getSubExpr());
+	else if(auto* leftOpCall = dyn_cast<CXXOperatorCallExpr>(leftOp))
+	{
+		printFormatFuncOrOpCall(pr, leftOpCall->getArg(0));
+		if(leftOpCall->getNumArgs() > 1)
+		{
+			pr.stream() << ", ";
+			pr.TraverseStmt(leftOpCall->getArg(1)); //The right of the left
+		}
+	}
+
+};
+
+
 //! @todo This function has to be split across all includes
 void boost_port(MatchContainer& mc, MatchFinder& finder)
 {
@@ -54,6 +71,30 @@ void boost_port(MatchContainer& mc, MatchFinder& finder)
 
 	//boost::format
 	Options::getInstance().types["class boost::basic_format<"].semantic = TypeOptions::Value;
+
+	// ****************************** boost::format ***********************************************
+	mc.operatorCallPrinter(finder, "^::boost::basic_format(<|$)", "%", [](DPrinter & pr, Stmt * s)
+	{
+		if(auto* opCall = dyn_cast<CXXOperatorCallExpr>(s))
+		{
+			pr.addExternInclude("std.format", "std.format.format");
+			pr.stream() << "std.format.format(";
+			printFormatFuncOrOpCall(pr, opCall->getArg(0)); //Left operand
+			if(opCall->getNumArgs() > 1)
+			{
+				pr.stream() << ", ";
+				pr.TraverseStmt(opCall->getArg(1)); //Right operand
+			}
+			pr.stream() << ")";
+		}
+	});
+
+	mc.globalFuncPrinter("^::boost::str(<|$)", [](DPrinter & pr, Stmt * s)
+	{
+		if(auto* memCall = dyn_cast<CallExpr>(s))
+			pr.TraverseStmt(memCall->getArg(0));
+	});
+
 }
 
 REG_CUSTOM_PRINTER(boost_port);
