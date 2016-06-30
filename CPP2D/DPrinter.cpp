@@ -2837,7 +2837,7 @@ bool DPrinter::TraverseCXXThrowExpr(CXXThrowExpr* Stmt)
 bool DPrinter::TraverseMaterializeTemporaryExpr(MaterializeTemporaryExpr* Stmt)
 {
 	if(passStmt(Stmt)) return true;
-	TraverseStmt(Stmt->GetTemporaryExpr());
+	TraverseStmt(Stmt->getTemporary());
 	return true;
 }
 
@@ -3017,6 +3017,14 @@ bool DPrinter::TraverseLambdaExpr(LambdaExpr* Node)
 			{
 				hasAuto = true;
 				break;
+			}
+			else if(auto* lvalueRef = dyn_cast<LValueReferenceType>(P->getType()))
+			{
+				if(lvalueRef->getPointeeType()->getTypeClass() == Type::TypeClass::TemplateTypeParm)
+				{
+					hasAuto = true;
+					break;
+				}
 			}
 		}
 	}

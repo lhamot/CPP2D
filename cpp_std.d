@@ -12,12 +12,12 @@ struct pair(K, V)
 	first_type first;
 	second_type second;
 
-	bool opEquals()(auto pair s) const pure @safe
+	bool opEquals(in pair s) const
 	{
 		return first == s.first;
 	}
 
-	int opCmp()(auto pair s) const pure @safe
+	int opCmp(in pair s) const
 	{
 		return 
 			first < s.first? -1:
@@ -78,7 +78,7 @@ struct unordered_map(K, V)
 struct toFunctor(alias F)
 {
 	this(int){}
-	auto opCall(Args...)(Args args)
+	auto ref opCall(Args...)(auto ref Args args)
 	{
 		return F(args);
 	}
@@ -109,7 +109,8 @@ auto move(T)(auto ref T ptr) if(is(T == class))
 
 auto make_pair(A, B)(auto ref A a, auto ref B b)
 {
-	return Tuple!(A, "key", B, "value")(a, b);
+	//return Tuple!(A, "key", B, "value")(a, b);
+	return pair!(A, B)(a, b);
 }
 
 // ******************************* other **************************************
@@ -158,4 +159,13 @@ struct OStream
 		return this;
 	}
 }
+
+//
+/*import mysql.protocol.commands;
+
+auto ref Command bindInputs(Args...)(auto ref Command command, Args args)
+{
+	command.bindParameterTuple(args);
+	return command;
+}*/
 

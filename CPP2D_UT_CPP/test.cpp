@@ -1764,6 +1764,17 @@ void check_lambda()
 
 	auto give_tx_plus_ty = [](auto x, auto y) {return x + y; };
 	CHECK(give_tx_plus_ty(1, 3.33) == 4.33);
+
+	auto copy_a_to_b = [](auto a, auto& b) {b = a; };
+	int b = 0;
+	copy_a_to_b(958421, b);
+	CHECK_EQUAL(b, 958421);
+
+	auto copy_42_to_b = [](auto & b) {b = 42; return 18; };
+	CHECK_EQUAL(copy_42_to_b(b), 18);
+	CHECK_EQUAL(b, 42);
+
+
 }
 
 struct StructWithDefCtor
