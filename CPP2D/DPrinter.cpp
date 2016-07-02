@@ -2469,8 +2469,8 @@ bool DPrinter::TraverseLValueReferenceType(LValueReferenceType* Type)
 		if(getSemantic(Type->getPointeeType()) == TypeOptions::Value)
 		{
 			out() << "Ref!(";
-			if(pt->castAs<AutoType>())
-				printType(pt.getDesugaredType(*Context));
+			if(auto* at = dyn_cast<AutoType>(pt))
+				printType(at->getDeducedType());
 			else
 				printType(pt);
 			out() << ")";
@@ -2988,7 +2988,7 @@ bool DPrinter::TraverseUnaryExprOrTypeTraitExpr(UnaryExprOrTypeTraitExpr* Expr)
 	UnaryExprOrTypeTrait const kind = Expr->getKind();
 	out() << (
 	        kind == UETT_AlignOf					? ").alignof"					:
-	        kind == UETT_SizeOf						? ").sizeof"						:
+	        kind == UETT_SizeOf						? ").sizeof"					:
 	        kind == UETT_OpenMPRequiredSimdAlign	? ").OpenMPRequiredSimdAlign"	:
 	        kind == UETT_VecStep					? ").VecStep"					:
 	        ")");

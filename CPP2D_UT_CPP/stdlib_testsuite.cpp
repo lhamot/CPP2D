@@ -250,6 +250,11 @@ void check_tuple()
 	Tutu tutu(42, "azer");
 	CHECK_EQUAL(std::get<0>(tutu), 42);
 	CHECK_EQUAL(std::get<1>(tutu), "azer");
+
+	typedef std::tuple<int&, std::string&> TutuR;
+	//TutuR tutuR(std::get<0>(tutu), std::get<1>(tutu));
+	//CHECK_EQUAL(std::get<0>(tutuR), 42);
+	//CHECK_EQUAL(std::get<1>(tutuR), "azer");
 }
 
 void stdlib_register(TestFrameWork& tf)
