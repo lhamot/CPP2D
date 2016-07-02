@@ -15,6 +15,8 @@
 #include "../DPrinter.h"
 #include "../MatchContainer.h"
 #include "../CustomPrinters.h"
+#include "../Spliter.h"
+#include "../Options.h"
 
 namespace clang
 {
@@ -567,6 +569,23 @@ void cpp_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 			pr.stream() << "]";
 		}
 	});
+
+	// ************************************ <tuple> *******************************************
+	// tuple
+	mc.tmplTypePrinter(finder, "std::tuple", [](DPrinter & printer, Type * Type)
+	{
+		auto* TSType = dyn_cast<TemplateSpecializationType>(Type);
+		printer.addExternInclude("std.typecons", "Tuple");
+		printer.stream() << "Tuple!(";
+		Spliter spliter(printer, ", ");
+		for(unsigned int arg_idx = 0; arg_idx < TSType->getNumArgs(); ++arg_idx)
+		{
+			spliter.split();
+			printer.printTemplateArgument(TSType->getArg(arg_idx));
+		}
+		printer.stream() << ")";
+	});
+	Options::getInstance().types["class std::tuple<"].semantic = TypeOptions::Value;
 
 	// ************************************ <algorithm> *******************************************
 	mc.globalFuncPrinter("^::std::max(<|$)", [](DPrinter & pr, Stmt * s)

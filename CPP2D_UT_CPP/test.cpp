@@ -1774,7 +1774,10 @@ void check_lambda()
 	CHECK_EQUAL(copy_42_to_b(b), 18);
 	CHECK_EQUAL(b, 42);
 
-
+	auto set_string_to_toto = [](std::string& b) {b = "toto"; };
+	std::string toto;
+	set_string_to_toto(toto);
+	CHECK_EQUAL(toto, "toto");
 }
 
 struct StructWithDefCtor

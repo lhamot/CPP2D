@@ -244,6 +244,14 @@ void check_vector()
 	CHECK_EQUAL(static_cast<int>(d.size()), 2);
 }
 
+void check_tuple()
+{
+	typedef std::tuple<int, std::string> Tutu;
+	Tutu tutu(42, "azer");
+	CHECK_EQUAL(std::get<0>(tutu), 42);
+	CHECK_EQUAL(std::get<1>(tutu), "azer");
+}
+
 void stdlib_register(TestFrameWork& tf)
 {
 	auto ts = std::make_unique<TestSuite>();
@@ -261,6 +269,8 @@ void stdlib_register(TestFrameWork& tf)
 	ts->addTestCase(check_stdarray);
 
 	ts->addTestCase(check_stdpair);
+
+	ts->addTestCase(check_tuple);
 
 	tf.addTestSuite(std::move(ts));
 }
