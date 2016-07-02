@@ -65,7 +65,7 @@ CPP2DPPHandling::CPP2DPPHandling(clang::SourceManager& sourceManager_,
 
 	// TODO : Find a better way if it exists
 	predefines = pp_.getPredefines() +
-	             "\nint cpp2d_dummy_variadic(...);\n"
+	             "\ntemplate<typename... Args> int cpp2d_dummy_variadic(Args&&...);\n"
 	             "template<typename T> int cpp2d_type();\n"
 	             "int cpp2d_name(char const*);\n"
 	             "#define CPP2D_ADD2(A, B) A##B\n"

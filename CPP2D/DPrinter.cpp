@@ -400,22 +400,28 @@ void DPrinter::printMacroArgs(CallExpr* macro_args)
 	{
 		split.split();
 		out() << "q{";
-		if(auto* callExpr = dyn_cast<CallExpr>(arg))
+		if(auto* matTmpExpr = dyn_cast<MaterializeTemporaryExpr>(arg))
 		{
-			if(auto* impCast = dyn_cast<ImplicitCastExpr>(callExpr->getCallee()))
+			Stmt* tmpExpr = matTmpExpr->getTemporary();
+			if(auto* callExpr = dyn_cast<CallExpr>(tmpExpr))
 			{
-				if(auto* func = dyn_cast<DeclRefExpr>(impCast->getSubExpr()))
+				if(auto* impCast = dyn_cast<ImplicitCastExpr>(callExpr->getCallee()))
 				{
-					std::string const func_name = func->getNameInfo().getAsString();
-					if(func_name == "cpp2d_type")
+					if(auto* func = dyn_cast<DeclRefExpr>(impCast->getSubExpr()))
 					{
-						TraverseTemplateArgument(func->getTemplateArgs()->getArgument());
-					}
-					else if(func_name == "cpp2d_name")
-					{
-						auto* impCast2 = dyn_cast<ImplicitCastExpr>(callExpr->getArg(0));
-						auto* str = dyn_cast<StringLiteral>(impCast2->getSubExpr());
-						out() << str->getString().str();
+						std::string const func_name = func->getNameInfo().getAsString();
+						if(func_name == "cpp2d_type")
+						{
+							TraverseTemplateArgument(func->getTemplateArgs()->getArgument());
+						}
+						else if(func_name == "cpp2d_name")
+						{
+							auto* impCast2 = dyn_cast<ImplicitCastExpr>(callExpr->getArg(0));
+							auto* str = dyn_cast<StringLiteral>(impCast2->getSubExpr());
+							out() << str->getString().str();
+						}
+						else
+							TraverseStmt(arg);
 					}
 					else
 						TraverseStmt(arg);
