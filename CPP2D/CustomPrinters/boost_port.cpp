@@ -95,6 +95,36 @@ void boost_port(MatchContainer& mc, MatchFinder& finder)
 			pr.TraverseStmt(memCall->getArg(0));
 	});
 
+
+	// ****************************** boost::range ***********************************************
+	// transform
+	finder.addMatcher(cxxOperatorCallExpr(
+	                    hasArgument(1, hasType(namedDecl(matchesName("transform_holder")))),
+	                    hasOverloadedOperatorName("|")
+	                  ).bind("boost::transformed"), &mc);
+	mc.stmtPrinters.emplace("boost::transformed", [](DPrinter & pr, Stmt * s)
+	{
+		if(auto* opCall = dyn_cast<CXXOperatorCallExpr>(s))
+		{
+			pr.addExternInclude("std.algorithm", "std.algorithm.map");
+			pr.TraverseStmt(opCall->getArg(0));
+			pr.stream() << "[].map!(";
+			if(auto* a = dyn_cast<MaterializeTemporaryExpr>(opCall->getArg(1)))
+			{
+				if(auto* b = dyn_cast<ImplicitCastExpr>(a->getTemporary()))
+				{
+					if(auto* c = dyn_cast<CXXOperatorCallExpr>(b->getSubExpr()))
+					{
+						Expr* right = c->getArg(1);
+						pr.dontTakePtr.insert(right);
+						pr.TraverseStmt(right);
+						pr.dontTakePtr.erase(right);
+					}
+				}
+			}
+			pr.stream() << ")()";
+		}
+	});
 }
 
 REG_CUSTOM_PRINTER(boost_port);

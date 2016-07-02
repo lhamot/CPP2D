@@ -479,6 +479,8 @@ public:
 
 	bool VisitType(clang::Type* Type);
 
+	std::set<clang::Expr*> dontTakePtr;    //!< Avoid to take pointer when implicit FunctionToPointerDecay
+
 private:
 	//! Add the import of for this file if it was included in the C++ file
 	void includeFile(std::string const& inclFile, std::string const& typeName);
@@ -540,7 +542,6 @@ private:
 	bool passType(clang::Type* type);
 
 	std::set<std::string> includesInFile;  //!< All includes find in the <b>C++</b> file
-	std::set<clang::Expr*> dontTakePtr;    //!< Avoid to take pointer when implicit FunctionToPointerDecay
 	std::map<std::string, std::set<std::string> > externIncludes; //!< import to do in **D**
 	std::string modulename; //!< Name of the <b>C++</b> module
 
