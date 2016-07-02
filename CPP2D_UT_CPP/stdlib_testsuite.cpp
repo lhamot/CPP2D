@@ -9,6 +9,7 @@
 #include "framework.h"
 #include <cmath>
 #include "math.h"
+#include <iostream>
 
 struct ContainHashMap
 {
@@ -156,6 +157,8 @@ void check_unique_ptr()
 	//std::unique_ptrd_ptr<Class781> classptr3(new Class781()); //Use make_shared!!
 	//CHECK(classptr3 != nullptr);
 	std::unique_ptr<Class781> classptr4 = std::make_unique<Class781>();  //make_shared ctor
+	(*classptr4).i = 78;
+	CHECK_EQUAL((*classptr4).i, 78);
 	CHECK(classptr4 != nullptr);
 	classptr4 = std::make_unique<Class781>(); //assign make_shared
 	CHECK(classptr4 != nullptr);
@@ -166,6 +169,8 @@ void check_unique_ptr()
 	std::unique_ptr<Struct781> structptr1; //default ctor
 	CHECK(structptr1 == nullptr);
 	structptr1 = std::make_unique<Struct781>(); //assign make_shared
+	(*structptr1).i = 78;
+	CHECK_EQUAL((*structptr1).i, 78);
 	CHECK(structptr1 != nullptr);
 	//structptr1.reset(new Struct781()); //Use make_shared!!
 	//CHECK(structptr1 != nullptr);
@@ -241,7 +246,10 @@ void check_vector()
 
 	d.push_back(std::make_shared<Class783>());
 	CHECK_EQUAL(d[1]->i, 12);
+	CHECK_EQUAL(d.at(1)->i, 12);
 	CHECK_EQUAL(static_cast<int>(d.size()), 2);
+
+	std::cout << std::endl;
 }
 
 void check_tuple()

@@ -191,6 +191,23 @@ void cpp_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 		});
 	}
 
+	for(char const* container : containerTab)
+	{
+		mc.methodPrinter(container, "at", [](DPrinter & pr, Stmt * s)
+		{
+			if(auto* memCall = dyn_cast<CXXMemberCallExpr>(s))
+			{
+				if(auto* memExpr = dyn_cast<MemberExpr>(memCall->getCallee()))
+				{
+					pr.TraverseStmt(memExpr->isImplicitAccess() ? nullptr : memExpr->getBase());
+					pr.stream() << '[';
+					pr.TraverseStmt(*memCall->arg_begin());
+					pr.stream() << ']';
+				}
+			}
+		});
+	}
+
 	mc.operatorCallPrinter(finder, "^::std::basic_string(<|$)", "+=",
 	                       [](DPrinter & pr, Stmt * s)
 	{
@@ -303,6 +320,13 @@ void cpp_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 				pr.TraverseStmt(rightOp);
 			}
 		}
+	});
+
+	mc.operatorCallPrinter(finder, "^::std::(__)?(shared_ptr|unique_ptr)(<|$)", "*",
+	                       [&mc](DPrinter & pr, Stmt * s)
+	{
+		if(auto* opCall = dyn_cast<CXXOperatorCallExpr>(s))
+			pr.TraverseStmt(opCall->getArg(0));
 	});
 
 	mc.operatorCallPrinter(finder, "^::std::(__)?shared_ptr(<|$)", "!=",
@@ -457,6 +481,14 @@ void cpp_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 		pr.stream() << "OStream(std.stdio.stdout)";
 		pr.addExternInclude("std.stdio", "std.stdio.stdout");
 		pr.addExternInclude("cpp_std", "OStream");
+	});
+
+	// std::endl
+	finder.addMatcher(
+	  implicitCastExpr(hasSourceExpression(declRefExpr(hasDeclaration(namedDecl(matchesName("endl")))))).bind("std::endl"), &mc);
+	mc.stmtPrinters.emplace("std::endl", [](DPrinter & pr, Stmt*)
+	{
+		pr.stream() << "\"\\n\"";
 	});
 
 	// ********************** <optional> **********************************************************
