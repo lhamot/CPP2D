@@ -67,15 +67,38 @@ void cpp_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 	  "^::(boost|std)::(vector|array|set|map|multiset|multimap|unordered_set|unordered_map|"
 	  "unordered_multiset|unordered_multimap|queue|stack|list|forcard_list)";
 
-	mc.tmplTypePrinter(finder, "std::map", [](DPrinter & printer, Type * Type)
+	mc.tmplTypePrinter("^::std::map($|<.*>$)", [](DPrinter & printer, Decl * d)
 	{
-		auto* TSType = dyn_cast<TemplateSpecializationType>(Type);
-		printer.addExternInclude("cpp_std", "cpp_std.map");
-		printer.stream() << "cpp_std.map!(";
-		printer.printTemplateArgument(TSType->getArg(0));
-		printer.stream() << ", ";
-		printer.printTemplateArgument(TSType->getArg(1));
-		printer.stream() << ")";
+		if(auto* tmpSpec = llvm::dyn_cast<ClassTemplateSpecializationDecl>(d))
+		{
+			printer.addExternInclude("cpp_std", "cpp_std.map");
+			printer.stream() << "cpp_std.map!(";
+			TemplateArgumentList const& tmpArgsSpec = tmpSpec->getTemplateInstantiationArgs();
+			printer.printTemplateArgument(tmpArgsSpec.get(0));
+			printer.stream() << ", ";
+			printer.printTemplateArgument(tmpArgsSpec.get(1));
+			printer.stream() << ")";
+		}
+	});
+
+	mc.tmplTypePrinter("^::std::map<.*>::value_type$", [](DPrinter & printer, Decl * d) //std::map<.*>::
+	{
+		if(auto* named = dyn_cast<NamedDecl>(d))
+		{
+			if(DeclContext* ctx = named->getDeclContext())
+			{
+				if(auto* tmpSpec = dyn_cast<ClassTemplateSpecializationDecl>(ctx))
+				{
+					printer.stream() << "cpp_std.pair!(";
+					TemplateArgumentList const& tmpArgsSpec = tmpSpec->getTemplateInstantiationArgs();
+					printer.printTemplateArgument(tmpArgsSpec.get(0));
+					printer.stream() << ", ";
+					printer.printTemplateArgument(tmpArgsSpec.get(1));
+					printer.stream() << ")";
+
+				}
+			}
+		}
 	});
 
 	finder.addMatcher(callExpr(
@@ -223,20 +246,23 @@ void cpp_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 
 
 	// shared_ptr
-	mc.tmplTypePrinter(finder, "std::shared_ptr", [](DPrinter & printer, Type * Type)
+	mc.tmplTypePrinter("^::std::shared_ptr", [](DPrinter & printer, Decl * d)
 	{
-		auto* TSType = dyn_cast<TemplateSpecializationType>(Type);
-		TemplateArgument const& arg = TSType->getArg(0);
-		TypeOptions::Semantic const sem = DPrinter::getSemantic(arg.getAsType());
-		if(sem == TypeOptions::Value)
+		if(auto* tmpSpec = llvm::dyn_cast<ClassTemplateSpecializationDecl>(d))
 		{
-			printer.addExternInclude("std.typecons", "RefCounted");
-			printer.stream() << "std.typecons.RefCounted!(";
-			printer.printTemplateArgument(TSType->getArg(0));
-			printer.stream() << ")";
+			TemplateArgumentList const& tmpArgsSpec = tmpSpec->getTemplateInstantiationArgs();
+			TemplateArgument const& arg = tmpArgsSpec.get(0);
+			TypeOptions::Semantic const sem = DPrinter::getSemantic(arg.getAsType());
+			if(sem == TypeOptions::Value)
+			{
+				printer.addExternInclude("std.typecons", "RefCounted");
+				printer.stream() << "std.typecons.RefCounted!(";
+				printer.printTemplateArgument(arg);
+				printer.stream() << ")";
+			}
+			else
+				printer.printTemplateArgument(arg);
 		}
-		else
-			printer.printTemplateArgument(TSType->getArg(0));
 	});
 
 	finder.addMatcher(implicitCastExpr(
@@ -353,20 +379,23 @@ void cpp_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 	});
 
 	// unique_ptr
-	mc.tmplTypePrinter(finder, "std::unique_ptr", [](DPrinter & printer, Type * Type)
+	mc.tmplTypePrinter("^::std::unique_ptr", [](DPrinter & printer, Decl * d)
 	{
-		auto* TSType = dyn_cast<TemplateSpecializationType>(Type);
-		TemplateArgument const& arg = TSType->getArg(0);
-		TypeOptions::Semantic const sem = DPrinter::getSemantic(arg.getAsType());
-		if(sem == TypeOptions::Value)
+		if(auto* tmpSpec = llvm::dyn_cast<ClassTemplateSpecializationDecl>(d))
 		{
-			printer.addExternInclude("std.typecons", "RefCounted");
-			printer.stream() << "std.typecons.RefCounted!(";
-			printer.printTemplateArgument(TSType->getArg(0));
-			printer.stream() << ")";
+			TemplateArgumentList const& tmpArgsSpec = tmpSpec->getTemplateInstantiationArgs();
+			TemplateArgument const& arg = tmpArgsSpec.get(0);
+			TypeOptions::Semantic const sem = DPrinter::getSemantic(arg.getAsType());
+			if(sem == TypeOptions::Value)
+			{
+				printer.addExternInclude("std.typecons", "RefCounted");
+				printer.stream() << "std.typecons.RefCounted!(";
+				printer.printTemplateArgument(arg);
+				printer.stream() << ")";
+			}
+			else
+				printer.printTemplateArgument(arg);
 		}
-		else
-			printer.printTemplateArgument(TSType->getArg(0));
 	});
 
 	mc.globalFuncPrinter("^::(std|boost)::make_unique(<|$)", [](DPrinter & pr, Stmt * s)
@@ -464,13 +493,16 @@ void cpp_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 	});
 
 	// std::function
-	auto function_print = [](DPrinter & printer, Type * Type)
+	auto function_print = [](DPrinter & printer, Decl * d)
 	{
-		auto* TSType = dyn_cast<TemplateSpecializationType>(Type);
-		printer.printTemplateArgument(TSType->getArg(0));
+		if(auto* tmpSpec = llvm::dyn_cast<ClassTemplateSpecializationDecl>(d))
+		{
+			TemplateArgumentList const& tmpArgsSpec = tmpSpec->getTemplateInstantiationArgs();
+			printer.printTemplateArgument(tmpArgsSpec.get(0));
+		}
 	};
-	mc.tmplTypePrinter(finder, "std::function", function_print);
-	mc.tmplTypePrinter(finder, "boost::function", function_print);
+	mc.tmplTypePrinter("^::std::function", function_print);
+	mc.tmplTypePrinter("^::boost::function", function_print);
 
 	// ********************** <iostream> **********************************************************
 	// std::cout
@@ -529,15 +561,18 @@ void cpp_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 
 
 	// pair
-	mc.tmplTypePrinter(finder, "std::pair", [](DPrinter & printer, Type * Type)
+	mc.tmplTypePrinter("^::std::pair", [](DPrinter & printer, Decl * d)
 	{
-		auto* TSType = dyn_cast<TemplateSpecializationType>(Type);
-		printer.addExternInclude("std.typecons", "Tuple");
-		printer.stream() << "Tuple!(";
-		printer.printTemplateArgument(TSType->getArg(0));
-		printer.stream() << ", \"key\", ";
-		printer.printTemplateArgument(TSType->getArg(1));
-		printer.stream() << ", \"value\")";
+		if(auto* tmpSpec = llvm::dyn_cast<ClassTemplateSpecializationDecl>(d))
+		{
+			TemplateArgumentList const& tmpArgsSpec = tmpSpec->getTemplateInstantiationArgs();
+			printer.addExternInclude("std.typecons", "Tuple");
+			printer.stream() << "Tuple!(";
+			printer.printTemplateArgument(tmpArgsSpec.get(0));
+			printer.stream() << ", \"key\", ";
+			printer.printTemplateArgument(tmpArgsSpec.get(1));
+			printer.stream() << ", \"value\")";
+		}
 	});
 
 	mc.memberPrinter(finder, "^::std::pair\\<.*\\>::second", [](DPrinter & pr, Stmt * s)
@@ -604,18 +639,21 @@ void cpp_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 
 	// ************************************ <tuple> *******************************************
 	// tuple
-	mc.tmplTypePrinter(finder, "std::tuple", [](DPrinter & printer, Type * Type)
+	mc.tmplTypePrinter("^::std::tuple", [](DPrinter & printer, Decl * d)
 	{
-		auto* TSType = dyn_cast<TemplateSpecializationType>(Type);
-		printer.addExternInclude("std.typecons", "Tuple");
-		printer.stream() << "Tuple!(";
-		Spliter spliter(printer, ", ");
-		for(unsigned int arg_idx = 0; arg_idx < TSType->getNumArgs(); ++arg_idx)
+		if(auto* tmpSpec = llvm::dyn_cast<ClassTemplateSpecializationDecl>(d))
 		{
-			spliter.split();
-			printer.printTemplateArgument(TSType->getArg(arg_idx));
+			TemplateArgumentList const& tmpArgsSpec = tmpSpec->getTemplateInstantiationArgs();
+			printer.addExternInclude("std.typecons", "Tuple");
+			printer.stream() << "Tuple!(";
+			Spliter spliter(printer, ", ");
+			for(unsigned int arg_idx = 0; arg_idx < tmpArgsSpec.size(); ++arg_idx)
+			{
+				spliter.split();
+				printer.printTemplateArgument(tmpArgsSpec.get(arg_idx));
+			}
+			printer.stream() << ")";
 		}
-		printer.stream() << ")";
 	});
 	Options::getInstance().types["class std::tuple<"].semantic = TypeOptions::Value;
 
@@ -660,12 +698,15 @@ void cpp_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 		}
 	});
 
-	mc.tmplTypePrinter(finder, "std::basic_string", [](DPrinter & printer, Type * Type)
+	mc.tmplTypePrinter("^::std::basic_string", [](DPrinter & printer, Decl * d)
 	{
-		auto* TSType = dyn_cast<TemplateSpecializationType>(Type);
-		printer.stream() << "immutable(";
-		printer.printTemplateArgument(TSType->getArg(0));
-		printer.stream() << ")[]";
+		if(auto* tmpSpec = llvm::dyn_cast<ClassTemplateSpecializationDecl>(d))
+		{
+			TemplateArgumentList const& tmpArgsSpec = tmpSpec->getTemplateInstantiationArgs();
+			printer.stream() << "immutable(";
+			printer.printTemplateArgument(tmpArgsSpec.get(0));
+			printer.stream() << ")[]";
+		}
 	});
 }
 

@@ -81,7 +81,6 @@ static std::map<std::string, std::string> type2type =
 	{ "size_t", "size_t" },
 	{ "SafeInt", "std.experimental.safeint.SafeInt" },
 	{ "RedBlackTree", "std.container.rbtree" },
-	{ "std::map", "cpp_std.map" },
 	{ "std::string", "string" },
 	{ "std::ostream", "std.stdio.File" },
 	{ "std::rand", "core.stdc.rand" },
@@ -215,17 +214,13 @@ void DPrinter::printDeclContext(DeclContext* DC)
 		return;
 	else if(ClassTemplateSpecializationDecl* Spec = dyn_cast<ClassTemplateSpecializationDecl>(DC))
 	{
-		out() << Spec->getIdentifier()->getName().str();
-		out() << "!(";
-		const TemplateArgumentList& tmpArgsSpec = Spec->getTemplateArgs();
-		Spliter spliter2(*this, ", ");
-		for(unsigned int i = 0, size = tmpArgsSpec.size(); i != size; ++i)
+		if(passDecl(Spec) == false)
 		{
-			spliter2.split();
-			TemplateArgument const& tmpArg = tmpArgsSpec.get(i);
-			printTemplateArgument(tmpArg);
+			auto* type = Spec->getTypeForDecl();
+			QualType qtype = type->getCanonicalTypeInternal();
+			TraverseType(qtype);
 		}
-		out() << ").";
+		out() << ".";
 	}
 	else if(TagDecl* Tag = dyn_cast<TagDecl>(DC))
 	{
@@ -688,9 +683,31 @@ void DPrinter::printTmpArgList(std::string const& tmpArgListStr)
 	out() << "!(" << tmpArgListStr << ')';
 }
 
+
+bool DPrinter::customTypePrinter(NamedDecl* decl)
+{
+	if(decl == nullptr)
+		return false;
+	std::string typeName = decl->getQualifiedNameAsString();
+	for(auto const& name_printer : receiver.customTypePrinters)
+	{
+		llvm::Regex RE(name_printer.first);
+		if(RE.match("::" + typeName))
+		{
+			name_printer.second(*this, decl);// TemplateName().getAsTemplateDecl());
+			return true;
+		}
+	}
+	return false;
+}
+
 bool DPrinter::TraverseTemplateSpecializationType(TemplateSpecializationType* Type)
 {
 	if(passType(Type)) return false;
+
+	if(customTypePrinter(Type->getAsTagDecl()))
+		return true;
+
 	if(isStdArray(Type->desugar()))
 	{
 		printTemplateArgument(Type->getArg(0));
@@ -723,6 +740,9 @@ bool DPrinter::TraverseTemplateSpecializationType(TemplateSpecializationType* Ty
 bool DPrinter::TraverseTypedefType(TypedefType* Type)
 {
 	if(passType(Type)) return false;
+	if(customTypePrinter(Type->getDecl()))
+		return true;
+
 	out() << printDeclName(Type->getDecl());
 	return true;
 }
@@ -1185,6 +1205,13 @@ void DPrinter::printTemplateArgument(TemplateArgument const& ta)
 	case TemplateArgument::Integral: out() << ta.getAsIntegral().toString(10); break;
 	case TemplateArgument::NullPtr: out() << "null"; break;
 	case TemplateArgument::Type: printType(ta.getAsType()); break;
+	case TemplateArgument::Pack:
+	{
+		Spliter split(*this, ", ");
+		for(TemplateArgument const& arg : ta.pack_elements())
+			split.split(), printTemplateArgument(arg);
+		break;
+	}
 	default: TraverseTemplateArgument(ta);
 	}
 }
@@ -3585,6 +3612,9 @@ bool DPrinter::TraverseUnresolvedLookupExpr(UnresolvedLookupExpr*  Expr)
 bool DPrinter::TraverseRecordType(RecordType* Type)
 {
 	if(passType(Type)) return false;
+	if(customTypePrinter(Type->getDecl()))
+		return true;
+
 	out() << printDeclName(Type->getDecl());
 	RecordDecl* decl = Type->getDecl();
 	switch(decl->getKind())

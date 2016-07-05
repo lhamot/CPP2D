@@ -101,12 +101,10 @@ void MatchContainer::globalFuncPrinter(
 	globalFuncPrinters[funcName] = printer;
 };
 
-void MatchContainer::tmplTypePrinter(clang::ast_matchers::MatchFinder& finder,
-                                     std::string const& name,
-                                     TypePrinter const& printer)
+void MatchContainer::tmplTypePrinter(std::string const& name,
+                                     DeclPrinter const& printMapDecl)
 {
-	finder.addMatcher(templateSpecializationType(hasDeclaration(namedDecl(hasName(name)))).bind(name), this);
-	typePrinters.emplace(name, printer);
+	customTypePrinters.emplace(name, printMapDecl);
 };
 
 void MatchContainer::memberPrinter(clang::ast_matchers::MatchFinder& finder,

@@ -80,9 +80,8 @@ public:
 
 	//! Custom print a template type
 	void tmplTypePrinter(
-	  clang::ast_matchers::MatchFinder& finder,
-	  std::string const& name,		//!< Type name (no regex)
-	  TypePrinter const& printer	//!< Custom printer
+	  std::string const& name,			//!< Type name (regex)
+	  DeclPrinter const& printMapDecl	//!< Custom printer
 	);
 
 	//! Custom print a member call
@@ -118,6 +117,8 @@ public:
 	std::unordered_map<std::string, ClassPrinter> methodPrinters;
 
 	std::unordered_map<std::string, StmtPrinter> globalFuncPrinters;
+
+	std::unordered_map<std::string, DeclPrinter> customTypePrinters;
 
 	//! Custom printer for clang::Type matchers. [matchername] -> printer
 	std::unordered_map<std::string, TypePrinter> typePrinters;

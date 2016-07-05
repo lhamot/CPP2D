@@ -5,11 +5,36 @@
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 //
 #include <unordered_map>
+#include <map>
 #include <array>
 #include "framework.h"
 #include <cmath>
 #include "math.h"
 #include <iostream>
+
+template<typename T>
+struct TestType {};
+
+void check_std_map()
+{
+	/*std::map<int, int> m1;
+	m1[36] = 78;
+	CHECK_EQUAL(m1[36], 78);
+
+	auto m2 = m1;
+	m2[36] = 581;
+	CHECK_EQUAL(m2[36], 581);
+	CHECK_EQUAL(m1[36], 78);*/
+
+	//auto lmbd = [](std::map<int, std::string> toto) {};
+	//auto lmbd2 = [](std::map<int, int>::value_type toto) {};
+
+	//TestType<std::string> toto;
+	//TestType<std::map<std::string, int>> tata;
+	std::map<int, std::string> tutu;
+	std::map<int, std::string>::value_type titi;
+	TestType<TestType<std::map<int, std::string>>> tata;
+}
 
 struct ContainHashMap
 {
@@ -254,6 +279,7 @@ void check_vector()
 
 void check_tuple()
 {
+	typedef std::tuple<int, std::map<int, std::string> > sdgdfh;
 	typedef std::tuple<int, std::string> Tutu;
 	Tutu tutu(42, "azer");
 	CHECK_EQUAL(std::get<0>(tutu), 42);
@@ -268,6 +294,8 @@ void check_tuple()
 void stdlib_register(TestFrameWork& tf)
 {
 	auto ts = std::make_unique<TestSuite>();
+
+	ts->addTestCase(check_std_map);
 
 	ts->addTestCase(check_vector);
 

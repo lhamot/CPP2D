@@ -509,6 +509,10 @@ private:
 	  clang::SourceLocation const& nextStart = clang::SourceLocation()  //!< Stmt end
 	);
 
+	//! Call a custom type printer for this type if it exist
+	//! @return true if a custom printer was called
+	bool customTypePrinter(clang::NamedDecl* decl);
+
 	//! @brief Print to **D**, arguments of a **cpp2d_dummy_variadic** function call
 	//! @see https://github.com/lhamot/CPP2D/wiki/Macro-migration
 	void printMacroArgs(clang::CallExpr* macroArgs //!< Argument of the **cpp2d_dummy_variadic**
