@@ -2879,11 +2879,21 @@ bool DPrinter::TraverseCXXFunctionalCastExpr(CXXFunctionalCastExpr* Stmt)
 	if(passStmt(Stmt)) return true;
 	QualType qt = Stmt->getTypeInfoAsWritten()->getType();
 	if(getSemantic(qt) == TypeOptions::Reference)
+	{
 		out() << "new ";
-	printType(qt);
-	out() << '(';
-	TraverseStmt(Stmt->getSubExpr());
-	out() << ')';
+		printType(qt);
+		out() << '(';
+		TraverseStmt(Stmt->getSubExpr());
+		out() << ')';
+	}
+	else
+	{
+		out() << "cast(";
+		printType(qt);
+		out() << ")(";
+		TraverseStmt(Stmt->getSubExpr());
+		out() << ")";
+	}
 	return true;
 }
 

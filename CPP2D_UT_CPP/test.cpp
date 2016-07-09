@@ -2342,9 +2342,18 @@ void check_enum()
 	CHECK_EQUAL(y, Z::B);
 }
 
+void check_cast()
+{
+	double d = 3.33;
+	int i = int(d);
+	CHECK_EQUAL(i, 3);
+}
+
 void test_register(TestFrameWork& tf)
 {
 	auto ts = std::make_unique<TestSuite>();
+
+	ts->addTestCase(check_cast);
 
 	ts->addTestCase(check_enum);
 
