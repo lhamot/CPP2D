@@ -3577,8 +3577,10 @@ bool DPrinter::TraverseDeclRefExpr(DeclRefExpr* Expr)
 			nnsQualType = nns->getAsType()->getCanonicalTypeUnqualified();
 	}
 	auto decl = Expr->getDecl();
+	bool nestedNamePrined = false;
 	if(decl->getKind() == Decl::Kind::EnumConstant)
 	{
+		nestedNamePrined = true;
 		if(nnsQualType != decl->getType().getUnqualifiedType())
 		{
 			printType(decl->getType().getUnqualifiedType());
@@ -3588,11 +3590,15 @@ bool DPrinter::TraverseDeclRefExpr(DeclRefExpr* Expr)
 			TraverseNestedNameSpecifier(nns);
 	}
 	else if(nns)
+	{
+		nestedNamePrined = true;
 		TraverseNestedNameSpecifier(nns);
+	}
 
 	std::string name = getName(Expr->getNameInfo().getName());
-	if(char const* filename = CPP2DTools::getFile(Context->getSourceManager(), Expr->getDecl()))
-		includeFile(filename, name);
+	if(nestedNamePrined == false)
+		if(char const* filename = CPP2DTools::getFile(Context->getSourceManager(), Expr->getDecl()))
+			includeFile(filename, name);
 	out() << mangleName(name);
 	traverseDeclRefExprImpl(Expr);
 	return true;

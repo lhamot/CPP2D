@@ -2,34 +2,11 @@ import std.container.rbtree;
 import std.container.array;
 import std.typecons;
 import std.stdio;
+import std.conv;
 
 //******************************  map *****************************************
-struct pair(K, V)
-{
-	alias first_type = K;
-	alias second_type = V;
-
-	first_type first;
-	second_type second;
-
-	bool opEquals(in pair s) const
-	{
-		return first == s.first;
-	}
-
-	int opCmp(in pair s) const
-	{
-		return 
-			first < s.first? -1:
-			first > s.first? 1:
-			0;
-	}
-
-	ref first_type key() {return first;}
-	ref second_type value() {return second;}
-}
-
-alias map(K, V, alias less = "a < b") = RedBlackTree!(pair!(K, V), less, false);
+alias pair(K, V) = Tuple!(K, "key", V, "value");
+alias map(K, V, alias less = "a[0] < b[0]") = RedBlackTree!(pair!(K, V), less, false);
 alias multimap(K, V, alias less = "a < b") = RedBlackTree!(pair!(K, V), less, true);
 
 
@@ -160,12 +137,30 @@ struct OStream
 	}
 }
 
-//
-/*import mysql.protocol.commands;
 
-auto ref Command bindInputs(Args...)(auto ref Command command, Args args)
+enum ios_base
 {
-	command.bindParameterTuple(args);
-	return command;
-}*/
+	in_ = 1,
+	out_ = 2
+}
+
+struct Stringstream
+{
+	string data;
+
+	this(ios_base mode){}
+
+	this(string str, int mode = 3){data = str;}
+
+	ref Stringstream opBinary(string op = "<<", T)(auto ref T arg)
+	{
+		data ~= to!string(arg);
+		return this;
+	}
+
+	string str()
+	{
+		return data;
+	}
+}
 

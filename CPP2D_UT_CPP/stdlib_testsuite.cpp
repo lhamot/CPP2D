@@ -4,6 +4,7 @@
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 //
+#include <sstream>
 #include <unordered_map>
 #include <map>
 #include <array>
@@ -291,9 +292,23 @@ void check_tuple()
 	//CHECK_EQUAL(std::get<1>(tutuR), "azer");
 }
 
+void check_stringstream()
+{
+	std::stringstream ss;
+	ss << "abc" << " " << 42;
+	CHECK(ss.str() == "abc 42");
+	std::stringstream& ss2 = ss;
+	CHECK(ss2.str() == "abc 42");
+
+	std::stringstream ss3("dfgdfgfh");
+	CHECK(ss3.str() == "dfgdfgfh");
+}
+
 void stdlib_register(TestFrameWork& tf)
 {
 	auto ts = std::make_unique<TestSuite>();
+
+	ts->addTestCase(check_stringstream);
 
 	ts->addTestCase(check_std_map);
 
