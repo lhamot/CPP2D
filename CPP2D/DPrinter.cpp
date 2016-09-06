@@ -2354,7 +2354,10 @@ bool DPrinter::TraverseEnumConstantDecl(EnumConstantDecl* Decl)
 bool DPrinter::TraverseEnumDecl(EnumDecl* Decl)
 {
 	if(passDecl(Decl)) return true;
-	out() << "enum " << mangleName(Decl->getNameAsString());
+	out() << "enum";
+	if (Decl->getDeclName()) {
+		out() << " " << mangleName(Decl->getNameAsString());
+	}
 	if(Decl->isFixed())
 	{
 		out() << " : ";
