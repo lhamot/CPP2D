@@ -152,6 +152,8 @@ std::string mangleName(std::string const& name)
 		return "function_";
 	if(name == "cast")
 		return "cast_";
+	if (name == "align")
+		return "align_";
 	else if(name == "Exception")
 		return "Exception_";
 	else

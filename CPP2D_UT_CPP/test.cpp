@@ -2350,6 +2350,28 @@ void check_cast()
 	CHECK_EQUAL(i, 3);
 }
 
+void check_keyword_convertion()
+{
+	int version = 0;
+	CHECK_EQUAL(version, 0);
+	int out = 0;
+	CHECK_EQUAL(out, 0);
+	int in = 0;
+	CHECK_EQUAL(in, 0);
+	int ref = 0;
+	CHECK_EQUAL(ref, 0);
+	int debug = 0;
+	CHECK_EQUAL(debug, 0);
+	int function = 0;
+	CHECK_EQUAL(function, 0);
+	int cast = 0;
+	CHECK_EQUAL(cast, 0);
+	int align = 0;
+	CHECK_EQUAL(align, 0);
+	int Exception = 0;
+	CHECK_EQUAL(Exception, 0);
+}
+
 void test_register(TestFrameWork& tf)
 {
 	auto ts = std::make_unique<TestSuite>();
@@ -2463,6 +2485,8 @@ void test_register(TestFrameWork& tf)
 	ts->addTestCase(check_tmpl_sized_array);
 
 	ts->addTestCase(check_rethrow);
+
+	ts->addTestCase(check_keyword_convertion);
 
 	tf.addTestSuite(std::move(ts));
 }
