@@ -28,6 +28,7 @@
 #include "MatchContainer.h"
 #include "CPP2DTools.h"
 #include "Spliter.h"
+#include "CPP2DTools.h"
 
 using namespace llvm;
 using namespace clang;
@@ -152,7 +153,7 @@ std::string mangleName(std::string const& name)
 		return "function_";
 	if(name == "cast")
 		return "cast_";
-	if (name == "align")
+	if(name == "align")
 		return "align_";
 	else if(name == "Exception")
 		return "Exception_";
@@ -351,6 +352,9 @@ void DPrinter::printStmtComment(SourceLocation& locStart,
 	                       sm,
 	                       LangOptions()
 	                      ).str();
+	comment = CPP2DTools::replaceString(comment, "#if", "/*#if");
+	comment = CPP2DTools::replaceString(comment, "#endif", "#endif*/");
+
 	std::vector<std::string> comments = split_lines(comment);
 	//if (comments.back() == std::string())
 	Spliter split(*this, indentStr());
@@ -1998,16 +2002,6 @@ void DPrinter::traverseFunctionDeclImpl(
 		TypeSourceInfo* declSourceInfo = Decl->getTypeSourceInfo();
 		FunctionTypeLoc funcTypeLoc;
 		SourceLocation locStart;
-		if(declSourceInfo)
-		{
-			TypeLoc declTypeLoc = declSourceInfo->getTypeLoc();
-			TypeLoc::TypeLocClass tlClass = declTypeLoc.getTypeLocClass();
-			if(tlClass == TypeLoc::TypeLocClass::FunctionProto)
-			{
-				funcTypeLoc = declTypeLoc.castAs<FunctionTypeLoc>();
-				locStart = funcTypeLoc.getLParenLoc().getLocWithOffset(1);
-			}
-		}
 
 		auto isConst = [](QualType type)
 		{
@@ -2025,8 +2019,23 @@ void DPrinter::traverseFunctionDeclImpl(
 		  ((arg_become_this == -1) ? 0 : -1);
 		FunctionDecl* bodyDecl = Decl;
 		for(FunctionDecl* decl : Decl->redecls())  //Print params of the function definition
-			if(decl != bodyDecl)                   //  rather than the function declaration
+			if(decl != bodyDecl)                    //  rather than the function declaration
+			{
 				bodyDecl = decl;
+				declSourceInfo = bodyDecl->getTypeSourceInfo();
+			}
+
+		if(declSourceInfo)
+		{
+			TypeLoc declTypeLoc = declSourceInfo->getTypeLoc();
+			TypeLoc::TypeLocClass tlClass = declTypeLoc.getTypeLocClass();
+			if(tlClass == TypeLoc::TypeLocClass::FunctionProto)
+			{
+				funcTypeLoc = declTypeLoc.castAs<FunctionTypeLoc>();
+				locStart = funcTypeLoc.getLParenLoc().getLocWithOffset(1);
+			}
+		}
+
 		for(ParmVarDecl* decl : bodyDecl->params())
 		{
 			if(arg_become_this == static_cast<int>(index))

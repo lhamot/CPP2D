@@ -163,19 +163,6 @@ std::string print_macro(MacroInfo const* MI)
 	return new_macro;
 }
 
-std::string replaceString(std::string subject,
-                          const std::string& search,
-                          const std::string& replace)
-{
-	size_t pos = 0;
-	while((pos = subject.find(search, pos)) != std::string::npos)
-	{
-		subject.replace(pos, search.length(), replace);
-		pos += replace.length();
-	}
-	return subject;
-}
-
 //! Print the macro as a D mixin
 std::string make_d_macro(MacroInfo const* MI, std::string const& name)
 {
@@ -211,12 +198,15 @@ std::string make_d_macro(MacroInfo const* MI, std::string const& name)
 		}
 		else if(Tok.isLiteral() && Tok.getLiteralData())
 		{
-			std::string const literal = replaceString(std::string(Tok.getLiteralData(), Tok.getLength()), "\"", "\\\"");
+			std::string const literal =
+			  CPP2DTools::replaceString(
+			    std::string(Tok.getLiteralData(), Tok.getLength()), "\"", "\\\"");
 			d_templ << '"' + literal + '"';
 		}
 		else if(auto* II = Tok.getIdentifierInfo())
 		{
-			std::string const identifierName = replaceString(II->getName(), "\"", "\\\"");
+			std::string const identifierName =
+			  CPP2DTools::replaceString(II->getName(), "\"", "\\\"");
 			if(arg_names.count(identifierName))
 			{
 				if(next_is_str)

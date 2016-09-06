@@ -29,4 +29,11 @@ bool checkFilename(std::string const& modulename, char const* filepath_str);
 bool checkFilename(clang::SourceManager const& sourceManager,
                    std::string const& modulename,
                    clang::Decl const* d);
+
+//! @brief Replace the ocurances of search in subject, by replace
+//! @return subject with the replaced strings.
+std::string replaceString(std::string subject,
+                          const std::string& search,
+                          const std::string& replace);
+
 }

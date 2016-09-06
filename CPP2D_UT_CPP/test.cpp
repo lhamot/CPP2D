@@ -270,6 +270,17 @@ struct Toto4
 	Toto4(int a) :tutu(a, 3.3f, true) {}
 };
 
+//! To ensure the same function isn't print twice
+extern "C" {
+	int a_func_with_c_export(int a, int b, int c);
+	// Blablabla
+}
+
+// Blablabla2
+int a_func_with_c_export(int a, int b, int c)
+{
+	return a + b + c;
+}
 
 void check_struct()
 {
