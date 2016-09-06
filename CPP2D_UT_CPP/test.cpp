@@ -1894,7 +1894,8 @@ void check_class_ctor_call()
 
 	Class781* tutu6 = take_class(new Class781(58));
 	CHECK(tutu6->i == 58);
-	delete tutu6;
+	tutu6->~Class781();
+	//::operator delete(tutu6);
 }
 
 void func_throw_except()

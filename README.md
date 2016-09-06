@@ -68,7 +68,7 @@ There is two way to use CPP2D:
 1. Go to the destination directory (D project)
 2. Call ```CPP2D.exe [options] <source0> [... <sourceN>] -- [compiler options]```
    - The double dashes are needed to inform cpp2d you don't need a compilation database
-   - <sourceN> are C++ source files
+   - ```<sourceN>``` are C++ source files
    - [compiler options] are options forwarded to the compiler, like includes path, preprocessor definitions and so on.
    - [options] can be **-macro-stmt** and **-macro-exec** which are for macro handling
 

@@ -3348,8 +3348,21 @@ bool DPrinter::TraverseCXXMemberCallExpr(CXXMemberCallExpr* expr)
 			}
 		}
 	}
-	TraverseStmt(expr->getCallee());
-	printCallExprArgument(expr);
+	if(auto* dtor = dyn_cast<CXXDestructorDecl>(expr->getCalleeDecl()))
+	{
+		out() << "object.destroy(";
+		if(auto* memExpr = dyn_cast<MemberExpr>(expr->getCallee()))
+		{
+			Expr* base = memExpr->isImplicitAccess() ? nullptr : memExpr->getBase();
+			TraverseStmt(base);
+		}
+		out() << ")";
+	}
+	else
+	{
+		TraverseStmt(expr->getCallee());
+		printCallExprArgument(expr);
+	}
 	return true;
 }
 
