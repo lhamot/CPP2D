@@ -3314,10 +3314,13 @@ bool DPrinter::traverseMemberExprImpl(ME* Stmt)
 	{
 		if (memberName.empty() == false && not isThis)
 		{	
-			if (Stmt->isArrow() && 
-				base->getStmtClass() != clang::Stmt::CXXOperatorCallExprClass && 
+			if (Stmt->isArrow() &&
+				base->getStmtClass() != clang::Stmt::CXXOperatorCallExprClass &&
 				getSemantic(base->getType()) == TypeOptions::Semantic::Value)
+			{
 				out() << ".front.";
+				addExternInclude("std.range", "front");
+			}
 			else
 				out() << '.';
 		}
