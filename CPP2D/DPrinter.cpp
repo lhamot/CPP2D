@@ -555,16 +555,29 @@ bool DPrinter::TraverseTranslationUnitDecl(TranslationUnitDecl* Decl)
 bool DPrinter::TraverseTypedefDecl(TypedefDecl* Decl)
 {
 	if(passDecl(Decl)) return true;
-	out() << "alias " << mangleName(Decl->getNameAsString()) << " = ";
+
+	pushStream();
 	printType(Decl->getUnderlyingType());
+	std::string rhs = popStream();
+	std::string lhs = mangleName(Decl->getNameAsString());
+
+	if (lhs != rhs) {
+		out() << "alias " << lhs << " = " << rhs;
+	}
 	return true;
 }
 
 bool DPrinter::TraverseTypeAliasDecl(TypeAliasDecl* Decl)
 {
 	if(passDecl(Decl)) return true;
-	out() << "alias " << mangleName(Decl->getNameAsString()) << " = ";
+	pushStream();
 	printType(Decl->getUnderlyingType());
+	std::string rhs = popStream();
+	std::string lhs = mangleName(Decl->getNameAsString());
+
+	if (lhs != rhs) {
+		out() << "alias " << lhs << " = " << rhs;
+	}
 	return true;
 }
 
