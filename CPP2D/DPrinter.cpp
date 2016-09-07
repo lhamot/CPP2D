@@ -618,12 +618,13 @@ bool DPrinter::TraverseFieldDecl(FieldDecl* Decl)
 		printType(Decl->getType());
 		out() << " " << mangleName(Decl->getNameAsString());
 	}
+	QualType const type = Decl->getType();
 	if(Decl->hasInClassInitializer())
 	{
 		out() << " = ";
 		TraverseStmt(Decl->getInClassInitializer());
 	}
-	else if(getSemantic(Decl->getType()) == TypeOptions::Reference)
+	else if(!type.getTypePtr()->isPointerType() && getSemantic(Decl->getType()) == TypeOptions::Reference)
 	{
 		out() << " = new ";
 		printType(Decl->getType());
@@ -1660,11 +1661,16 @@ bool DPrinter::TraverseConstructorInitializer(CXXCtorInitializer* Init)
 						return true;
 				}
 			}
-			out() << "new ";
-			printType(fieldDecl->getType());
-			out() << '(';
-			TraverseStmt(init);
-			out() << ')';
+			if (fieldDecl->getType()->isPointerType())
+				TraverseStmt(init);
+			else
+			{
+				out() << "new ";
+				printType(fieldDecl->getType());
+				out() << '(';
+				TraverseStmt(init);
+				out() << ')';
+			}
 		}
 	}
 	else if(Init->isWritten())
@@ -2289,11 +2295,11 @@ TypeOptions::Semantic DPrinter::getSemantic(QualType qt)
 			return nvp.second.semantic;
 	}
 
-	Type::TypeClass const cla = type->getTypeClass();
-	return
-	  cla == Type::TypeClass::Auto ? TypeOptions::Value :
-	  (type->isClassType() || type->isFunctionType()) ? TypeOptions::Reference :
-	  TypeOptions::Value;
+	if (auto *pt = dyn_cast<PointerType>(type))
+		return getSemantic(pt->getPointeeType());
+	else
+		return (type->isClassType() || type->isFunctionType()) ? 
+			TypeOptions::Reference : TypeOptions::Value;
 }
 
 bool DPrinter::isPointer(QualType const& type)
@@ -3306,8 +3312,15 @@ bool DPrinter::traverseMemberExprImpl(ME* Stmt)
 	}
 	else
 	{
-		if(memberName.empty() == false && not isThis)
-			out() << '.';
+		if (memberName.empty() == false && not isThis)
+		{	
+			if (Stmt->isArrow() && 
+				base->getStmtClass() != clang::Stmt::CXXOperatorCallExprClass && 
+				getSemantic(base->getType()) == TypeOptions::Semantic::Value)
+				out() << ".front.";
+			else
+				out() << '.';
+		}
 		out() << memberName;
 	}
 	auto TAL = Stmt->getTemplateArgs();

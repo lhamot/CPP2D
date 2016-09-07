@@ -1864,6 +1864,7 @@ class Class782
 public:
 	Class781 toto;
 	Class781* toto2 = nullptr;
+	Class781* toto3;
 
 	//Class782():toto2(new Class781()) {};
 	Class782() = default;
@@ -2404,6 +2405,25 @@ void check_anonymous_enum()
 	static_assert(f == 2, "");
 }
 
+void func_with_pointer(Struct781* s, SimpleClass* s2)
+{
+	int u = s->i;
+	CHECK_EQUAL(u, 5678);
+	int v = s2->i;
+	CHECK_EQUAL(v, 1234);
+}
+
+void check_not_array_ptr()
+{
+	SimpleClass* b = new SimpleClass;
+	b->i = 1234;
+
+	Struct781 s;
+	s.i = 5678;
+	func_with_pointer(&s, b);
+	delete b;
+}
+
 void test_register(TestFrameWork& tf)
 {
 	auto ts = std::make_unique<TestSuite>();
@@ -2521,6 +2541,8 @@ void test_register(TestFrameWork& tf)
 	ts->addTestCase(check_keyword_convertion);
 	
 	ts->addTestCase(check_anonymous_enum);
+
+	ts->addTestCase(check_not_array_ptr);
 
 	tf.addTestSuite(std::move(ts));
 }
