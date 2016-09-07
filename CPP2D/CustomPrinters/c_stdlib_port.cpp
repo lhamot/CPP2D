@@ -46,7 +46,16 @@ void c_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 		mc.cFuncPrinter("string", func);
 
 	// <stdlib>
-	mc.cFuncPrinter("stdlib", "rand");
+	char const* stdlibFuncs[] =
+	{
+		"abort", "abs", "alloca", "atexit", "atof", "atoi", "atol", "atoll", "bsearch", "calloc", 
+		"div", "div_t", "exit", "free", "getenv", "labs", "ldiv", "ldiv_t", "llabs", "lldiv", 
+		"lldiv_t", "malloc", "mblen", "mbstowcs", "mbtowc", "qsort", "rand", "realloc", "srand", 
+		"strtod", "strtof", "strtol", "strtold", "strtoll", "strtoul", "strtoull", "system", 
+		"wcstombs", "wctomb" 
+	};
+	for (char const* func : stdlibFuncs)
+		mc.cFuncPrinter("stdlib", func);
 
 	// <cmath>
 	char const* mathFuncs[] =
