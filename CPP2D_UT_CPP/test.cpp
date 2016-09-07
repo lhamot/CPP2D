@@ -2329,6 +2329,7 @@ void check_rethrow()
 	CHECK(status == 5);
 }
 
+typedef struct Z Z;
 
 struct Z
 {
@@ -2381,6 +2382,26 @@ void check_keyword_convertion()
 	CHECK_EQUAL(align, 0);
 	int Exception = 0;
 	CHECK_EQUAL(Exception, 0);
+}
+
+enum 
+{
+	a,
+	b,
+	c = 32,
+	d,
+	e = 1,
+	f
+};
+
+void check_anonymous_enum()
+{
+	static_assert(a == 0, "");
+	static_assert(b == 1, "");
+	static_assert(c == 32, "");
+	static_assert(d == 33, "");
+	static_assert(e == 1, "");
+	static_assert(f == 2, "");
 }
 
 void test_register(TestFrameWork& tf)
@@ -2498,6 +2519,8 @@ void test_register(TestFrameWork& tf)
 	ts->addTestCase(check_rethrow);
 
 	ts->addTestCase(check_keyword_convertion);
+	
+	ts->addTestCase(check_anonymous_enum);
 
 	tf.addTestSuite(std::move(ts));
 }
