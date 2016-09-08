@@ -2241,6 +2241,68 @@ void check_switch()
 	CHECK(test(1) == 1);
 	CHECK(test(2) == 2);
 	CHECK(test(3) == 3);
+
+	enum EA 
+	{
+		OPT2,
+		OPT21 = OPT2,
+		OPT3
+	};
+
+	auto test_named_enum = [](EA a)
+	{
+		int result = 0;
+		switch (a)
+		{
+		case OPT2: result = 1; break;
+		case OPT3: result = 2;  break;
+		}
+		return result;
+	};
+	CHECK(test_named_enum(OPT2) == 1);
+	CHECK(test_named_enum(OPT21) == 1);
+	CHECK(test_named_enum(OPT3) == 2);
+	CHECK(test_named_enum((EA)-1) == 0);
+
+	enum class EB
+	{
+		OPT4,
+		OPT41 = OPT4,
+		OPT5
+	};
+
+	auto test_class_enum = [](EB a)
+	{
+		int result = 0;
+		switch (a)
+		{
+		case EB::OPT4: result = 1;  break;
+		case EB::OPT5: result = 2;  break;
+		}
+		return result;
+	};
+	CHECK(test_class_enum(EB::OPT4) == 1);
+	CHECK(test_class_enum(EB::OPT41) == 1);
+	CHECK(test_class_enum(EB::OPT5) == 2);
+	CHECK(test_class_enum((EB)-1) == 0);
+
+	auto test_enum_fallthrough = [](EB a) 
+	{
+		int result = 0;
+		switch (a)
+		{
+		case EB::OPT4:
+			result = 2;
+		case EB::OPT5:
+			++result;
+			break;
+		}
+		return result;
+	};
+	CHECK(test_enum_fallthrough(EB::OPT4) == 3);
+	CHECK(test_enum_fallthrough(EB::OPT41) == 3);
+	CHECK(test_enum_fallthrough(EB::OPT5) == 1);
+	CHECK(test_enum_fallthrough((EB)-1) == 0);
 }
 
 extern int ext_var;

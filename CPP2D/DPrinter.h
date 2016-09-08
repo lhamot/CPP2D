@@ -58,10 +58,11 @@ public:
 	  std::string const& prevTmplParmsStr);
 
 	//! Print a clang::CompoundStmt with an optional function for print an initialization list
-	template<typename InitList>
+	template<typename InitList, typename AddBeforeEnd>
 	void traverseCompoundStmtImpl(
 	  clang::CompoundStmt* Stmt, //!< The clang::CompoundStmt to print
-	  InitList initList //!< A callable printing somthing a the begining of the scope
+	  InitList initList, //!< A callable printing somthing a the begining of the scope
+	  AddBeforeEnd addBeforEnd //!< A callable printing somthing a the end of the scope
 	);
 
 	//! Print a clang::CXXTryStmt with an optional function for print an initialization list

@@ -767,8 +767,8 @@ bool DPrinter::TraverseTypedefType(TypedefType* Type)
 	return true;
 }
 
-template<typename InitList>
-void DPrinter::traverseCompoundStmtImpl(CompoundStmt* Stmt, InitList initList)
+template<typename InitList, typename AddBeforeEnd>
+void DPrinter::traverseCompoundStmtImpl(CompoundStmt* Stmt, InitList initList, AddBeforeEnd addBeforEnd)
 {
 	SourceLocation locStart = Stmt->getLBracLoc().getLocWithOffset(1);
 	out() << "{";
@@ -786,6 +786,7 @@ void DPrinter::traverseCompoundStmtImpl(CompoundStmt* Stmt, InitList initList)
 		output_enabled = (isInMacro == 0);
 	}
 	printStmtComment(locStart, Stmt->getRBracLoc().getLocWithOffset(-1));
+	addBeforEnd();
 	--indent;
 	out() << indentStr();
 	out() << "}";
@@ -794,7 +795,7 @@ void DPrinter::traverseCompoundStmtImpl(CompoundStmt* Stmt, InitList initList)
 bool DPrinter::TraverseCompoundStmt(CompoundStmt* Stmt)
 {
 	if(passStmt(Stmt)) return false;
-	traverseCompoundStmtImpl(Stmt, [] {});
+	traverseCompoundStmtImpl(Stmt, [] {}, [] {});
 	return true;
 }
 
@@ -803,7 +804,7 @@ void DPrinter::traverseCXXTryStmtImpl(CXXTryStmt* Stmt, InitList initList)
 {
 	out() << "try" << std::endl << indentStr();
 	auto tryBlock = Stmt->getTryBlock();
-	traverseCompoundStmtImpl(tryBlock, initList);
+	traverseCompoundStmtImpl(tryBlock, initList, [] {});
 	auto handlerCount = Stmt->getNumHandlers();
 	for(decltype(handlerCount) i = 0; i < handlerCount; ++i)
 	{
@@ -1425,7 +1426,15 @@ bool DPrinter::TraverseSwitchStmt(SwitchStmt* Stmt)
 	out() << "switch(";
 	TraverseStmt(Stmt->getCond());
 	out() << ")" << std::endl << indentStr();
-	TraverseStmt(Stmt->getBody());
+	if (auto* body = dyn_cast<CompoundStmt>(Stmt->getBody()))
+	{
+		auto* last = dyn_cast<DefaultStmt>(body->body_back());
+		if(last)
+			traverseCompoundStmtImpl(body, [] {}, [] {});
+		else
+			traverseCompoundStmtImpl(
+				body, [] {}, [this] {out() << indentStr() << "default: break;\n"; });
+	}
 	return true;
 }
 
@@ -2139,7 +2148,8 @@ void DPrinter::traverseFunctionDeclImpl(
 			out() << indentStr();
 			assert(body->getStmtClass() == Stmt::CompoundStmtClass);
 			traverseCompoundStmtImpl(static_cast<CompoundStmt*>(body),
-			                         [&] {alias_this(); startCtorBody(Decl); });
+			                         [&] {alias_this(); startCtorBody(Decl); },
+				                     [] {});
 		}
 	}
 	else
