@@ -92,6 +92,8 @@ static std::map<std::string, std::string> type2type =
 static const std::set<Decl::Kind> noSemiCommaDeclKind =
 {
 	Decl::Kind::CXXRecord,
+	Decl::Kind::Record,
+	Decl::Kind::ClassTemplate,
 	Decl::Kind::Function,
 	Decl::Kind::CXXConstructor,
 	Decl::Kind::CXXDestructor,
@@ -119,22 +121,31 @@ static const std::set<Stmt::StmtClass> noSemiCommaStmtKind =
 	//Stmt::StmtClass::DeclStmtClass,
 };
 
-bool needSemiComma(Stmt* stmt)
-{
-	auto const kind = stmt->getStmtClass();
-	return noSemiCommaStmtKind.count(kind) == 0;
-}
-
 bool needSemiComma(Decl* decl)
 {
 	auto const kind = decl->getKind();
-	if(kind == Decl::Kind::CXXRecord)
-	{
-		auto record = static_cast<CXXRecordDecl*>(decl);
+	if (auto record = dyn_cast<RecordDecl>(decl))
 		return !record->isCompleteDefinition();
-	}
+	else if (auto tmp = dyn_cast<ClassTemplateDecl>(decl))
+		return !tmp->hasBody();
 	else
 		return noSemiCommaDeclKind.count(kind) == 0;
+}
+
+bool needSemiComma(Stmt* stmt)
+{
+	if (auto* declStmt = dyn_cast<DeclStmt>(stmt))
+	{
+		if (declStmt->isSingleDecl()) //May be in for or catch
+			return needSemiComma(declStmt->getSingleDecl());
+		else
+			return false;//needSemiComma(*(declStmt->children().end()--));
+	}
+	else
+	{
+		auto const kind = stmt->getStmtClass();
+		return noSemiCommaStmtKind.count(kind) == 0;
+	}
 }
 
 std::string mangleName(std::string const& name)
@@ -558,12 +569,11 @@ bool DPrinter::TraverseTypedefDecl(TypedefDecl* Decl)
 
 	pushStream();
 	printType(Decl->getUnderlyingType());
-	std::string rhs = popStream();
-	std::string lhs = mangleName(Decl->getNameAsString());
 
-	if (lhs != rhs) {
+	std::string const rhs = popStream();
+	std::string const lhs = mangleName(Decl->getNameAsString());
+	if (lhs != rhs && rhs.empty() == false)
 		out() << "alias " << lhs << " = " << rhs;
-	}
 	return true;
 }
 
@@ -572,12 +582,11 @@ bool DPrinter::TraverseTypeAliasDecl(TypeAliasDecl* Decl)
 	if(passDecl(Decl)) return true;
 	pushStream();
 	printType(Decl->getUnderlyingType());
-	std::string rhs = popStream();
-	std::string lhs = mangleName(Decl->getNameAsString());
 
-	if (lhs != rhs) {
+	std::string const rhs = popStream();
+	std::string const lhs = mangleName(Decl->getNameAsString());
+	if (lhs != rhs && rhs.empty() == false)
 		out() << "alias " << lhs << " = " << rhs;
-	}
 	return true;
 }
 
@@ -988,7 +997,12 @@ void DPrinter::traverseCXXRecordDeclImpl(
 	  decl->isClass() ? "class" :
 	  decl->isUnion() ? "union" :
 	  "struct";
-	out() << struct_class << " " << mangleName(decl->getNameAsString());
+	TypedefNameDecl* typedefDecl = decl->getTypedefNameForAnonDecl();
+	if (typedefDecl)
+		out() << struct_class << " " << mangleName(typedefDecl->getNameAsString());
+	else
+		out() << struct_class << " " << mangleName(decl->getNameAsString());
+
 	traverseTmpSpecs();
 	if(decl->isCompleteDefinition() == false)
 		return;
@@ -2643,14 +2657,21 @@ bool DPrinter::TraverseDeclStmt(DeclStmt* Stmt)
 		// Better to split multi line decl, but in for init, we can't do it
 		if(splitMultiLineDecl)
 		{
-			auto declCount = Stmt->decl_end() - Stmt->decl_begin();
-			decltype(declCount) count = 0;
+			int count = 0;
 			for(auto d : Stmt->decls())
 			{
+				pushStream();
 				TraverseDecl(d);
-				++count;
-				if(count != declCount)
-					out() << ";\n" << indentStr();
+				std::string const line = popStream();
+				if (line.empty() == false)
+				{
+					if (count != 0)
+						out() << "\n" << indentStr();
+					++count;
+					out() << line;
+					if (needSemiComma(d))
+						out() << ";";
+				}
 			}
 		}
 		else

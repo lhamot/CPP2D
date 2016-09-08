@@ -358,6 +358,11 @@ void check_struct()
 	};
 	Toto5 tt5(1);
 	CHECK(tt5.tutu.b == 3.3f);
+
+	typedef struct {int x; } c_style_struct_dect;
+	c_style_struct_dect i;
+	i.x = 12;
+	CHECK_EQUAL(i.x, 12);
 };
 
 // Template type
