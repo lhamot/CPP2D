@@ -25,7 +25,7 @@ const char* getFile(clang::SourceManager const& sourceManager, clang::SourceLoca
 	clang::FullSourceLoc fsl = FullSourceLoc(sl, sourceManager).getExpansionLoc();
 	auto& mgr = fsl.getManager();
 	if(clang::FileEntry const* f = mgr.getFileEntryForID(fsl.getFileID()))
-		return f->getName();
+		return f->getName().data();
 	else
 		return nullptr;
 }

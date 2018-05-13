@@ -11,6 +11,8 @@
 #include <llvm/ADT/StringRef.h>
 #pragma warning(pop)
 
+#include <set>
+
 namespace clang
 {
 class ASTContext;

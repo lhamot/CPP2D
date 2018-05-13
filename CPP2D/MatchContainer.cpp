@@ -12,25 +12,7 @@
 #include "CustomPrinters.h"
 #include "Spliter.h"
 
-namespace clang
-{
-namespace ast_matchers
-{
-const internal::VariadicDynCastAllOfMatcher<Stmt, UnresolvedLookupExpr>
-unresolvedLookupExpr;
 
-#pragma warning(push)
-#pragma warning(disable: 4100)
-AST_MATCHER_P(UnresolvedLookupExpr, uleMatchesName, std::string, RegExp)
-{
-	assert(!RegExp.empty());
-	std::string FullNameString = "::" + Node.getName().getAsString();
-	llvm::Regex RE(RegExp);
-	return RE.match(FullNameString);
-}
-#pragma warning(pop)
-}
-}
 
 using namespace clang;
 using namespace clang::ast_matchers;

@@ -18,23 +18,6 @@
 #include "../Spliter.h"
 #include "../Options.h"
 
-namespace clang
-{
-namespace ast_matchers
-{
-const internal::VariadicDynCastAllOfMatcher<Stmt, UnresolvedLookupExpr>
-unresolvedLookupExpr;
-
-#pragma warning(push)
-#pragma warning(disable: 4100)
-AST_MATCHER_P(CastExpr, hasCastKind, CastKind, Kind)
-{
-	return Node.getCastKind() == Kind;
-}
-#pragma warning(pop)
-}
-}
-
 using namespace clang;
 using namespace clang::ast_matchers;
 

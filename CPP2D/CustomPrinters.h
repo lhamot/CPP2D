@@ -6,6 +6,7 @@
 //
 
 #include "MatchContainer.h"
+#include <set>
 
 //! Singleton where all custom printers are registered
 class CustomPrinters

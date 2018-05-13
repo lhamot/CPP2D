@@ -23,6 +23,7 @@
 #include <clang/Lex/Preprocessor.h>
 #include <clang/Lex/MacroArgs.h>
 #include <clang/AST/Comment.h>
+#include <clang/AST/Expr.h>
 #pragma warning(pop)
 
 #include "MatchContainer.h"
@@ -429,7 +430,7 @@ void DPrinter::printMacroArgs(CallExpr* macro_args)
 						else if(func_name == "cpp2d_name")
 						{
 							auto* impCast2 = dyn_cast<ImplicitCastExpr>(callExpr->getArg(0));
-							auto* str = dyn_cast<StringLiteral>(impCast2->getSubExpr());
+							auto* str = dyn_cast<clang::StringLiteral>(impCast2->getSubExpr());
 							out() << str->getString().str();
 						}
 						else
@@ -461,7 +462,7 @@ void DPrinter::printStmtMacro(std::string const& varName, Expr* init)
 			return dyn_cast<BinaryOperator>(dyn_cast<ParenExpr>(paren)->getSubExpr());
 		};
 		BinaryOperator* name_and_args = get_binop(init);
-		auto* macro_name = dyn_cast<StringLiteral>(name_and_args->getLHS());
+		auto* macro_name = dyn_cast<clang::StringLiteral>(name_and_args->getLHS());
 		auto* macro_args = dyn_cast<CallExpr>(name_and_args->getRHS());
 		out() << "mixin(" << macro_name->getString().str() << "!(";
 		printMacroArgs(macro_args);
@@ -2078,7 +2079,7 @@ void DPrinter::traverseFunctionDeclImpl(
 			}
 		}
 
-		for(ParmVarDecl* decl : bodyDecl->params())
+		for(ParmVarDecl* decl : bodyDecl->parameters())
 		{
 			if(arg_become_this == static_cast<int>(index))
 				isConstMethod = isConst(decl->getType());
@@ -3023,7 +3024,7 @@ bool DPrinter::TraverseCharacterLiteral(CharacterLiteral* Stmt)
 	return true;
 }
 
-bool DPrinter::TraverseStringLiteral(StringLiteral* Stmt)
+bool DPrinter::TraverseStringLiteral(clang::StringLiteral* Stmt)
 {
 	if(passStmt(Stmt)) return true;
 	out() << "\"";
@@ -3118,7 +3119,7 @@ bool DPrinter::TraverseLambdaExpr(LambdaExpr* Node)
 	bool hasAuto = false;
 	if(Node->hasExplicitParameters())
 	{
-		for(ParmVarDecl* P : Method->params())
+		for(ParmVarDecl* P : Method->parameters())
 		{
 			if(P->getType()->getTypeClass() == Type::TypeClass::TemplateTypeParm)
 			{
@@ -3156,7 +3157,7 @@ bool DPrinter::TraverseLambdaExpr(LambdaExpr* Node)
 		inFuncParams = true;
 		refAccepted = true;
 		Spliter split(*this, ", ");
-		for(ParmVarDecl* P : Method->params())
+		for(ParmVarDecl* P : Method->parameters())
 		{
 			split.split();
 			TraverseDecl(P);
@@ -3815,7 +3816,7 @@ bool DPrinter::TraverseParenExpr(ParenExpr* expr)
 	{
 		Expr* lhs = binOp->getLHS();
 		Expr* rhs = binOp->getRHS();
-		StringLiteral const* strLit = dyn_cast<StringLiteral>(lhs);
+		clang::StringLiteral const* strLit = dyn_cast<clang::StringLiteral>(lhs);
 		if(strLit && (binOp->getOpcode() == BinaryOperatorKind::BO_Comma))
 		{
 			StringRef const str = strLit->getString();
@@ -3827,7 +3828,7 @@ bool DPrinter::TraverseParenExpr(ParenExpr* expr)
 				};
 				BinaryOperator* macro_and_cpp = get_binop(rhs);
 				BinaryOperator* macro_name_and_args = get_binop(macro_and_cpp->getLHS());
-				auto* macro_name = dyn_cast<StringLiteral>(macro_name_and_args->getLHS());
+				auto* macro_name = dyn_cast<clang::StringLiteral>(macro_name_and_args->getLHS());
 				auto* macro_args = dyn_cast<CallExpr>(macro_name_and_args->getRHS());
 				std::string macroName = macro_name->getString().str();
 				if(macroName == "assert")
@@ -3919,10 +3920,10 @@ void DPrinter::traverseVarDeclImpl(VarDecl* Decl)
 	if(Decl->getCanonicalDecl() != Decl)
 		return;
 
-	if(Decl->isOutOfLine())
+	if (Decl->isOutOfLine())
 		return;
-	else if(Decl->getOutOfLineDefinition())
-		Decl = Decl->getOutOfLineDefinition();
+	else if (Decl->isOutOfLine())
+		Decl = Decl->getDefinition();
 	QualType varType = Decl->getType();
 	bool const isRef = [&]()
 	{
