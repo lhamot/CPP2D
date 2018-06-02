@@ -17,3 +17,5 @@
 /compile_commands.json
 /CPP2D_UT_CPP/*.tmp
 /garbage
+/CPP2D.VC.db
+/*.opendb

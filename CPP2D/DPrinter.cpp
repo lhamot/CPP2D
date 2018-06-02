@@ -453,13 +453,21 @@ void DPrinter::printMacroArgs(CallExpr* macro_args)
 
 void DPrinter::printStmtMacro(std::string const& varName, Expr* init)
 {
-	if(varName.find("CPP2D_MACRO_STMT_END") == 0)
+	if (varName.find("CPP2D_MACRO_STMT_END") == 0)
 		--isInMacro;
 	else if(varName.find("CPP2D_MACRO_STMT") == 0)
 	{
 		auto get_binop = [](Expr * paren)
 		{
-			return dyn_cast<BinaryOperator>(dyn_cast<ParenExpr>(paren)->getSubExpr());
+			auto cleanups = dyn_cast<ExprWithCleanups>(paren);
+			if (cleanups)
+				paren = cleanups->getSubExpr();
+
+			auto parenExpr = dyn_cast<ParenExpr>(paren);
+			assert(parenExpr);
+			auto binOp = dyn_cast<BinaryOperator>(parenExpr->getSubExpr());
+			assert(binOp);
+			return binOp;
 		};
 		BinaryOperator* name_and_args = get_binop(init);
 		auto* macro_name = dyn_cast<clang::StringLiteral>(name_and_args->getLHS());
@@ -607,8 +615,13 @@ bool DPrinter::TraverseFieldDecl(FieldDecl* Decl)
 	std::string const varName = Decl->getNameAsString();
 	if(varName.find("CPP2D_MACRO_STMT") == 0)
 	{
-		printStmtMacro(varName, Decl->getInClassInitializer());
-		return true;
+		if (Decl->hasInClassInitializer())
+		{
+			printStmtMacro(varName, Decl->getInClassInitializer());
+			return true;
+		}
+		else
+			out() << varName << " // NO InClassInitializer! (2)" << std::endl;
 	}
 
 	if(passDecl(Decl)) return true;

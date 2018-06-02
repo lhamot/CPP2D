@@ -317,7 +317,7 @@ void CPP2DPPHandling::TransformMacroStmt(
 	new_macro << ");\\\n";
 
 	new_macro << print_macro(MI) << "\\\n";
-	new_macro << "int CPP2D_ADD(CPP2D_MACRO_STMT_END, __COUNTER__);";
+	new_macro << "int CPP2D_ADD(CPP2D_MACRO_STMT_END, __COUNTER__) = 0;";
 
 	SourceLocation const location = MacroNameTok.getLocation();
 	if(location.printToString(sourceManager).find(MemFileSuffix) != std::string::npos)
