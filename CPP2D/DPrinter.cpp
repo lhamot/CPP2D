@@ -84,6 +84,7 @@ static std::map<std::string, std::string> type2type =
 	{ "SafeInt", "std.experimental.safeint.SafeInt" },
 	{ "RedBlackTree", "std.container.rbtree" },
 	{ "std::string", "string" },
+	{ "std::__cxx11::string", "string" },
 	{ "std::ostream", "std.stdio.File" },
 	{ "std::rand", "core.stdc.rand" },
 	{ "::rand", "core.stdc.stdlib.rand" },
@@ -119,6 +120,7 @@ static const std::set<Stmt::StmtClass> noSemiCommaStmtKind =
 	Stmt::StmtClass::CXXCatchStmtClass,
 	Stmt::StmtClass::CXXTryStmtClass,
 	Stmt::StmtClass::NullStmtClass,
+	Stmt::StmtClass::SwitchStmtClass,
 	//Stmt::StmtClass::DeclStmtClass,
 };
 
@@ -275,7 +277,10 @@ std::string DPrinter::printDeclName(NamedDecl* decl)
 		                    dQualType.substr(0, dotPos);
 		if(not module.empty())  //Need an import
 			externIncludes[module].insert(qualName);
-		return result + dQualType.substr(dotPos + 1);
+		if(dotPos == std::string::npos)
+			return result + dQualType;
+		else
+			return result + dQualType.substr(dotPos + 1);
 	}
 	else
 	{
@@ -2297,6 +2302,8 @@ TypeOptions::Semantic DPrinter::getSemantic(QualType qt)
 	if(isStdArray(qt))
 		return TypeOptions::Value;
 	if(name.find("class std::basic_string<") == 0)
+		return TypeOptions::Value;
+	if(name.find("class std::__cxx11::basic_string<") == 0)
 		return TypeOptions::Value;
 	if(name.find("class boost::optional<") == 0)
 		return TypeOptions::Value;

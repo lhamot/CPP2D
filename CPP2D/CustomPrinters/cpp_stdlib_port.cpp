@@ -214,7 +214,7 @@ void cpp_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 		});
 	}
 
-	mc.operatorCallPrinter(finder, "^::std::basic_string(<|$)", "+=",
+	mc.operatorCallPrinter(finder, "^::std::(__cxx11::)?(basic_)?string(<|$)", "+=",
 	                       [](DPrinter & pr, Stmt * s)
 	{
 		if(auto* opCall = dyn_cast<CXXOperatorCallExpr>(s))
@@ -694,7 +694,7 @@ void cpp_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 		}
 	});
 
-	mc.tmplTypePrinter("^::std::basic_string", [](DPrinter & printer, Decl * d)
+	mc.tmplTypePrinter("^::std::(__cxx11::)?basic_string", [](DPrinter & printer, Decl * d)
 	{
 		if(auto* tmpSpec = llvm::dyn_cast<ClassTemplateSpecializationDecl>(d))
 		{

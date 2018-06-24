@@ -7,6 +7,8 @@
 
 #include "CPP2DFrontendAction.h"
 
+#include <memory>
+
 #pragma warning(push, 0)
 #include <clang/Frontend/CompilerInstance.h>
 #include <clang/Lex/Preprocessor.h>
