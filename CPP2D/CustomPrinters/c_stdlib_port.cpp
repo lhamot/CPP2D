@@ -83,6 +83,7 @@ void c_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 
 	//<assert>
 	mc.globalFuncPrinter("^(::std)?::_wassert$", [](DPrinter&, Stmt*) {});
+	mc.globalFuncPrinter("^(::)?__assert_fail$", [](DPrinter&, Stmt*) {});
 }
 
 REG_CUSTOM_PRINTER(c_stdlib_port);

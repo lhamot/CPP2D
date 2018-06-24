@@ -19,3 +19,6 @@
 /garbage
 /CPP2D.VC.db
 /*.opendb
+/CPP2D_UT_CPP/compile_commands.json
+/build
+/CPP2D_UT_D

@@ -507,7 +507,8 @@ void cpp_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 	});
 
 	Options::getInstance().types["class std::basic_stringstream<"].semantic = TypeOptions::Value;
-	mc.tmplTypePrinter("^::std::stringstream", [](DPrinter & printer, Decl*)
+	Options::getInstance().types["class std::__cxx11::basic_stringstream<"].semantic = TypeOptions::Value;
+	mc.tmplTypePrinter("^::std::(__cxx11::)?stringstream", [](DPrinter & printer, Decl*)
 	{
 		printer.addExternInclude("cpp_std", "cpp_std.Stringstream");
 		printer.stream() << "cpp_std.Stringstream";
