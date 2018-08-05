@@ -930,8 +930,14 @@ void check_incr_pointer()
 	CHECK(*ptr2 == 5);
 }
 
+template<typename A, typename B, typename C, typename D>
+auto comma4(A const& a, B const& b, C const& c, D const& d)
+{
+	return d;
+}
+
 #define UT_MACRO(expr1, expr2, expr3)  \
-	(var##expr1 = 42, var2 = #expr2, var3 = expr3, expr1 + expr3)
+	comma4(var##expr1 = 42, var2 = #expr2, var3 = expr3, expr1 + expr3)
 
 #define UT_MACRO_STMT  \
 int a = 1; \

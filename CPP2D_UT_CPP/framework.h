@@ -17,18 +17,18 @@ extern unsigned int testCount;
 void check(bool ok, char const* message, int line, char const* file);
 
 template<typename A, typename B>
-void check_equal(A a, B b, char const* message, int line, char const* file)
+void check_equal(A a, B b, char const* astr, char const* bstr, int line, char const* file)
 {
 	++testCount;
 	if (a != b)
 	{
-		std::cout << message << "    ->Failed at line " << line << ", in file " << file 
+		std::cout << astr << " == " << bstr << "    ->Failed at line " << line << ", in file " << file
 			      << ", because " << a << " != " << b << '\n';
 	}
 }
 
 #define CHECK(COND) check(COND, #COND, __LINE__, __FILE__)
-#define CHECK_EQUAL(A, B) check_equal(A, B, #A " == " #B, __LINE__, __FILE__)
+#define CHECK_EQUAL(A, B) check_equal(A, B, #A, #B, __LINE__, __FILE__)
 
 typedef void(*TestCase)(); //!< One small test independant of others
 

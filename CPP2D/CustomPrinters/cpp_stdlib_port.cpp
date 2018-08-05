@@ -670,7 +670,7 @@ void cpp_stdlib_port(MatchContainer& mc, MatchFinder& finder)
 		{
 			pr.stream() << "std.algorithm.comparison.min";
 			pr.printCallExprArgument(call);
-			pr.addExternInclude("std.algorithm.comparison", "std.algorithm.comparison.min");
+			pr.addExternInclude("std.algorithm", "std.algorithm.comparison.min");
 		}
 	});
 
