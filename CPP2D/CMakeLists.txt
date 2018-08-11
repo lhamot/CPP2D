@@ -79,10 +79,16 @@ target_link_libraries(cpp2d
   LLVMProfileData
   LLVMSupport
   LLVMDemangle
-  version.lib
 )
 
 if(CMAKE_COMPILER_IS_GNUCXX)
     SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -fno-rtti")
     target_link_libraries(cpp2d rt dl tinfo pthread z m)
 endif()
+
+if(CMAKE_SYSTEM_NAME MATCHES "Windows")
+	target_link_libraries(cpp2d
+		version.lib
+	)
+endif()
+
