@@ -79,6 +79,7 @@ target_link_libraries(cpp2d
   LLVMProfileData
   LLVMSupport
   LLVMDemangle
+  version.lib
 )
 
 if(CMAKE_COMPILER_IS_GNUCXX)
