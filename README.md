@@ -12,6 +12,16 @@ Distributed under the Boost Software License, Version 1.0.
 
 See ./LICENSE_1_0.txt or http://www.boost.org/LICENSE_1_0.txt 
 
+## Continuous integration
+
+* Ubuntu
+
+[![Build Status](https://travis-ci.org/lhamot/CPP2D.svg?branch=master)](https://travis-ci.org/lhamot/CPP2D)
+
+* Windows
+
+[![Build Status](https://ci.appveyor.com/api/projects/status/github/lhamot/cpp2d?svg=true)](https://ci.appveyor.com/project/lhamot/cpp2d)
+
 ## Already handled C++ features
 
 Majority of C++ code is already convertible to D.
@@ -44,8 +54,8 @@ Some samples here : https://github.com/lhamot/CPP2D/wiki/Conversion-samples
 
 ## Requirements
 * cmake >= 2.6
-* Tested with **gcc** 4.9.2 (**Ubuntu** 15.04) and **Visual Studio** 2015 (**Windows** seven)
-* Tested with **LLVM/clang** **3.8.0** and **3.8.1**
+* Tested with **gcc** 4.8.4 (**Ubuntu** 14.04.3) and **Visual Studio** 2015 (**Windows** 7 & 10)
+* Tested with **LLVM/clang** **4.0.1**
 
 ## How to install it?
 1. Install **clang** : http://clang.llvm.org/get_started.html
