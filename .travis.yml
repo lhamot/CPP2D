@@ -17,7 +17,7 @@ install:
   - sudo apt-get -y install gcc-4.9 g++-4.9
   - sudo apt-get -y install curl
   - curl -fsS https://dlang.org/install.sh | bash -s ldc
-  - source ~/dlang/ldc-1.10.0/activate
+  - source ~/dlang/ldc-1.11.0/activate
   - export CC="gcc-4.9"
   - export CPP="g++-4.9"
   - export CXX="g++-4.9"
