@@ -9,8 +9,14 @@
 #include "stdlib_testsuite.h"
 #include "template_testsuite.h"
 
-int main()
+int main(
+	int argc, char** argv
+)
 {
+	int argvCount = argc;
+	CHECK(argvCount > 0);
+	CHECK(argv[0] != nullptr);
+
 	TestFrameWork testFrameWork;
 	test_register(testFrameWork); 
 	stdlib_register(testFrameWork);

@@ -102,7 +102,8 @@ class TmplClass2<0> : public TmplClass1<42> {};
 template<typename T1, typename T2>
 bool fl_equal(T1 v1, T2 v2)
 {
-	auto diff = v1 - v2;
+	int argc = 2;
+	auto diff = ((v1 - v2) + argc) - argc;
 	return (diff < 0. ? -diff : diff) < 0.00001;
 }
 

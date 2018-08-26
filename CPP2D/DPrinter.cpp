@@ -2012,6 +2012,8 @@ void DPrinter::traverseFunctionDeclImpl(
 
 	pushStream();
 	refAccepted = true;
+	std::string const name = Decl->getQualifiedNameAsString();
+	bool const isMain = name == "main";
 	std::string tmplParamsStr;
 	if(printFuncBegin(Decl, tmplParamsStr, arg_become_this) == false)
 	{
@@ -2099,6 +2101,11 @@ void DPrinter::traverseFunctionDeclImpl(
 
 		for(ParmVarDecl* decl : bodyDecl->parameters())
 		{
+			if (isMain && Decl->getNumParams() == 2 && decl == bodyDecl->parameters()[0])
+			{	// Remove the first parameter (argc) of the main function
+				++index;
+				continue;
+			}
 			if(arg_become_this == static_cast<int>(index))
 				isConstMethod = isConst(decl->getType());
 			else
@@ -3701,6 +3708,16 @@ bool DPrinter::TraverseDeclRefExpr(DeclRefExpr* Expr)
 	{
 		nestedNamePrined = true;
 		TraverseNestedNameSpecifier(nns);
+	}
+	else
+	{	// If it refer the param argc, print argv.length
+		ValueDecl* valdecl = Expr->getDecl();
+		ParmVarDecl* pVarDecl = llvm::dyn_cast<ParmVarDecl>(valdecl);
+		if (pVarDecl && pVarDecl->getNameAsString() == "argc")
+		{
+			out() << "(cast(int)argv.length)";
+			return true;
+		}
 	}
 
 	std::string name = getName(Expr->getNameInfo().getName());
