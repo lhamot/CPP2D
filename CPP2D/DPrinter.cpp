@@ -1717,9 +1717,15 @@ bool DPrinter::TraverseConstructorInitializer(CXXCtorInitializer* Init)
 	}
 	else if(Init->isWritten())
 	{
-		out() << "super(";
-		TraverseStmt(Init->getInit());
-		out() << ")";
+		assert(Init->isBaseInitializer());
+		Expr* decl = Init->getInit();
+		CXXConstructorDecl* ctorDecl = llvm::dyn_cast<CXXConstructExpr>(decl)->getConstructor();
+		if (ctorDecl->isDefaulted() == false)
+		{
+			out() << "super(";
+			TraverseStmt(Init->getInit());
+			out() << ")";
+		}
 	}
 	return true;
 }

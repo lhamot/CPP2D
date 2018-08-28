@@ -1896,6 +1896,65 @@ Class781* take_class(Class781* s)
 	return s;
 }
 
+class CheckNoCtor
+{
+
+};
+
+class InheritCheckNoCtor : public CheckNoCtor
+{
+public:
+	InheritCheckNoCtor() :CheckNoCtor()
+	{
+	}
+};
+
+class CheckWithDefCtor
+{
+public:
+	CheckWithDefCtor() {}
+};
+
+class InheritWithDefCtor : public CheckWithDefCtor
+{
+public:
+	InheritWithDefCtor() :CheckWithDefCtor()
+	{
+	}
+};
+
+class CheckWithDefDefCtor
+{
+public:
+	CheckWithDefDefCtor() {}
+};
+
+class InheritWithDefDefCtor : public CheckWithDefDefCtor
+{
+public:
+	InheritWithDefDefCtor() :CheckWithDefDefCtor()
+	{
+	}
+};
+
+class CheckWithCtor
+{
+public:
+	int i;
+	CheckWithCtor(int u) 
+		:i(u)
+	{
+	}
+};
+
+class InheritCheckWithCtor : public CheckWithCtor
+{
+public:
+	InheritCheckWithCtor() :CheckWithCtor(72)
+	{
+	}
+};
+
 void check_class_ctor_call()
 {
 	Class782 tutu;
@@ -1920,6 +1979,23 @@ void check_class_ctor_call()
 	CHECK(tutu6->i == 58);
 	tutu6->~Class781();
 	//::operator delete(tutu6);
+
+	InheritCheckNoCtor* tutu7 = new InheritCheckNoCtor;
+	CheckNoCtor* tutu8 = tutu7;
+	CHECK(tutu8 != nullptr);
+
+	InheritCheckWithCtor* tutu9 = new InheritCheckWithCtor;
+	CheckWithCtor* tutu10 = tutu9;
+	CHECK(tutu10 != nullptr);
+	CHECK(tutu10->i == 72);
+
+	InheritWithDefCtor* tutu11 = new InheritWithDefCtor;
+	CheckWithDefCtor* tutu12 = tutu11;
+	CHECK(tutu12 != nullptr);
+
+	InheritWithDefDefCtor* tutu13 = new InheritWithDefDefCtor;
+	CheckWithDefDefCtor* tutu14 = tutu13;
+	CHECK(tutu14 != nullptr);
 }
 
 void func_throw_except()
