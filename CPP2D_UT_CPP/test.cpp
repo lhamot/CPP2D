@@ -2574,9 +2574,18 @@ void check_not_array_ptr()
 	delete b;
 }
 
+
+void check_string_literal()
+{
+	char a[] = "\x53\x80\xF6\x34";	// Not an utf-8 string
+	char b[] = "漢字";				// utf-8 (Need Unicode to be printed)
+}
+
 void test_register(TestFrameWork& tf)
 {
 	auto ts = std::make_unique<TestSuite>();
+
+	ts->addTestCase(check_string_literal);
 
 	ts->addTestCase(check_cast);
 

@@ -12,6 +12,7 @@
 #include <sstream>
 #include <locale>
 #include <ciso646>
+#include <cstdio>
 
 #pragma warning(push, 0)
 #include <llvm/ADT/SmallString.h>
@@ -3084,13 +3085,34 @@ bool DPrinter::TraverseStringLiteral(clang::StringLiteral* Stmt)
 			literal.resize(size_t(reinterpret_cast<char*>(dest) - &literal[0]));
 		}
 		else
-			literal = std::string(str.data(), str.size());
+		{
+			for (char _c : str)
+			{
+				unsigned char c = (unsigned char)_c;
+				if (c < 128)
+					literal.push_back(_c);
+				else
+				{
+					static char buffer[20];
+					std::sprintf(buffer, "\\x%x", c);
+					literal += buffer;
+				}
+			}
+		}
 	}
 	size_t pos = 0;
 	while((pos = literal.find('\\', pos)) != std::string::npos)
 	{
-		literal = literal.substr(0, pos) + "\\\\" + literal.substr(pos + 1);
-		pos += 2;
+		char next = ' ';
+		if (literal.size() > (pos + 1))
+			next = literal[pos + 1];
+		if (next != 'n' && next != 'x')
+		{
+			literal = literal.substr(0, pos) + "\\\\" + literal.substr(pos + 1);
+			pos += 2;
+		}
+		else
+			++pos;
 	}
 	pos = std::string::npos;
 	while((pos = literal.find('\n')) != std::string::npos)
