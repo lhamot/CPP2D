@@ -10,7 +10,7 @@ Copyright Loïc HAMOT, 2016
 
 Distributed under the Boost Software License, Version 1.0.
 
-See ./LICENSE_1_0.txt or http://www.boost.org/LICENSE_1_0.txt 
+See ./LICENSE_1_0.txt or http://www.boost.org/LICENSE_1_0.txt
 
 ## Continuous integration
 
@@ -108,7 +108,7 @@ $ project/build/directory/CPP2D/cpp2d source1.cpp source2.cpp source3.cpp
 $ cp project/build/directory/CPP2D/cpp_std.d dproject/source
 ```
 
-Need for more documentation? You can search here : 
+Need for more documentation? You can search here :
 - http://eli.thegreenplace.net/2014/05/21/compilation-databases-for-clang-based-tools
 
 ## Future of the project?
@@ -121,7 +121,7 @@ Small C++ project are almost fully convertible to **D**, but many things have to
 * Variadic template
    * Not tried to do yet
 * Better conservation of comments
-* Porting constness 
+* Porting constness
    * Hard because **D** containers seem to not be const correct
 * Handling const ref function argument
    * Hard because, unlike in **C++**, in **D** we can't pass a rvalue to a const ref parameter
@@ -130,7 +130,7 @@ Small C++ project are almost fully convertible to **D**, but many things have to
 
 * CMake : Create a cmake to compile a project linked to **LLVM**/**clang** in a cross-platform way seems to be not straightforward. If you can enhance my CMakeLists, please do it!
 * Clang integration : Maybe there is a better way to integrate **CPP2D** with **clang**, like make it a real clang tool, in clang/tools, or clang/tools/extra.
-   
+
 ## Want to help?
 I would be happy to get some help on this project. If you are interested, do not hesitate to :
 - Reach us on the mailing list: https://groups.google.com/forum/#!forum/cpp2d

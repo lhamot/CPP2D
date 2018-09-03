@@ -26,7 +26,7 @@ find_path(CLANG_LIB clang
 )
 link_directories(${CLANG_LIB})
 
-# Déclaration de l'exécutable
+# DÃ©claration de l'exÃ©cutable
 add_executable(
     cpp2d
     CPP2D.cpp
@@ -91,4 +91,3 @@ if(CMAKE_SYSTEM_NAME MATCHES "Windows")
 		version.lib
 	)
 endif()
-
