@@ -17,6 +17,8 @@ namespace clang
 class CompilerInstance;
 }
 
+class CPP2DPPHandling;
+
 //! Implement clang::ASTFrontendAction to create the CPP2DConsumer
 class CPP2DFrontendAction : public clang::ASTFrontendAction
 {
@@ -28,5 +30,8 @@ public:
 	) override;
 
 	//! Add the CPP2DPPHandling (PPCallbacks) to the Preprocessor
-	bool BeginSourceFileAction(clang::CompilerInstance& ci, llvm::StringRef file) override;
+	bool BeginSourceFileAction(clang::CompilerInstance& ci) override;
+
+private:
+	CPP2DPPHandling* ppHandlingPtr = nullptr;
 };

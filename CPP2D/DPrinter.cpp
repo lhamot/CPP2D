@@ -873,7 +873,7 @@ bool DPrinter::passStmt(Stmt* stmt)
 		return false;
 }
 
-bool DPrinter::passType(Type* type)
+bool DPrinter::passType(clang::Type* type)
 {
 	auto printer = receiver.getPrinter(type);
 	if(printer)
@@ -1132,7 +1132,7 @@ void DPrinter::traverseCXXRecordDeclImpl(
 		ClassInfo const& classInfo = classInfoMap[cxxRecordDecl];
 		for(auto && type_info : classInfoMap[cxxRecordDecl].relations)
 		{
-			Type const* type = type_info.first;
+			clang::Type const* type = type_info.first;
 			RelationInfo& info = type_info.second;
 			if(info.hasOpLess and info.hasOpEqual)
 			{
@@ -1615,7 +1615,7 @@ bool DPrinter::TraverseCXXConstructExpr(CXXConstructExpr* Init)
 
 void DPrinter::printType(QualType const& type)
 {
-	if(type.getTypePtr()->getTypeClass() == Type::TypeClass::Auto)
+	if(type.getTypePtr()->getTypeClass() == clang::Type::TypeClass::Auto)
 	{
 		if(type.isConstQualified() && portConst)
 			out() << "const ";
@@ -1993,7 +1993,7 @@ TypeOptions::Semantic getThisSemantic(Decl* decl, ASTContext& context)
 {
 	if(decl->isStatic())
 		return TypeOptions::Reference;
-	auto* recordPtrType = dyn_cast<PointerType>(decl->getThisType(context));
+	auto* recordPtrType = dyn_cast<clang::PointerType>(decl->getThisType(context));
 	return DPrinter::getSemantic(recordPtrType->getPointeeType());
 }
 
@@ -2305,7 +2305,7 @@ bool DPrinter::TraverseBuiltinType(BuiltinType* Type)
 
 TypeOptions::Semantic DPrinter::getSemantic(QualType qt)
 {
-	Type const* type = qt.getTypePtr();
+	clang::Type const* type = qt.getTypePtr();
 	std::string empty;
 	raw_string_ostream os(empty);
 	qt.getCanonicalType().getUnqualifiedType().print(os, printingPolicy);
@@ -2354,7 +2354,7 @@ TypeOptions::Semantic DPrinter::getSemantic(QualType qt)
 			return nvp.second.semantic;
 	}
 
-	if (auto *pt = dyn_cast<PointerType>(type))
+	if (auto *pt = dyn_cast<clang::PointerType>(type))
 		return getSemantic(pt->getPointeeType());
 	else
 		return (type->isClassType() || type->isFunctionType()) ? 
@@ -2392,11 +2392,11 @@ template<typename PType>
 void DPrinter::traversePointerTypeImpl(PType* Type)
 {
 	QualType const pointee = Type->getPointeeType();
-	Type::TypeClass const tc = pointee->getTypeClass();
-	if(tc == Type::Paren)  //function pointer do not need '*'
+	clang::Type::TypeClass const tc = pointee->getTypeClass();
+	if(tc == clang::Type::Paren)  //function pointer do not need '*'
 	{
 		auto innerType = static_cast<ParenType const*>(pointee.getTypePtr())->getInnerType();
-		if(innerType->getTypeClass() == Type::FunctionProto)
+		if(innerType->getTypeClass() == clang::Type::FunctionProto)
 		{
 			TraverseType(innerType);
 			return;
@@ -2412,7 +2412,7 @@ bool DPrinter::TraverseMemberPointerType(MemberPointerType* Type)
 	traversePointerTypeImpl(Type);
 	return true;
 }
-bool DPrinter::TraversePointerType(PointerType* Type)
+bool DPrinter::TraversePointerType(clang::PointerType* Type)
 {
 	if(passType(Type)) return false;
 	traversePointerTypeImpl(Type);
@@ -2969,7 +2969,7 @@ bool DPrinter::TraverseCXXThrowExpr(CXXThrowExpr* Stmt)
 bool DPrinter::TraverseMaterializeTemporaryExpr(MaterializeTemporaryExpr* Stmt)
 {
 	if(passStmt(Stmt)) return true;
-	TraverseStmt(Stmt->getTemporary());
+	TraverseStmt(Stmt->GetTemporaryExpr());
 	return true;
 }
 
@@ -3176,14 +3176,14 @@ bool DPrinter::TraverseLambdaExpr(LambdaExpr* Node)
 	{
 		for(ParmVarDecl* P : Method->parameters())
 		{
-			if(P->getType()->getTypeClass() == Type::TypeClass::TemplateTypeParm)
+			if(P->getType()->getTypeClass() == clang::Type::TypeClass::TemplateTypeParm)
 			{
 				hasAuto = true;
 				break;
 			}
 			else if(auto* lvalueRef = dyn_cast<LValueReferenceType>(P->getType()))
 			{
-				if(lvalueRef->getPointeeType()->getTypeClass() == Type::TypeClass::TemplateTypeParm)
+				if(lvalueRef->getPointeeType()->getTypeClass() == clang::Type::TypeClass::TemplateTypeParm)
 				{
 					hasAuto = true;
 					break;
@@ -4088,7 +4088,7 @@ bool DPrinter::VisitStmt(Stmt* Stmt)
 	return true;
 }
 
-bool DPrinter::VisitType(Type* Type)
+bool DPrinter::VisitType(clang::Type* Type)
 {
 	out() << indentStr() << "/*" << Type->getTypeClassName() << " Type*/";
 	return true;
