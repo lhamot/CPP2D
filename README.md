@@ -58,15 +58,15 @@ Some samples here : https://github.com/lhamot/CPP2D/wiki/Conversion-samples
 
 ## Requirements
 * cmake >= 2.6
-* Tested with **gcc** 4.8.4 (**Ubuntu** 14.04.3) and **Visual Studio** 2015 (**Windows** 7 & 10)
-* Tested with **LLVM/clang** **4.0.1**
+* Tested with **gcc** 4.8.4 (**Ubuntu** 14.04.3), **Visual Studio** 2015 (**Windows** 7 & 10), and **clang** (**macOS** 10.14)
+* Tested with **LLVM/clang** **6.0.1**
 
 ## How to install it?
 1. Install **clang** : http://clang.llvm.org/get_started.html
 2. Check out **CPP2D** from : https://github.com/lhamot/CPP2D.git
 3. Run **cmake** in the root directory of **CPP2D**
    1. Set the build type if needed (Debug;Release;MinSizeRel;RelWithDebInfo)
-   2. Set the path to **LLVM** named **LLVM_PATH**.
+   2. Set the path to **LLVM** using **CMAKE_PREFIX_PATH**.
    4. Generate
 4. Run **make**
 
