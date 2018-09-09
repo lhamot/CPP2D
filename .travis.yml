@@ -26,9 +26,9 @@ install:
 script:	  
   - mkdir -p build
   - cd build
-  - cmake .. -DLLVM_INCLUDE=/usr/lib/llvm-6.0/include -DLLVM_LIB=/usr/lib/llvm-6.0/lib -DCLANG_INCLUDE=/usr/lib/llvm-6.0/include/clang -DCLANG_LIB=/usr/lib/llvm-6.0/lib -DCMAKE_EXPORT_COMPILE_COMMANDS=OFF
+  - cmake .. -DCMAKE_PREFIX_PATH=/usr/lib/llvm-6.0 -DCMAKE_EXPORT_COMPILE_COMMANDS=OFF
   - make
-  - cmake .. -DLLVM_INCLUDE=/usr/lib/llvm-6.0/include -DLLVM_LIB=/usr/lib/llvm-6.0/lib -DCLANG_INCLUDE=/usr/lib/llvm-6.0/include/clang -DCLANG_LIB=/usr/lib/llvm-6.0/lib -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+  - cmake .. -DCMAKE_PREFIX_PATH=/usr/lib/llvm-6.0 -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
   - ln -s $PWD/compile_commands.json ../CPP2D_UT_CPP
   - cd ../CPP2D_UT_CPP
   - ../build/CPP2D/cpp2d stdlib_testsuite.cpp template_testsuite.cpp test.cpp framework.cpp main.cpp  -macro-expr=UT_MACRO_EXPR/nn -macro-expr=CHECK/e -macro-expr=CHECK_EQUAL/ee -macro-expr=UT_MACRO/eee -macro-stmt=UT_MACRO_STMT -macro-stmt=UT_MACRO_STMT_CLASS/ntne

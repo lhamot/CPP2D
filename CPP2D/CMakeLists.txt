@@ -2,30 +2,6 @@ cmake_minimum_required(VERSION 2.6)
 
 project(cpp2d)
 
-find_path(LLVM_INCLUDE llvm
-   PATH_SUFFIXES llvm
-   DOC "Include directory for llvm"
-   )
-include_directories(${LLVM_INCLUDE})
-
-find_path(LLVM_LIB llvm
-   PATH_SUFFIXES llvm
-   DOC "Lib directory for llvm"
-)
-link_directories(${LLVM_LIB})
-
-find_path(CLANG_INCLUDE clang
-   PATH_SUFFIXES clang
-   DOC "Include directory for clang"
-)
-include_directories(${CLANG_INCLUDE})
-
-find_path(CLANG_LIB clang
-   PATH_SUFFIXES clang
-   DOC "Lib directory for clang"
-)
-link_directories(${CLANG_LIB})
-
 # Déclaration de l'exécutable
 add_executable(
     cpp2d
@@ -83,7 +59,6 @@ target_link_libraries(cpp2d
 )
 
 if(CMAKE_COMPILER_IS_GNUCXX)
-    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -fno-rtti")
     target_link_libraries(cpp2d rt dl tinfo pthread z m)
 endif()
 

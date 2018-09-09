@@ -6,6 +6,7 @@
 //
 
 #include <ciso646>
+#include <ostream>
 
 #pragma warning(push, 0)
 #pragma warning(disable: 4265)
