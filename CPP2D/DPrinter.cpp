@@ -13,6 +13,7 @@
 #include <locale>
 #include <ciso646>
 #include <cstdio>
+#include <regex>
 
 #pragma warning(push, 0)
 #include <llvm/ADT/SmallString.h>
@@ -345,12 +346,14 @@ std::vector<std::string> DPrinter::split_lines(std::string const& instr)
 	do
 	{
 		iter = std::find(prevIter, std::end(instr), '\n');
-		result.push_back(DPrinter::trim(std::string(prevIter, iter)));
-		if(iter != std::end(instr))
+		result.push_back(std::string(prevIter, iter));
+		if (iter != std::end(instr))
+		{
+			result.back() += "\n";
 			prevIter = iter + 1;
+		}
 	}
 	while(iter != std::end(instr));
-	result.pop_back();
 	return result;
 }
 
@@ -370,43 +373,67 @@ void DPrinter::printStmtComment(SourceLocation& locStart,
 	                       sm,
 	                       LangOptions()
 	                      ).str();
+
+	// Uniformize end of lines
+	comment = std::regex_replace(comment, std::regex(R"(\r\n)"), std::string("\n"));
+
+	// Extract comments
+	std::smatch matches;
+	std::string filtered;
+	while (std::regex_search(comment, matches, std::regex(R"(\/\/[^\n]*$|\/\*[^*]*\*\/|#[^\z]*?[^\\]\s*$)")))
+	{
+		for (auto x : matches)
+		{
+			filtered += x;
+			filtered += "\n";
+		}
+		comment = matches.suffix();
+	}
+	comment = filtered;
+
+	size_t pos = comment.find_first_not_of(" \r\n\t,;");
+	if (pos != std::string::npos)
+		comment = comment.substr(pos);
+	else
+		comment.clear();
+	pos = comment.find_last_not_of(" \r\n\t,;");
+	if (pos != std::string::npos)
+		comment = comment.substr(0, pos + 1);
+	else
+		comment.clear();
+
 	comment = CPP2DTools::replaceString(comment, "#if", "/*#if");
 	comment = CPP2DTools::replaceString(comment, "#endif", "#endif*/");
 
 	std::vector<std::string> comments = split_lines(comment);
-	//if (comments.back() == std::string())
-	Spliter split(*this, indentStr());
-	if(comments.empty())
-		out() << std::endl;
+
+	Spliter split(*this, "");
 	if(not comments.empty())
 	{
-		auto& firstComment = comments.front();
-		auto commentPos1 = firstComment.find("//");
-		auto commentPos2 = firstComment.find("/*");
-		size_t trimPos = 0;
-		if(commentPos1 != std::string::npos)
+		// Comment multi lines macro
+		for (size_t i = 0; i < comments.size(); ++i)
 		{
-			if(commentPos2 != std::string::npos)
-				trimPos = std::min(commentPos1, commentPos2);
-			else
-				trimPos = commentPos1;
+			if (std::regex_search(comments[i], std::regex(R"(^\s*\#define)")))
+			{
+				comments[i] = "//" + comments[i];
+				for (; i < comments.size() && std::regex_search(comments[i], std::regex(R"(\\\s*$)")); ++i)
+				{
+					if (i < (comments.size() - 1))
+						comments[i + 1] = "//" + comments[i + 1];
+				}
+			}
 		}
-		else if(commentPos2 != std::string::npos)
-			trimPos = commentPos2;
-		else
-			firstComment = "";
 
-		if(not firstComment.empty())
-			firstComment = firstComment.substr(trimPos);
-
-		out() << " ";
 		size_t index = 0;
 		for(auto const& c : comments)
 		{
-			split.split();
-			out() << c;
-			out() << std::endl;
-			++index;
+			size_t incPos = c.find("#include");
+			if (not c.empty() && incPos == std::string::npos)
+			{
+				split.split();
+				out() << c;
+				++index;
+			}
 		}
 	}
 	locStart = nextStart;
@@ -545,11 +572,13 @@ bool DPrinter::TraverseTranslationUnitDecl(TranslationUnitDecl* Decl)
 	llvm::raw_fd_ostream file(StringRef(modulename + ".print.cpp"), ec, sys::fs::OpenFlags());
 	Decl->print(file);
 
+	SourceLocation locStart = Decl->getLocStart();
+
 	std::ofstream file2(modulename + ".source.cpp");
+	auto& sm = Context->getSourceManager();
 
 	for(clang::Decl* c : Decl->decls())
 	{
-		auto& sm = Context->getSourceManager();
 		std::string decl_str =
 		  Lexer::getSourceText(CharSourceRange(c->getSourceRange(), true),
 		                       sm,
@@ -557,23 +586,35 @@ bool DPrinter::TraverseTranslationUnitDecl(TranslationUnitDecl* Decl)
 		                      ).str();
 		file2 << decl_str;
 
-		if(CPP2DTools::checkFilename(Context->getSourceManager(), modulename, c))
+		if (CPP2DTools::checkFilename(Context->getSourceManager(), modulename, c))
 		{
 			pushStream();
+
+			if (locStart.isInvalid())
+				locStart = sm.getLocForStartOfFile(sm.getMainFileID()).getLocWithOffset(3);
+
+			printStmtComment(locStart,
+				c->getSourceRange().getBegin(),
+				c->getSourceRange().getEnd()
+			);
+			out() << std::endl;
+
 			TraverseDecl(c);
 			std::string const decl = popStream();
-			if(not decl.empty())
+			if (not decl.empty())
 			{
 				printCommentBefore(c);
 				out() << indentStr() << decl;
-				if(needSemiComma(c))
+				if (needSemiComma(c))
 					out() << ';';
 				printCommentAfter(c);
-				out() << std::endl << std::endl;
 			}
 			output_enabled = (isInMacro == 0);
 		}
 	}
+
+	printStmtComment(locStart, sm.getLocForEndOfFile(sm.getMainFileID()));
+	out() << std::endl;
 
 	return true;
 }
@@ -800,25 +841,36 @@ template<typename InitList, typename AddBeforeEnd>
 void DPrinter::traverseCompoundStmtImpl(CompoundStmt* Stmt, InitList initList, AddBeforeEnd addBeforEnd)
 {
 	SourceLocation locStart = Stmt->getLBracLoc().getLocWithOffset(1);
-	out() << "{";
+	out() << "{" << std::endl;
 	++indent;
+	out() << indentStr();
 	initList();
 	for(auto child : Stmt->children())
 	{
 		printStmtComment(locStart,
-		                 child->getLocStart().getLocWithOffset(-1),
-		                 child->getLocEnd());
+		                 child->getLocStart(),
+		                 child->getLocEnd()
+		);
+		out() << std::endl;
 		out() << indentStr();
 		TraverseStmt(child);
 		if(needSemiComma(child))
 			out() << ";";
+		out() << std::endl;
+		out() << indentStr();
 		output_enabled = (isInMacro == 0);
 	}
-	printStmtComment(locStart, Stmt->getRBracLoc().getLocWithOffset(-1));
+	printStmtComment(
+		locStart, 
+		Stmt->getRBracLoc()
+	);
 	addBeforEnd();
 	--indent;
+	out() << '\n';
 	out() << indentStr();
 	out() << "}";
+	out() << std::endl;
+	out() << indentStr();
 }
 
 bool DPrinter::TraverseCompoundStmt(CompoundStmt* Stmt)
@@ -2110,20 +2162,28 @@ void DPrinter::traverseFunctionDeclImpl(
 		{
 			if (isMain && Decl->getNumParams() == 2 && decl == bodyDecl->parameters()[0])
 			{	// Remove the first parameter (argc) of the main function
+				locStart = decl->getLocEnd();
 				++index;
 				continue;
 			}
-			if(arg_become_this == static_cast<int>(index))
+			if (arg_become_this == static_cast<int>(index))
+			{
 				isConstMethod = isConst(decl->getType());
+				locStart = decl->getLocEnd();
+			}
 			else
 			{
-				if(numParam != 1)
+				SourceLocation endLoc = decl->getLocEnd();
+				if (numParam != 1)
 				{
 					printStmtComment(locStart,
-					                 decl->getLocStart().getLocWithOffset(-1),
-					                 decl->getLocEnd().getLocWithOffset(1));
+						decl->getLocStart(),
+						endLoc);
+					out() << std::endl;
 					out() << indentStr();
 				}
+				else
+					locStart = endLoc;
 				if(isCopyCtor && sem == TypeOptions::Value)
 					out() << "this";
 				else
@@ -2136,7 +2196,7 @@ void DPrinter::traverseFunctionDeclImpl(
 					printDefaultValue = true;
 				}
 				if(index < numParam - 1)
-					out() << ',';
+					out() << ", ";
 			}
 			++index;
 		}
@@ -2146,6 +2206,7 @@ void DPrinter::traverseFunctionDeclImpl(
 				out() << "\n" << indentStr();
 			out() << "...";
 			addExternInclude("core.vararg", "...");
+			locStart = funcTypeLoc.getRParenLoc(); // the dots doesn't have Decl, but we have to go foreward
 		}
 		pushStream();
 		if(funcTypeLoc.isNull() == false)
@@ -2155,7 +2216,7 @@ void DPrinter::traverseFunctionDeclImpl(
 		if(comment.size() > 2)
 			out() << comment << indentStr();
 	}
-	out() << ")";
+	out() << std::endl << indentStr() << ")";
 	if(isConstMethod && portConst)
 		out() << " const";
 	printFuncEnd(Decl);

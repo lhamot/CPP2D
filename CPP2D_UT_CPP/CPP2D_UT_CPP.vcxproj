@@ -149,6 +149,7 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="comment.cpp" />
     <ClCompile Include="framework.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="stdlib_testsuite.cpp" />
