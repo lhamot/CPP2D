@@ -5,6 +5,52 @@
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 //
 
+// Check for #ifdef #endif
+
+#define FEATURE_A
+
+#ifdef FEATURE_A
+int const FeatureA = 1;
+#else
+int const FeatureA = 0;
+#endif
+
+static_assert(FeatureA == 1, "FEATURE_A is not defined??");
+
+// Check for #if
+
+#define FEATURE_B
+
+#if defined(FEATURE_B)
+int const FeatureB = 1;
+#else
+int const FeatureB = 0;
+#endif
+
+static_assert(FeatureB, "FEATURE_B is not defined??");
+
+// Check for #else
+
+#if defined(FEATURE_C)
+int const FeatureC = 1;
+#else
+int const FeatureC = 0;
+#endif
+
+static_assert(FeatureC == 0, "FEATURE_C is defined??");
+
+// Check for #elif
+
+#if defined(FEATURE_D)
+	int const FeatureD = 1;
+#elif defined(FEATURE_B)
+	int const FeatureD = 2;
+#else
+	int const FeatureD = 3;
+#endif
+
+static_assert(FeatureD == 2, "FEATURE_D is defined??");
+
 void func4845(
 	int aaaa
 	, int bbbb //hhhh!
@@ -14,21 +60,6 @@ void func4845(
 	int eeee = 13
 )
 {
-}
-
-// Comment! 1
-void func(int asdflkhds = 36, int bateau = 42)
-{
-#define ABCDEF
-}
-
-int func2()
-{
-#define ABCDEF1
-	int a = 0;
-#define ABCDEF2
-	return a;
-#define ABCDEF3
 }
 
 int func2(int asdflkhds, int bateau)

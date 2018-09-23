@@ -384,7 +384,13 @@ void DPrinter::printStmtComment(SourceLocation& locStart,
 	{
 		for (auto x : matches)
 		{
-			filtered += x;
+			std::string str = x.str();
+			if (str.front() == '#') // It is preproc
+			{
+				str = std::regex_replace(str, std::regex(R"(\\\n)"), std::string(""));
+				str = std::regex_replace(str, std::regex(R"(defined(\(\w+\)))"), std::string("version$1"));
+			}
+			filtered += str;
 			filtered += "\n";
 		}
 		comment = matches.suffix();
@@ -402,8 +408,16 @@ void DPrinter::printStmtComment(SourceLocation& locStart,
 	else
 		comment.clear();
 
-	comment = CPP2DTools::replaceString(comment, "#if", "/*#if");
-	comment = CPP2DTools::replaceString(comment, "#endif", "#endif*/");
+	comment = std::regex_replace(comment, std::regex(R"(^\s*\#define\s+(\w+)\s+(\w+)(\s*)$)"), std::string("auto const $1 = $2;$3"));
+	comment = std::regex_replace(comment, std::regex(R"(^\s*\#define\s+(\w+)(\s*)$)"), std::string("version = $1;$2"));  // OK
+	comment = std::regex_replace(comment, std::regex(R"(^\s*\#ifdef\s*([^\z]*?[^\\])(\s*)$)"), std::string("version($1)\n{$2"));
+	comment = std::regex_replace(comment, std::regex(R"(^\s*\#ifndef\s*([^\z]*?[^\\])(\s*)$)"), std::string("version(!($1))\n{$2"));
+	comment = std::regex_replace(comment, std::regex(R"(^\s*\#if\s*([^\z]*?[^\\])(\s*)$)"), std::string("$1\n{$2"));
+	comment = std::regex_replace(comment, std::regex(R"(^\s*\#elif\s*([^\z]*?[^\\])(\s*)$)"), std::string("}\nelse $1\n{$2"));
+	comment = std::regex_replace(comment, std::regex(R"(^\s*\#else(\s*))"), std::string("}\nelse\n{$1"));
+	comment = std::regex_replace(comment, std::regex(R"(^\s*\#endif(\s*))"), std::string("}$1"));
+	comment = std::regex_replace(comment, std::regex(R"(^\s*(\#undef\s+\w+\s*$))"), std::string("//$1"));
+	comment = std::regex_replace(comment, std::regex(R"(^\s*\#error\s*([^\z]*?[^\\])(\s*)$)"), std::string("static_assert(false, $1);$2"));
 
 	std::vector<std::string> comments = split_lines(comment);
 
