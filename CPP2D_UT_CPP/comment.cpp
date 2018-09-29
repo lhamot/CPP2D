@@ -10,9 +10,9 @@
 #define FEATURE_A
 
 #ifdef FEATURE_A
-int const FeatureA = 1;
+const int FeatureA = 1;
 #else
-int const FeatureA = 0;
+const int FeatureA = 0;
 #endif
 
 static_assert(FeatureA == 1, "FEATURE_A is not defined??");
@@ -22,9 +22,9 @@ static_assert(FeatureA == 1, "FEATURE_A is not defined??");
 #define FEATURE_B
 
 #if defined(FEATURE_B)
-int const FeatureB = 1;
+const int FeatureB = 1;
 #else
-int const FeatureB = 0;
+const int FeatureB = 0;
 #endif
 
 static_assert(FeatureB, "FEATURE_B is not defined??");
@@ -32,9 +32,9 @@ static_assert(FeatureB, "FEATURE_B is not defined??");
 // Check for #else
 
 #if defined(FEATURE_C)
-int const FeatureC = 1;
+const int FeatureC = 1;
 #else
-int const FeatureC = 0;
+const int FeatureC = 0;
 #endif
 
 static_assert(FeatureC == 0, "FEATURE_C is defined??");
@@ -42,11 +42,11 @@ static_assert(FeatureC == 0, "FEATURE_C is defined??");
 // Check for #elif
 
 #if defined(FEATURE_D)
-	int const FeatureD = 1;
+	const int FeatureD = 1;
 #elif defined(FEATURE_B)
-	int const FeatureD = 2;
+	const int FeatureD = 2;
 #else
-	int const FeatureD = 3;
+	const int FeatureD = 3;
 #endif
 
 static_assert(FeatureD == 2, "FEATURE_D is defined??");

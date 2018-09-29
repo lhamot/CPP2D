@@ -380,8 +380,17 @@ void DPrinter::printStmtComment(SourceLocation& locStart,
 	// Extract comments
 	std::smatch matches;
 	std::string filtered;
-	while (std::regex_search(comment, matches, std::regex(R"(\/\/[^\n]*$|\/\*[^*]*\*\/|#[^\z]*?[^\\]\s*$)")))
+	bool firstIteration = true;
+	while (std::regex_search(comment, matches, std::regex(R"(\/\*(?:(?!\*\/)[^ç])*\*\/|\/\/[^\n]*$|#[^\z]*?[^\\]\s*$)")))
 	{
+		if (!firstIteration)
+		{
+			auto pos = matches.position();
+			filtered += comment.substr(0, size_t(pos));
+		}
+		else
+			firstIteration = false;
+
 		for (auto x : matches)
 		{
 			std::string str = x.str();
@@ -391,7 +400,6 @@ void DPrinter::printStmtComment(SourceLocation& locStart,
 				str = std::regex_replace(str, std::regex(R"(defined(\(\w+\)))"), std::string("version$1"));
 			}
 			filtered += str;
-			filtered += "\n";
 		}
 		comment = matches.suffix();
 	}
