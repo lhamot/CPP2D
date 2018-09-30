@@ -7,6 +7,10 @@
 
 // Check for #ifdef #endif
 
+#define MULTI_LINE \
+int i = 45; \
+int j = 72;
+
 #define FEATURE_A
 
 #ifdef FEATURE_A

@@ -88,7 +88,6 @@ if(CMAKE_COMPILER_IS_GNUCXX)
 endif()
 
 if(CMAKE_SYSTEM_NAME MATCHES "Windows")
-	SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_REGEX_MAX_STACK_COUNT=0  -D_REGEX_MAX_COMPLEXITY_COUNT=0")
 	target_link_libraries(cpp2d
 		version.lib
 	)

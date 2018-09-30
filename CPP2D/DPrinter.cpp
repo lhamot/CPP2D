@@ -375,77 +375,146 @@ void DPrinter::printStmtComment(SourceLocation& locStart,
 	                      ).str();
 
 	// Uniformize end of lines
-	comment = std::regex_replace(comment, std::regex(R"(\r\n)"), std::string("\n"));
+	comment = std::regex_replace(comment, std::regex(R"(\r)"), std::string(""));
 
 	// Extract comments
-	std::smatch matches;
-	std::string filtered;
-	bool firstIteration = true;
-	while (std::regex_search(comment, matches, std::regex(R"(\/\*(?:(?!\*\/)[^ç])*\*\/|\/\/[^\n]*$|#[^\z]*?[^\\]\s*$)")))
+	enum State
 	{
-		if (!firstIteration)
+		StartOfLine,
+		Line,
+		Slash,
+		MultilineComment,
+		MultilineComment_star,
+		SinglelineComment,
+		Pragma,
+		Pragma_antislash,
+	};
+	State state = StartOfLine;
+	State topTokenState = StartOfLine;
+	std::vector<std::string> comments;
+	comments.emplace_back();
+	auto splitComment = [&](State newState)
+	{
+		if (topTokenState == Pragma)
 		{
-			auto pos = matches.position();
-			filtered += comment.substr(0, size_t(pos));
+			std::string& pragma = comments.back();
+			pragma = std::regex_replace(pragma, std::regex(R"(^\s*\#define\s+(\w+)\s+(\w+)(\s*)$)"), std::string("auto const $1 = $2;$3"));
+			pragma = std::regex_replace(pragma, std::regex(R"(^\s*\#define\s+(\w+)(\s*)$)"), std::string("version = $1;$2"));  // OK
+			pragma = std::regex_replace(pragma, std::regex(R"(^\s*\#ifdef\s*([^\z]*?[^\\])(\s*)$)"), std::string("version($1)\n{$2"));
+			pragma = std::regex_replace(pragma, std::regex(R"(^\s*\#ifndef\s*([^\z]*?[^\\])(\s*)$)"), std::string("version(!($1))\n{$2"));
+			pragma = std::regex_replace(pragma, std::regex(R"(^\s*\#if\s*([^\z]*?[^\\])(\s*)$)"), std::string("$1\n{$2"));
+			pragma = std::regex_replace(pragma, std::regex(R"(^\s*\#elif\s*([^\z]*?[^\\])(\s*)$)"), std::string("}\nelse $1\n{$2"));
+			pragma = std::regex_replace(pragma, std::regex(R"(^\s*\#else(\s*))"), std::string("}\nelse\n{$1"));
+			pragma = std::regex_replace(pragma, std::regex(R"(^\s*\#endif(\s*))"), std::string("}$1"));
+			pragma = std::regex_replace(pragma, std::regex(R"(^\s*(\#undef\s+\w+\s*$))"), std::string("//$1"));
+			pragma = std::regex_replace(pragma, std::regex(R"(^\s*\#error\s*([^\z]*?[^\\])(\s*)$)"), std::string("static_assert(false, $1);$2"));
+			pragma = std::regex_replace(pragma, std::regex(R"(defined(\(\w+\)))"), std::string("version$1"));
+			std::replace(pragma.begin(), pragma.end(), '\\', '\n');
+			if (pragma.find("#define") == 0)
+				pragma = std::regex_replace(pragma, std::regex(R"((^.*$))"), std::string("//$1"));
 		}
-		else
-			firstIteration = false;
-
-		for (auto x : matches)
+		comments.emplace_back();
+		topTokenState = newState;
+	};
+	auto push = [&](char c)
+	{
+		comments.back().push_back(c);
+	};
+	for (char c : comment)
+	{
+		switch (state)
 		{
-			std::string str = x.str();
-			if (str.front() == '#') // It is preproc
+		case StartOfLine:
+		{
+			switch (c)
 			{
-				str = std::regex_replace(str, std::regex(R"(\\\n)"), std::string(""));
-				str = std::regex_replace(str, std::regex(R"(defined(\(\w+\)))"), std::string("version$1"));
+			case '/': state = Slash; break;
+			case '#': state = Pragma; splitComment(Pragma); push(c); break;
+			case ' ': state = StartOfLine; push(c); break;
+			case '\t': state = StartOfLine; push(c); break;
+			case '\n': state = StartOfLine; push(c); break;
+			default: state = Line; push(c);
 			}
-			filtered += str;
+			break;
 		}
-		comment = matches.suffix();
+		case Line:
+		{
+			switch (c)
+			{
+			case '/': state = Slash; break;
+			case '\n': state = StartOfLine; push(c); break;
+			default: push(c);
+			}
+			break;
+		}
+		case Slash:
+		{
+			switch (c)
+			{
+			case '*': state = MultilineComment; splitComment(MultilineComment); push('/'); push(c); break;
+			case '/': state = SinglelineComment; splitComment(SinglelineComment); push('/'); push(c); break;
+			default: state = Line; push(c);
+			}
+			break;
+		}
+		case MultilineComment:
+		{
+			switch (c)
+			{
+			case '*': state = MultilineComment_star; break;
+			default: push(c);
+			}
+			break;
+		}
+		case MultilineComment_star:
+		{
+			switch (c)
+			{
+			case '/': state = Line; push('*'); push(c); splitComment(Line); break;
+			default: state = MultilineComment; push(c);
+			}
+			break;
+		}
+		case SinglelineComment:
+		{
+			switch (c)
+			{
+			case '\n': state = StartOfLine; push(c); splitComment(Line); break;
+			default: push(c);
+			}
+			break;
+		}
+		case Pragma:
+		{
+			switch (c)
+			{
+			case '\n': state = StartOfLine; push(c); splitComment(Line); break;
+			case '\\': state = Pragma_antislash; push(c); break;
+			default: push(c);
+			}
+			break;
+		}
+		case Pragma_antislash:
+		{
+			state = Pragma;
+		}
+		}
 	}
-	comment = filtered;
 
-	size_t pos = comment.find_first_not_of(" \r\n\t,;");
-	if (pos != std::string::npos)
-		comment = comment.substr(pos);
-	else
-		comment.clear();
-	pos = comment.find_last_not_of(" \r\n\t,;");
-	if (pos != std::string::npos)
-		comment = comment.substr(0, pos + 1);
-	else
-		comment.clear();
+	if(not comments.empty())
+		comments.erase(comments.begin());
+	if (not comments.empty())
+		comments.erase(comments.end() - 1);
 
-	comment = std::regex_replace(comment, std::regex(R"(^\s*\#define\s+(\w+)\s+(\w+)(\s*)$)"), std::string("auto const $1 = $2;$3"));
-	comment = std::regex_replace(comment, std::regex(R"(^\s*\#define\s+(\w+)(\s*)$)"), std::string("version = $1;$2"));  // OK
-	comment = std::regex_replace(comment, std::regex(R"(^\s*\#ifdef\s*([^\z]*?[^\\])(\s*)$)"), std::string("version($1)\n{$2"));
-	comment = std::regex_replace(comment, std::regex(R"(^\s*\#ifndef\s*([^\z]*?[^\\])(\s*)$)"), std::string("version(!($1))\n{$2"));
-	comment = std::regex_replace(comment, std::regex(R"(^\s*\#if\s*([^\z]*?[^\\])(\s*)$)"), std::string("$1\n{$2"));
-	comment = std::regex_replace(comment, std::regex(R"(^\s*\#elif\s*([^\z]*?[^\\])(\s*)$)"), std::string("}\nelse $1\n{$2"));
-	comment = std::regex_replace(comment, std::regex(R"(^\s*\#else(\s*))"), std::string("}\nelse\n{$1"));
-	comment = std::regex_replace(comment, std::regex(R"(^\s*\#endif(\s*))"), std::string("}$1"));
-	comment = std::regex_replace(comment, std::regex(R"(^\s*(\#undef\s+\w+\s*$))"), std::string("//$1"));
-	comment = std::regex_replace(comment, std::regex(R"(^\s*\#error\s*([^\z]*?[^\\])(\s*)$)"), std::string("static_assert(false, $1);$2"));
+	comment.clear();
+	for (std::string& str : comments)
+		comment += str;
 
-	std::vector<std::string> comments = split_lines(comment);
+	comments = split_lines(comment);
 
 	Spliter split(*this, "");
 	if(not comments.empty())
 	{
-		// Comment multi lines macro
-		for (size_t i = 0; i < comments.size(); ++i)
-		{
-			if (std::regex_search(comments[i], std::regex(R"(^\s*\#define)")))
-			{
-				comments[i] = "//" + comments[i];
-				for (; i < comments.size() && std::regex_search(comments[i], std::regex(R"(\\\s*$)")); ++i)
-				{
-					if (i < (comments.size() - 1))
-						comments[i + 1] = "//" + comments[i + 1];
-				}
-			}
-		}
-
 		size_t index = 0;
 		for(auto const& c : comments)
 		{
