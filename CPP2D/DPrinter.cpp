@@ -357,15 +357,15 @@ std::vector<std::string> DPrinter::split_lines(std::string const& instr)
 	return result;
 }
 
-void DPrinter::printStmtComment(SourceLocation& locStart,
+bool DPrinter::printStmtComment(SourceLocation& locStart,
                                 SourceLocation const& locEnd,
-                                SourceLocation const& nextStart)
+                                SourceLocation const& nextStart,
+                                bool doIndent)
 {
 	if(locStart.isInvalid() || locEnd.isInvalid() || locStart.isMacroID() || locEnd.isMacroID())
 	{
 		locStart = nextStart;
-		out() << std::endl;
-		return;
+		return false;
 	}
 	auto& sm = Context->getSourceManager();
 	std::string comment =
@@ -390,14 +390,19 @@ void DPrinter::printStmtComment(SourceLocation& locStart,
 		Pragma_antislash,
 	};
 	State state = StartOfLine;
-	State topTokenState = StartOfLine;
-	std::vector<std::string> comments;
-	comments.emplace_back();
+	struct StringWithState
+	{
+		StringWithState(State s) :state(s) {}
+		State state = Line;
+		std::string str;
+	};
+	std::vector<StringWithState> comments;
+	comments.emplace_back(StartOfLine);
 	auto splitComment = [&](State newState)
 	{
-		if (topTokenState == Pragma)
+		if (comments.back().state == Pragma)
 		{
-			std::string& pragma = comments.back();
+			std::string& pragma = comments.back().str;
 			pragma = std::regex_replace(pragma, std::regex(R"(^\s*\#define\s+(\w+)\s+(\w+)(\s*)$)"), std::string("auto const $1 = $2;$3"));
 			pragma = std::regex_replace(pragma, std::regex(R"(^\s*\#define\s+(\w+)(\s*)$)"), std::string("version = $1;$2"));  // OK
 			pragma = std::regex_replace(pragma, std::regex(R"(^\s*\#ifdef\s*([^\z]*?[^\\])(\s*)$)"), std::string("version($1)\n{$2"));
@@ -411,14 +416,15 @@ void DPrinter::printStmtComment(SourceLocation& locStart,
 			pragma = std::regex_replace(pragma, std::regex(R"(defined(\(\w+\)))"), std::string("version$1"));
 			std::replace(pragma.begin(), pragma.end(), '\\', '\n');
 			if (pragma.find("#define") == 0)
-				pragma = std::regex_replace(pragma, std::regex(R"((^.*$))"), std::string("//$1"));
+				pragma = std::regex_replace(pragma, std::regex(R"((^.+$))"), std::string("//$1"));
 		}
-		comments.emplace_back();
-		topTokenState = newState;
+		else if (comments.back().state == MultilineComment)
+			comments.back().str += '\n';
+		comments.emplace_back(newState);
 	};
 	auto push = [&](char c)
 	{
-		comments.back().push_back(c);
+		comments.back().str.push_back(c);
 	};
 	for (char c : comment)
 	{
@@ -432,7 +438,7 @@ void DPrinter::printStmtComment(SourceLocation& locStart,
 			case '#': state = Pragma; splitComment(Pragma); push(c); break;
 			case ' ': state = StartOfLine; push(c); break;
 			case '\t': state = StartOfLine; push(c); break;
-			case '\n': state = StartOfLine; push(c); break;
+			case '\n': state = StartOfLine; push(c); splitComment(StartOfLine); break;
 			default: state = Line; push(c);
 			}
 			break;
@@ -442,7 +448,7 @@ void DPrinter::printStmtComment(SourceLocation& locStart,
 			switch (c)
 			{
 			case '/': state = Slash; break;
-			case '\n': state = StartOfLine; push(c); break;
+			case '\n': state = StartOfLine; push(c); splitComment(StartOfLine); break;
 			default: push(c);
 			}
 			break;
@@ -506,28 +512,26 @@ void DPrinter::printStmtComment(SourceLocation& locStart,
 	if (not comments.empty())
 		comments.erase(comments.end() - 1);
 
-	comment.clear();
-	for (std::string& str : comments)
-		comment += str;
-
-	comments = split_lines(comment);
-
+	bool printedSomething = false;
 	Spliter split(*this, "");
 	if(not comments.empty())
 	{
-		size_t index = 0;
-		for(auto const& c : comments)
+		for(StringWithState const& ss : comments)
 		{
+			std::string const& c = ss.str;
 			size_t incPos = c.find("#include");
-			if (not c.empty() && incPos == std::string::npos)
+			if (not c.empty() && incPos == std::string::npos && ss.state != StartOfLine && ss.state != Line)
 			{
 				split.split();
+				if (doIndent)
+					out() << indentStr();
 				out() << c;
-				++index;
+				printedSomething = true;
 			}
 		}
 	}
 	locStart = nextStart;
+	return printedSomething;
 }
 
 void DPrinter::printMacroArgs(CallExpr* macro_args)
@@ -686,9 +690,9 @@ bool DPrinter::TraverseTranslationUnitDecl(TranslationUnitDecl* Decl)
 
 			printStmtComment(locStart,
 				c->getSourceRange().getBegin(),
-				c->getSourceRange().getEnd()
+				c->getSourceRange().getEnd(),
+				true
 			);
-			out() << std::endl;
 
 			TraverseDecl(c);
 			std::string const decl = popStream();
@@ -704,8 +708,7 @@ bool DPrinter::TraverseTranslationUnitDecl(TranslationUnitDecl* Decl)
 		}
 	}
 
-	printStmtComment(locStart, sm.getLocForEndOfFile(sm.getMainFileID()));
-	out() << std::endl;
+	printStmtComment(locStart, sm.getLocForEndOfFile(sm.getMainFileID()), clang::SourceLocation(), true);
 
 	return true;
 }
@@ -934,30 +937,29 @@ void DPrinter::traverseCompoundStmtImpl(CompoundStmt* Stmt, InitList initList, A
 	SourceLocation locStart = Stmt->getLBracLoc().getLocWithOffset(1);
 	out() << "{" << std::endl;
 	++indent;
-	out() << indentStr();
 	initList();
 	for(auto child : Stmt->children())
 	{
 		printStmtComment(locStart,
 		                 child->getLocStart(),
-		                 child->getLocEnd()
+		                 child->getLocEnd(),
+		                 true
 		);
-		out() << std::endl;
 		out() << indentStr();
 		TraverseStmt(child);
 		if(needSemiComma(child))
 			out() << ";";
 		out() << std::endl;
-		out() << indentStr();
 		output_enabled = (isInMacro == 0);
 	}
 	printStmtComment(
 		locStart, 
-		Stmt->getRBracLoc()
+		Stmt->getRBracLoc(),
+		clang::SourceLocation(),
+		true
 	);
 	addBeforEnd();
 	--indent;
-	out() << '\n';
 	out() << indentStr();
 	out() << "}";
 	out() << std::endl;
@@ -2267,10 +2269,11 @@ void DPrinter::traverseFunctionDeclImpl(
 				SourceLocation endLoc = decl->getLocEnd();
 				if (numParam != 1)
 				{
-					printStmtComment(locStart,
+					bool isComment = printStmtComment(locStart,
 						decl->getLocStart(),
 						endLoc);
-					out() << std::endl;
+					if(not isComment)
+						out() << std::endl;
 					out() << indentStr();
 				}
 				else
@@ -2299,15 +2302,18 @@ void DPrinter::traverseFunctionDeclImpl(
 			addExternInclude("core.vararg", "...");
 			locStart = funcTypeLoc.getRParenLoc(); // the dots doesn't have Decl, but we have to go foreward
 		}
-		pushStream();
-		if(funcTypeLoc.isNull() == false)
-			printStmtComment(locStart, funcTypeLoc.getRParenLoc());
-		std::string const comment = popStream();
+		if (funcTypeLoc.isNull() == false)
+		{
+			bool isComment = printStmtComment(locStart, funcTypeLoc.getRParenLoc());
+			if (not isComment)
+				out() << std::endl;
+		}
 		--indent;
-		if(comment.size() > 2)
-			out() << comment << indentStr();
 	}
-	out() << std::endl << indentStr() << ")";
+	if(Decl->getNumParams() != 0)
+		out() << indentStr() << ')';
+	else
+		out() << ')';
 	if(isConstMethod && portConst)
 		out() << " const";
 	printFuncEnd(Decl);
@@ -2325,10 +2331,9 @@ void DPrinter::traverseFunctionDeclImpl(
 			if(arg_become_this >= 0)
 			{
 				ParmVarDecl* param = *(Decl->param_begin() + arg_become_this);
-				out() << std::endl;
 				std::string const this_name = getName(param->getDeclName());
 				if(this_name.empty() == false)
-					out() << indentStr() << "alias " << this_name << " = this;";
+					out() << indentStr() << "alias " << this_name << " = this;" << std::endl;
 			}
 		};
 		if(body->getStmtClass() == Stmt::CXXTryStmtClass)
