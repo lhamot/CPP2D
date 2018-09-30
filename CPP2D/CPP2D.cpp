@@ -73,7 +73,6 @@ public:
 };
 
 int main(int argc, char const** argv)
-try
 {
 	std::vector<char const*> argv_vect;
 	std::copy(argv, argv + static_cast<intptr_t>(argc), std::back_inserter(argv_vect));
@@ -85,12 +84,4 @@ try
 	  compilationDatabase,
 	  OptionsParser.getSourcePathList());
 	return Tool.run(newFrontendActionFactory<CPP2DFrontendAction>().get());
-}
-catch (std::exception& ex)
-{
-	std::cout << typeid(ex).name() << " " << ex.what() << "\n";
-}
-catch (...)
-{
-	std::cout << "Unknown exception!!" << "\n";
 }
