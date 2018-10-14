@@ -414,9 +414,8 @@ bool DPrinter::printStmtComment(SourceLocation& locStart,
 			pragma = std::regex_replace(pragma, std::regex(R"(^\s*(\#undef\s+\w+\s*$))"), std::string("//$1"));
 			pragma = std::regex_replace(pragma, std::regex(R"(^\s*\#error\s*([^\z]*?[^\\])(\s*)$)"), std::string("static_assert(false, $1);$2"));
 			pragma = std::regex_replace(pragma, std::regex(R"(defined(\(\w+\)))"), std::string("version$1"));
-			std::replace(pragma.begin(), pragma.end(), '\\', '\n');
 			if (pragma.find("#define") == 0)
-				pragma = std::regex_replace(pragma, std::regex(R"((^.+$))"), std::string("//$1"));
+				pragma = "//" + std::regex_replace(pragma, std::regex(R"((\\))"), std::string("\n//"));
 		}
 		else if (comments.back().state == MultilineComment)
 			comments.back().str += '\n';
