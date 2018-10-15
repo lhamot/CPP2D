@@ -519,7 +519,7 @@ bool DPrinter::printStmtComment(SourceLocation& locStart,
 		{
 			std::string const& c = ss.str;
 			size_t incPos = c.find("#include");
-			if (not c.empty() && incPos == std::string::npos && ss.state != StartOfLine && ss.state != Line)
+			if (not c.empty() && incPos == std::string::npos && ss.state != StartOfLine)
 			{
 				split.split();
 				if (doIndent)
