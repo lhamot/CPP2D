@@ -49,6 +49,10 @@ A not exhaustive list:
    * dynamic
    * std::vector (partially)
    * std::array (partially)
+* preprocessor
+   * function-like macro
+   * declaration-like macro
+   * simple #ifdef/else/endif
 
 Some samples here : https://github.com/lhamot/CPP2D/wiki/Conversion-samples
 
@@ -130,7 +134,10 @@ Small C++ project are almost fully convertible to **D**, but many things have to
 
 * CMake : Create a cmake to compile a project linked to **LLVM**/**clang** in a cross-platform way seems to be not straightforward. If you can enhance my CMakeLists, please do it!
 * Clang integration : Maybe there is a better way to integrate **CPP2D** with **clang**, like make it a real clang tool, in clang/tools, or clang/tools/extra.
-   
+
+## Want to try?
+- http://nogane.net/cpp2d
+
 ## Want to help?
 I would be happy to get some help on this project. If you are interested, do not hesitate to :
 - Reach us on the mailing list: https://groups.google.com/forum/#!forum/cpp2d
