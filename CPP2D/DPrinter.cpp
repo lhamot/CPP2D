@@ -685,7 +685,7 @@ bool DPrinter::TraverseTranslationUnitDecl(TranslationUnitDecl* Decl)
 			pushStream();
 
 			if (locStart.isInvalid())
-				locStart = sm.getLocForStartOfFile(sm.getMainFileID()).getLocWithOffset(3);
+				locStart = sm.getLocForStartOfFile(sm.getMainFileID());
 
 			printStmtComment(locStart,
 				c->getSourceRange().getBegin(),
