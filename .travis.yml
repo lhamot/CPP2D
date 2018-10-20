@@ -5,12 +5,12 @@ addons:
   apt:
     update: true
     sources:
-      - llvm-toolchain-trusty-4.0
+      - llvm-toolchain-trusty-6.0
       - ubuntu-toolchain-r-test
     packages:
       - cmake
-      - libclang-4.0-dev
-      - llvm-4.0-dev
+      - libclang-6.0-dev
+      - llvm-6.0-dev
       - gcc-4.9
       - g++-4.9
       - curl
@@ -22,10 +22,6 @@ install:
   - export CPP="g++-4.9"
   - export CXX="g++-4.9"
   - export LD="g++-4.9"
-  - sudo apt-add-repository "deb http://apt.llvm.org/trusty/ llvm-toolchain-trusty-6.0 main"
-  - sudo apt-get update
-  - sudo apt-get -y --allow-unauthenticated install libclang-6.0-dev
-  - sudo apt-get -y --allow-unauthenticated install llvm-6.0-dev
 
 script:
   - mkdir -p build
