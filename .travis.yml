@@ -1,4 +1,4 @@
-language: C++
+language: cpp
 sudo: false
 dist: trusty
 os:
@@ -21,10 +21,10 @@ addons:
 install:
   - curl -fsS https://dlang.org/install.sh | bash -s ldc
   - source ~/dlang/ldc-1.12.0/activate
-  - export CC="gcc-4.9"
-  - export CPP="g++-4.9"
-  - export CXX="g++-4.9"
-  - export LD="g++-4.9"
+  - export CC="clang-6.0"
+  - export CPP="clang++-6.0"
+  - export CXX="clang++-6.0"
+  - export LD="clang++-6.0"
 
 script:
   - mkdir -p build
