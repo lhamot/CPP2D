@@ -1,6 +1,9 @@
 language: C++
 sudo: false
 dist: trusty
+os:
+  - linux
+  - osx
 addons:
   apt:
     update: true
