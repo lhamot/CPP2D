@@ -111,14 +111,14 @@
       <AdditionalIncludeDirectories>I:\C_libs\llvm-4.0.1_VS2015\include;I:\C_libs\llvm-4.0.1\include;I:\C_libs\llvm-4.0.1\tools\clang\include;I:\C_libs\llvm-4.0.1_VS2015\tools\clang\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <RuntimeTypeInfo>true</RuntimeTypeInfo>
-      <DisableSpecificWarnings>4548;4503;4820;4371;4710;4514;5027;4626;5026;4625;4996;4702;4714;4711;4464;4061;4062</DisableSpecificWarnings>
+      <DisableSpecificWarnings>4571;4548;4503;4820;4371;4710;4514;5027;4626;5026;4625;4996;4702;4714;4711;4464;4061;4062</DisableSpecificWarnings>
       <TreatWarningAsError>true</TreatWarningAsError>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>I:\C_libs\llvm-4.0.1_VS2015/$(Configuration)/lib</AdditionalLibraryDirectories>
-      <AdditionalDependencies>Version.lib;clangFrontend.lib;clangDriver.lib;clangSerialization.lib;clangParse.lib;clangSema.lib;clangAnalysis.lib;clangEdit.lib;clangAST.lib;clangASTMatchers.lib;clangLex.lib;clangBasic.lib;clangTooling.lib;LLVMX86AsmParser.lib;LLVMX86Desc.lib;LLVMX86AsmPrinter.lib;LLVMX86Info.lib;LLVMX86Utils.lib;LLVMipo.lib;LLVMScalarOpts.lib;LLVMInstCombine.lib;LLVMTransformUtils.lib;LLVMAnalysis.lib;LLVMTarget.lib;LLVMOption.lib;LLVMMCParser.lib;LLVMMC.lib;LLVMObject.lib;LLVMBitReader.lib;LLVMCore.lib;LLVMProfileData.lib;LLVMSupport.lib;Mincore.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Version.lib;clangFrontend.lib;clangDriver.lib;clangSerialization.lib;clangParse.lib;clangSema.lib;clangAnalysis.lib;clangEdit.lib;clangAST.lib;clangASTMatchers.lib;clangLex.lib;clangBasic.lib;clangTooling.lib;LLVMX86AsmParser.lib;LLVMX86Desc.lib;LLVMX86AsmPrinter.lib;LLVMX86Info.lib;LLVMX86Utils.lib;LLVMipo.lib;LLVMScalarOpts.lib;LLVMInstCombine.lib;LLVMTransformUtils.lib;LLVMAnalysis.lib;LLVMTarget.lib;LLVMOption.lib;LLVMMCParser.lib;LLVMMC.lib;LLVMObject.lib;LLVMBitReader.lib;LLVMCore.lib;LLVMProfileData.lib;LLVMSupport.lib;LLVMBinaryFormat.lib;Mincore.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -149,13 +149,13 @@
       <WarningLevel>EnableAllWarnings</WarningLevel>
       <PrecompiledHeader>
       </PrecompiledHeader>
-      <Optimization>Full</Optimization>
+      <Optimization>Disabled</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>I:\C_libs\llvm-4.0.1_VS2015\include;I:\C_libs\llvm-4.0.1\include;I:\C_libs\llvm-4.0.1\tools\clang\include;I:\C_libs\llvm-4.0.1_VS2015\tools\clang\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Program Files\LLVM\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeTypeInfo>true</RuntimeTypeInfo>
-      <DisableSpecificWarnings>4548;4503;4820;4371;4710;4514;5027;4626;5026;4625;4996;4702;4714;4711;4464;4061;4062</DisableSpecificWarnings>
+      <DisableSpecificWarnings>4571;4548;4503;4820;4371;4710;4514;5027;4626;5026;4625;4996;4702;4714;4711;4464;4061;4062</DisableSpecificWarnings>
       <TreatWarningAsError>true</TreatWarningAsError>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
     </ClCompile>
@@ -164,8 +164,8 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalLibraryDirectories>I:\C_libs\llvm-4.0.1_VS2015/$(Configuration)/lib</AdditionalLibraryDirectories>
-      <AdditionalDependencies>Version.lib;clangFrontend.lib;clangDriver.lib;clangSerialization.lib;clangParse.lib;clangSema.lib;clangAnalysis.lib;clangEdit.lib;clangAST.lib;clangASTMatchers.lib;clangLex.lib;clangBasic.lib;clangTooling.lib;LLVMX86AsmParser.lib;LLVMX86Desc.lib;LLVMX86AsmPrinter.lib;LLVMX86Info.lib;LLVMX86Utils.lib;LLVMipo.lib;LLVMScalarOpts.lib;LLVMInstCombine.lib;LLVMTransformUtils.lib;LLVMAnalysis.lib;LLVMTarget.lib;LLVMOption.lib;LLVMMCParser.lib;LLVMMC.lib;LLVMObject.lib;LLVMBitReader.lib;LLVMCore.lib;LLVMProfileData.lib;LLVMSupport.lib;Mincore.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\Program Files\LLVM\lib</AdditionalLibraryDirectories>
+      <AdditionalDependencies>Version.lib;clangFrontend.lib;clangDriver.lib;clangSerialization.lib;clangParse.lib;clangSema.lib;clangAnalysis.lib;clangEdit.lib;clangAST.lib;clangASTMatchers.lib;clangLex.lib;clangBasic.lib;clangTooling.lib;LLVMX86AsmParser.lib;LLVMX86Desc.lib;LLVMX86AsmPrinter.lib;LLVMX86Info.lib;LLVMX86Utils.lib;LLVMipo.lib;LLVMScalarOpts.lib;LLVMInstCombine.lib;LLVMTransformUtils.lib;LLVMAnalysis.lib;LLVMTarget.lib;LLVMOption.lib;LLVMMCParser.lib;LLVMMC.lib;LLVMObject.lib;LLVMBitReader.lib;LLVMCore.lib;LLVMProfileData.lib;LLVMSupport.lib;LLVMBinaryFormat.lib;Mincore.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>

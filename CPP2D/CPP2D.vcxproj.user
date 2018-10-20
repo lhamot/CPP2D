@@ -11,13 +11,13 @@
     <LocalDebuggerWorkingDirectory>I:\C\CPP2D_UT_D\CPP2D_UT_D</LocalDebuggerWorkingDirectory>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LocalDebuggerCommandArguments>I:\C\CPP2D\CPP2D_UT_CPP\main.cpp I:\C\CPP2D\CPP2D_UT_CPP\template_testsuite.cpp I:\C\CPP2D\CPP2D_UT_CPP\stdlib_testsuite.cpp I:\C\CPP2D\CPP2D_UT_CPP\framework.cpp I:\C\CPP2D\CPP2D_UT_CPP\test.cpp -macro-expr=UT_MACRO_EXPR/nn -macro-expr=CHECK/e -macro-expr=CHECK_EQUAL/ee -macro-expr=UT_MACRO/eee -macro-stmt=UT_MACRO_STMT -macro-stmt=UT_MACRO_STMT_CLASS/ntne -- -fms-extensions -fms-compatibility</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>C:\C\CPP2D\CPP2D_UT_CPP\comment.cpp C:\C\CPP2D\CPP2D_UT_CPP\framework.cpp C:\C\CPP2D\CPP2D_UT_CPP\main.cpp C:\C\CPP2D\CPP2D_UT_CPP\template_testsuite.cpp C:\C\CPP2D\CPP2D_UT_CPP\stdlib_testsuite.cpp C:\C\CPP2D\CPP2D_UT_CPP\test.cpp -macro-expr=UT_MACRO_EXPR/nn -macro-expr=CHECK/e -macro-expr=CHECK_EQUAL/ee -macro-expr=UT_MACRO/eee -macro-stmt=UT_MACRO_STMT -macro-stmt=UT_MACRO_STMT_CLASS/ntne -- -fms-extensions -fms-compatibility</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
-    <LocalDebuggerWorkingDirectory>I:\C\CPP2D_UT_D\source</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerWorkingDirectory>C:\C\CPP2D_UT_D\source</LocalDebuggerWorkingDirectory>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <LocalDebuggerCommandArguments>I:\C\CPP2D\CPP2D_UT_CPP\main.cpp I:\C\CPP2D\CPP2D_UT_CPP\template_testsuite.cpp I:\C\CPP2D\CPP2D_UT_CPP\stdlib_testsuite.cpp I:\C\CPP2D\CPP2D_UT_CPP\framework.cpp I:\C\CPP2D\CPP2D_UT_CPP\test.cpp -macro-expr=UT_MACRO_EXPR/nn -macro-expr=CHECK/e -macro-expr=CHECK_EQUAL/ee -macro-expr=UT_MACRO/eee -macro-stmt=UT_MACRO_STMT -macro-stmt=UT_MACRO_STMT_CLASS/ntne -- -fms-extensions -fms-compatibility</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>C:\C\CPP2D\CPP2D_UT_CPP\comment.cpp C:\C\CPP2D\CPP2D_UT_CPP\framework.cpp C:\C\CPP2D\CPP2D_UT_CPP\main.cpp C:\C\CPP2D\CPP2D_UT_CPP\template_testsuite.cpp C:\C\CPP2D\CPP2D_UT_CPP\stdlib_testsuite.cpp C:\C\CPP2D\CPP2D_UT_CPP\test.cpp -macro-expr=UT_MACRO_EXPR/nn -macro-expr=CHECK/e -macro-expr=CHECK_EQUAL/ee -macro-expr=UT_MACRO/eee -macro-stmt=UT_MACRO_STMT -macro-stmt=UT_MACRO_STMT_CLASS/ntne -- -fms-extensions -fms-compatibility</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
-    <LocalDebuggerWorkingDirectory>I:\C\CPP2D_UT_D\source</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerWorkingDirectory>C:\C\CPP2D_UT_D\source</LocalDebuggerWorkingDirectory>
   </PropertyGroup>
 </Project>

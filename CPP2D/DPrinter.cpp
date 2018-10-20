@@ -1,4 +1,4 @@
-﻿//
+//
 // Copyright (c) 2016 Loïc HAMOT
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
@@ -13,6 +13,7 @@
 #include <locale>
 #include <ciso646>
 #include <cstdio>
+#include <regex>
 
 #pragma warning(push, 0)
 #include <llvm/ADT/SmallString.h>
@@ -345,24 +346,26 @@ std::vector<std::string> DPrinter::split_lines(std::string const& instr)
 	do
 	{
 		iter = std::find(prevIter, std::end(instr), '\n');
-		result.push_back(DPrinter::trim(std::string(prevIter, iter)));
-		if(iter != std::end(instr))
+		result.push_back(std::string(prevIter, iter));
+		if (iter != std::end(instr))
+		{
+			result.back() += "\n";
 			prevIter = iter + 1;
+		}
 	}
 	while(iter != std::end(instr));
-	result.pop_back();
 	return result;
 }
 
-void DPrinter::printStmtComment(SourceLocation& locStart,
+bool DPrinter::printStmtComment(SourceLocation& locStart,
                                 SourceLocation const& locEnd,
-                                SourceLocation const& nextStart)
+                                SourceLocation const& nextStart,
+                                bool doIndent)
 {
 	if(locStart.isInvalid() || locEnd.isInvalid() || locStart.isMacroID() || locEnd.isMacroID())
 	{
 		locStart = nextStart;
-		out() << std::endl;
-		return;
+		return false;
 	}
 	auto& sm = Context->getSourceManager();
 	std::string comment =
@@ -370,46 +373,164 @@ void DPrinter::printStmtComment(SourceLocation& locStart,
 	                       sm,
 	                       LangOptions()
 	                      ).str();
-	comment = CPP2DTools::replaceString(comment, "#if", "/*#if");
-	comment = CPP2DTools::replaceString(comment, "#endif", "#endif*/");
 
-	std::vector<std::string> comments = split_lines(comment);
-	//if (comments.back() == std::string())
-	Spliter split(*this, indentStr());
-	if(comments.empty())
-		out() << std::endl;
+	// Uniformize end of lines
+	comment = std::regex_replace(comment, std::regex(R"(\r)"), std::string(""));
+
+	// Extract comments
+	enum State
+	{
+		StartOfLine,
+		Line,
+		Slash,
+		MultilineComment,
+		MultilineComment_star,
+		SinglelineComment,
+		Pragma,
+		Pragma_antislash,
+	};
+	State state = StartOfLine;
+	struct StringWithState
+	{
+		StringWithState(State s) :state(s) {}
+		State state = Line;
+		std::string str;
+	};
+	std::vector<StringWithState> comments;
+	comments.emplace_back(StartOfLine);
+	auto splitComment = [&](State newState)
+	{
+		if (comments.back().state == Pragma)
+		{
+			std::string& pragma = comments.back().str;
+			pragma = std::regex_replace(pragma, std::regex(R"(^\s*\#define\s+(\w+)\s+(\w+)(\s*)$)"), std::string("auto const $1 = $2;$3"));
+			pragma = std::regex_replace(pragma, std::regex(R"(^\s*\#define\s+(\w+)(\s*)$)"), std::string("version = $1;$2"));  // OK
+			pragma = std::regex_replace(pragma, std::regex(R"(^\s*\#ifdef\s*([^\z]*?[^\\])(\s*)$)"), std::string("version($1)\n{$2"));
+			pragma = std::regex_replace(pragma, std::regex(R"(^\s*\#ifndef\s*([^\z]*?[^\\])(\s*)$)"), std::string("version(!($1))\n{$2"));
+			pragma = std::regex_replace(pragma, std::regex(R"(^\s*\#if\s*([^\z]*?[^\\])(\s*)$)"), std::string("$1\n{$2"));
+			pragma = std::regex_replace(pragma, std::regex(R"(^\s*\#elif\s*([^\z]*?[^\\])(\s*)$)"), std::string("}\nelse $1\n{$2"));
+			pragma = std::regex_replace(pragma, std::regex(R"(^\s*\#else(\s*))"), std::string("}\nelse\n{$1"));
+			pragma = std::regex_replace(pragma, std::regex(R"(^\s*\#endif(\s*))"), std::string("}$1"));
+			pragma = std::regex_replace(pragma, std::regex(R"(^\s*(\#undef\s+\w+\s*$))"), std::string("//$1"));
+			pragma = std::regex_replace(pragma, std::regex(R"(^\s*\#error\s*([^\z]*?[^\\])(\s*)$)"), std::string("static_assert(false, $1);$2"));
+			pragma = std::regex_replace(pragma, std::regex(R"(defined(\(\w+\)))"), std::string("version$1"));
+			if (pragma.find("#define") == 0)
+				pragma = "//" + std::regex_replace(pragma, std::regex(R"((\\))"), std::string("\n//"));
+		}
+		else if (comments.back().state == MultilineComment)
+			comments.back().str += '\n';
+		comments.emplace_back(newState);
+	};
+	auto push = [&](char c)
+	{
+		comments.back().str.push_back(c);
+	};
+	for (char c : comment)
+	{
+		switch (state)
+		{
+		case StartOfLine:
+		{
+			switch (c)
+			{
+			case '/': state = Slash; break;
+			case '#': state = Pragma; splitComment(Pragma); push(c); break;
+			case ' ': state = StartOfLine; push(c); break;
+			case '\t': state = StartOfLine; push(c); break;
+			case '\n': state = StartOfLine; push(c); splitComment(StartOfLine); break;
+			default: state = Line; push(c);
+			}
+			break;
+		}
+		case Line:
+		{
+			switch (c)
+			{
+			case '/': state = Slash; break;
+			case '\n': state = StartOfLine; push(c); splitComment(StartOfLine); break;
+			default: push(c);
+			}
+			break;
+		}
+		case Slash:
+		{
+			switch (c)
+			{
+			case '*': state = MultilineComment; splitComment(MultilineComment); push('/'); push(c); break;
+			case '/': state = SinglelineComment; splitComment(SinglelineComment); push('/'); push(c); break;
+			default: state = Line; push(c);
+			}
+			break;
+		}
+		case MultilineComment:
+		{
+			switch (c)
+			{
+			case '*': state = MultilineComment_star; break;
+			default: push(c);
+			}
+			break;
+		}
+		case MultilineComment_star:
+		{
+			switch (c)
+			{
+			case '/': state = Line; push('*'); push(c); splitComment(Line); break;
+			default: state = MultilineComment; push(c);
+			}
+			break;
+		}
+		case SinglelineComment:
+		{
+			switch (c)
+			{
+			case '\n': state = StartOfLine; push(c); splitComment(Line); break;
+			default: push(c);
+			}
+			break;
+		}
+		case Pragma:
+		{
+			switch (c)
+			{
+			case '\n': state = StartOfLine; push(c); splitComment(Line); break;
+			case '\\': state = Pragma_antislash; push(c); break;
+			default: push(c);
+			}
+			break;
+		}
+		case Pragma_antislash:
+		{
+			state = Pragma;
+		}
+		}
+	}
+
+	if(not comments.empty())
+		comments.erase(comments.begin());
+	if (not comments.empty())
+		comments.erase(comments.end() - 1);
+
+	bool printedSomething = false;
+	Spliter split(*this, "");
 	if(not comments.empty())
 	{
-		auto& firstComment = comments.front();
-		auto commentPos1 = firstComment.find("//");
-		auto commentPos2 = firstComment.find("/*");
-		size_t trimPos = 0;
-		if(commentPos1 != std::string::npos)
+		for(StringWithState const& ss : comments)
 		{
-			if(commentPos2 != std::string::npos)
-				trimPos = std::min(commentPos1, commentPos2);
-			else
-				trimPos = commentPos1;
-		}
-		else if(commentPos2 != std::string::npos)
-			trimPos = commentPos2;
-		else
-			firstComment = "";
-
-		if(not firstComment.empty())
-			firstComment = firstComment.substr(trimPos);
-
-		out() << " ";
-		size_t index = 0;
-		for(auto const& c : comments)
-		{
-			split.split();
-			out() << c;
-			out() << std::endl;
-			++index;
+			std::string const& c = ss.str;
+			size_t incPos = c.find("#include");
+			if (not c.empty() && incPos == std::string::npos && ss.state != StartOfLine)
+			{
+				split.split();
+				if (doIndent)
+					out() << indentStr();
+				out() << c;
+				printedSomething = true;
+			}
 		}
 	}
 	locStart = nextStart;
+	return printedSomething;
 }
 
 void DPrinter::printMacroArgs(CallExpr* macro_args)
@@ -545,11 +666,13 @@ bool DPrinter::TraverseTranslationUnitDecl(TranslationUnitDecl* Decl)
 	llvm::raw_fd_ostream file(StringRef(modulename + ".print.cpp"), ec, sys::fs::OpenFlags());
 	Decl->print(file);
 
+	SourceLocation locStart = Decl->getLocStart();
+
 	std::ofstream file2(modulename + ".source.cpp");
+	auto& sm = Context->getSourceManager();
 
 	for(clang::Decl* c : Decl->decls())
 	{
-		auto& sm = Context->getSourceManager();
 		std::string decl_str =
 		  Lexer::getSourceText(CharSourceRange(c->getSourceRange(), true),
 		                       sm,
@@ -557,23 +680,34 @@ bool DPrinter::TraverseTranslationUnitDecl(TranslationUnitDecl* Decl)
 		                      ).str();
 		file2 << decl_str;
 
-		if(CPP2DTools::checkFilename(Context->getSourceManager(), modulename, c))
+		if (CPP2DTools::checkFilename(Context->getSourceManager(), modulename, c))
 		{
 			pushStream();
+
+			if (locStart.isInvalid())
+				locStart = sm.getLocForStartOfFile(sm.getMainFileID());
+
+			printStmtComment(locStart,
+				c->getSourceRange().getBegin(),
+				c->getSourceRange().getEnd(),
+				true
+			);
+
 			TraverseDecl(c);
 			std::string const decl = popStream();
-			if(not decl.empty())
+			if (not decl.empty())
 			{
 				printCommentBefore(c);
 				out() << indentStr() << decl;
-				if(needSemiComma(c))
+				if (needSemiComma(c))
 					out() << ';';
 				printCommentAfter(c);
-				out() << std::endl << std::endl;
 			}
 			output_enabled = (isInMacro == 0);
 		}
 	}
+
+	printStmtComment(locStart, sm.getLocForEndOfFile(sm.getMainFileID()), clang::SourceLocation(), true);
 
 	return true;
 }
@@ -800,25 +934,35 @@ template<typename InitList, typename AddBeforeEnd>
 void DPrinter::traverseCompoundStmtImpl(CompoundStmt* Stmt, InitList initList, AddBeforeEnd addBeforEnd)
 {
 	SourceLocation locStart = Stmt->getLBracLoc().getLocWithOffset(1);
-	out() << "{";
+	out() << "{" << std::endl;
 	++indent;
 	initList();
 	for(auto child : Stmt->children())
 	{
 		printStmtComment(locStart,
-		                 child->getLocStart().getLocWithOffset(-1),
-		                 child->getLocEnd());
+		                 child->getLocStart(),
+		                 child->getLocEnd(),
+		                 true
+		);
 		out() << indentStr();
 		TraverseStmt(child);
 		if(needSemiComma(child))
 			out() << ";";
+		out() << std::endl;
 		output_enabled = (isInMacro == 0);
 	}
-	printStmtComment(locStart, Stmt->getRBracLoc().getLocWithOffset(-1));
+	printStmtComment(
+		locStart, 
+		Stmt->getRBracLoc(),
+		clang::SourceLocation(),
+		true
+	);
 	addBeforEnd();
 	--indent;
 	out() << indentStr();
 	out() << "}";
+	out() << std::endl;
+	out() << indentStr();
 }
 
 bool DPrinter::TraverseCompoundStmt(CompoundStmt* Stmt)
@@ -873,7 +1017,7 @@ bool DPrinter::passStmt(Stmt* stmt)
 		return false;
 }
 
-bool DPrinter::passType(Type* type)
+bool DPrinter::passType(clang::Type* type)
 {
 	auto printer = receiver.getPrinter(type);
 	if(printer)
@@ -1132,7 +1276,7 @@ void DPrinter::traverseCXXRecordDeclImpl(
 		ClassInfo const& classInfo = classInfoMap[cxxRecordDecl];
 		for(auto && type_info : classInfoMap[cxxRecordDecl].relations)
 		{
-			Type const* type = type_info.first;
+			clang::Type const* type = type_info.first;
 			RelationInfo& info = type_info.second;
 			if(info.hasOpLess and info.hasOpEqual)
 			{
@@ -1615,7 +1759,7 @@ bool DPrinter::TraverseCXXConstructExpr(CXXConstructExpr* Init)
 
 void DPrinter::printType(QualType const& type)
 {
-	if(type.getTypePtr()->getTypeClass() == Type::TypeClass::Auto)
+	if(type.getTypePtr()->getTypeClass() == clang::Type::TypeClass::Auto)
 	{
 		if(type.isConstQualified() && portConst)
 			out() << "const ";
@@ -1993,7 +2137,7 @@ TypeOptions::Semantic getThisSemantic(Decl* decl, ASTContext& context)
 {
 	if(decl->isStatic())
 		return TypeOptions::Reference;
-	auto* recordPtrType = dyn_cast<PointerType>(decl->getThisType(context));
+	auto* recordPtrType = dyn_cast<clang::PointerType>(decl->getThisType(context));
 	return DPrinter::getSemantic(recordPtrType->getPointeeType());
 }
 
@@ -2110,20 +2254,29 @@ void DPrinter::traverseFunctionDeclImpl(
 		{
 			if (isMain && Decl->getNumParams() == 2 && decl == bodyDecl->parameters()[0])
 			{	// Remove the first parameter (argc) of the main function
+				locStart = decl->getLocEnd();
 				++index;
 				continue;
 			}
-			if(arg_become_this == static_cast<int>(index))
+			if (arg_become_this == static_cast<int>(index))
+			{
 				isConstMethod = isConst(decl->getType());
+				locStart = decl->getLocEnd();
+			}
 			else
 			{
-				if(numParam != 1)
+				SourceLocation endLoc = decl->getLocEnd();
+				if (numParam != 1)
 				{
-					printStmtComment(locStart,
-					                 decl->getLocStart().getLocWithOffset(-1),
-					                 decl->getLocEnd().getLocWithOffset(1));
+					bool isComment = printStmtComment(locStart,
+						decl->getLocStart(),
+						endLoc);
+					if(not isComment)
+						out() << std::endl;
 					out() << indentStr();
 				}
+				else
+					locStart = endLoc;
 				if(isCopyCtor && sem == TypeOptions::Value)
 					out() << "this";
 				else
@@ -2136,7 +2289,7 @@ void DPrinter::traverseFunctionDeclImpl(
 					printDefaultValue = true;
 				}
 				if(index < numParam - 1)
-					out() << ',';
+					out() << ", ";
 			}
 			++index;
 		}
@@ -2146,16 +2299,20 @@ void DPrinter::traverseFunctionDeclImpl(
 				out() << "\n" << indentStr();
 			out() << "...";
 			addExternInclude("core.vararg", "...");
+			locStart = funcTypeLoc.getRParenLoc(); // the dots doesn't have Decl, but we have to go foreward
 		}
-		pushStream();
-		if(funcTypeLoc.isNull() == false)
-			printStmtComment(locStart, funcTypeLoc.getRParenLoc());
-		std::string const comment = popStream();
+		if (funcTypeLoc.isNull() == false)
+		{
+			bool isComment = printStmtComment(locStart, funcTypeLoc.getRParenLoc());
+			if (not isComment)
+				out() << std::endl;
+		}
 		--indent;
-		if(comment.size() > 2)
-			out() << comment << indentStr();
 	}
-	out() << ")";
+	if(Decl->getNumParams() != 0)
+		out() << indentStr() << ')';
+	else
+		out() << ')';
 	if(isConstMethod && portConst)
 		out() << " const";
 	printFuncEnd(Decl);
@@ -2173,10 +2330,9 @@ void DPrinter::traverseFunctionDeclImpl(
 			if(arg_become_this >= 0)
 			{
 				ParmVarDecl* param = *(Decl->param_begin() + arg_become_this);
-				out() << std::endl;
 				std::string const this_name = getName(param->getDeclName());
 				if(this_name.empty() == false)
-					out() << indentStr() << "alias " << this_name << " = this;";
+					out() << indentStr() << "alias " << this_name << " = this;" << std::endl;
 			}
 		};
 		if(body->getStmtClass() == Stmt::CXXTryStmtClass)
@@ -2305,7 +2461,7 @@ bool DPrinter::TraverseBuiltinType(BuiltinType* Type)
 
 TypeOptions::Semantic DPrinter::getSemantic(QualType qt)
 {
-	Type const* type = qt.getTypePtr();
+	clang::Type const* type = qt.getTypePtr();
 	std::string empty;
 	raw_string_ostream os(empty);
 	qt.getCanonicalType().getUnqualifiedType().print(os, printingPolicy);
@@ -2354,7 +2510,7 @@ TypeOptions::Semantic DPrinter::getSemantic(QualType qt)
 			return nvp.second.semantic;
 	}
 
-	if (auto *pt = dyn_cast<PointerType>(type))
+	if (auto *pt = dyn_cast<clang::PointerType>(type))
 		return getSemantic(pt->getPointeeType());
 	else
 		return (type->isClassType() || type->isFunctionType()) ? 
@@ -2392,11 +2548,11 @@ template<typename PType>
 void DPrinter::traversePointerTypeImpl(PType* Type)
 {
 	QualType const pointee = Type->getPointeeType();
-	Type::TypeClass const tc = pointee->getTypeClass();
-	if(tc == Type::Paren)  //function pointer do not need '*'
+	clang::Type::TypeClass const tc = pointee->getTypeClass();
+	if(tc == clang::Type::Paren)  //function pointer do not need '*'
 	{
 		auto innerType = static_cast<ParenType const*>(pointee.getTypePtr())->getInnerType();
-		if(innerType->getTypeClass() == Type::FunctionProto)
+		if(innerType->getTypeClass() == clang::Type::FunctionProto)
 		{
 			TraverseType(innerType);
 			return;
@@ -2412,7 +2568,7 @@ bool DPrinter::TraverseMemberPointerType(MemberPointerType* Type)
 	traversePointerTypeImpl(Type);
 	return true;
 }
-bool DPrinter::TraversePointerType(PointerType* Type)
+bool DPrinter::TraversePointerType(clang::PointerType* Type)
 {
 	if(passType(Type)) return false;
 	traversePointerTypeImpl(Type);
@@ -2969,7 +3125,7 @@ bool DPrinter::TraverseCXXThrowExpr(CXXThrowExpr* Stmt)
 bool DPrinter::TraverseMaterializeTemporaryExpr(MaterializeTemporaryExpr* Stmt)
 {
 	if(passStmt(Stmt)) return true;
-	TraverseStmt(Stmt->getTemporary());
+	TraverseStmt(Stmt->GetTemporaryExpr());
 	return true;
 }
 
@@ -3176,14 +3332,14 @@ bool DPrinter::TraverseLambdaExpr(LambdaExpr* Node)
 	{
 		for(ParmVarDecl* P : Method->parameters())
 		{
-			if(P->getType()->getTypeClass() == Type::TypeClass::TemplateTypeParm)
+			if(P->getType()->getTypeClass() == clang::Type::TypeClass::TemplateTypeParm)
 			{
 				hasAuto = true;
 				break;
 			}
 			else if(auto* lvalueRef = dyn_cast<LValueReferenceType>(P->getType()))
 			{
-				if(lvalueRef->getPointeeType()->getTypeClass() == Type::TypeClass::TemplateTypeParm)
+				if(lvalueRef->getPointeeType()->getTypeClass() == clang::Type::TypeClass::TemplateTypeParm)
 				{
 					hasAuto = true;
 					break;
@@ -4088,7 +4244,7 @@ bool DPrinter::VisitStmt(Stmt* Stmt)
 	return true;
 }
 
-bool DPrinter::VisitType(Type* Type)
+bool DPrinter::VisitType(clang::Type* Type)
 {
 	out() << indentStr() << "/*" << Type->getTypeClassName() << " Type*/";
 	return true;

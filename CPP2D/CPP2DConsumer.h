@@ -1,4 +1,4 @@
-﻿//
+//
 // Copyright (c) 2016 Loïc HAMOT
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
@@ -20,6 +20,8 @@ namespace clang
 class CompilerInstance;
 }
 
+class CPP2DPPHandling;
+
 //! Implement clang::ASTConsumer to call the DPrinter
 class CPP2DConsumer : public clang::ASTConsumer
 {
@@ -32,6 +34,11 @@ public:
 	//! Print imports, mixins, and finaly call the DPrinter on the translationUnit
 	void HandleTranslationUnit(clang::ASTContext& context) override;
 
+	void setPPCallBack(CPP2DPPHandling* cb)
+	{
+		ppcallbackPtr = cb;
+	}
+
 private:
 	clang::CompilerInstance& compiler;
 	MatchContainer receiver;
@@ -39,5 +46,6 @@ private:
 	std::unique_ptr<clang::ASTConsumer> finderConsumer;
 	std::string inFile;
 	DPrinter visitor;
+	CPP2DPPHandling* ppcallbackPtr = nullptr;
 };
 

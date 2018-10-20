@@ -1,4 +1,4 @@
-﻿//
+//
 // Copyright (c) 2016 Loïc HAMOT
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
@@ -24,13 +24,17 @@ std::unique_ptr<clang::ASTConsumer> CPP2DFrontendAction::CreateASTConsumer(
   llvm::StringRef InFile
 )
 {
-	return std::make_unique<CPP2DConsumer>(Compiler, InFile);
+	auto consumer = std::make_unique<CPP2DConsumer>(Compiler, InFile);
+	consumer->setPPCallBack(ppHandlingPtr);
+	return std::move(consumer);
 }
 
-bool CPP2DFrontendAction::BeginSourceFileAction(CompilerInstance& ci, StringRef file)
+bool CPP2DFrontendAction::BeginSourceFileAction(CompilerInstance& ci)
 {
 	Preprocessor& pp = ci.getPreprocessor();
-	pp.addPPCallbacks(std::make_unique<CPP2DPPHandling>(pp.getSourceManager(), pp, file));
+	auto ppHandling = std::make_unique<CPP2DPPHandling>(pp.getSourceManager(), pp, getCurrentFile());
+	ppHandlingPtr = ppHandling.get();
+	pp.addPPCallbacks(std::move(ppHandling));
 	return true;
 }
 

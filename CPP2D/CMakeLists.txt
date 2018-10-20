@@ -26,7 +26,7 @@ find_path(CLANG_LIB clang
 )
 link_directories(${CLANG_LIB})
 
-# Déclaration de l'exécutable
+# Executable declaration
 add_executable(
     cpp2d
     CPP2D.cpp
@@ -79,6 +79,7 @@ target_link_libraries(cpp2d
   LLVMProfileData
   LLVMSupport
   LLVMDemangle
+  LLVMBinaryFormat  # Needed under windows
 )
 
 if(CMAKE_COMPILER_IS_GNUCXX)

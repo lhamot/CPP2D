@@ -14,6 +14,7 @@ add_executable(
     test.cpp
 	stdlib_testsuite.cpp
 	template_testsuite.cpp
+	comment.cpp
 )
 if(CMAKE_COMPILER_IS_GNUCXX)
     SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++1y -fno-rtti")

@@ -1,4 +1,4 @@
-﻿//
+//
 // Copyright (c) 2016 Loïc HAMOT
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
@@ -504,10 +504,11 @@ private:
 	static std::vector<std::string> split_lines(std::string const& instr);
 
 	//! Print comment before a clang::Stmt
-	void printStmtComment(
+	bool printStmtComment(
 	  clang::SourceLocation& locStart,      //!< IN/OUT Comment start (Will become nextStart)
 	  clang::SourceLocation const& locEnd,  //!< Comment end (Stmt start)
-	  clang::SourceLocation const& nextStart = clang::SourceLocation()  //!< Stmt end
+	  clang::SourceLocation const& nextStart = clang::SourceLocation(),  //!< Stmt end
+	  bool doIndent = false   //!< Add indentation before each new line
 	);
 
 	//! Call a custom type printer for this type if it exist

@@ -1,4 +1,4 @@
-﻿//
+//
 // Copyright (c) 2016 Loïc HAMOT
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
@@ -65,7 +65,7 @@ CPP2DPPHandling::CPP2DPPHandling(clang::SourceManager& sourceManager_,
 
 	// TODO : Find a better way if it exists
 	predefines = pp_.getPredefines() +
-	             "\ntemplate<typename... Args> int cpp2d_dummy_variadic(Args&&...);\n"
+	             "\ntemplate<typename... Args> int cpp2d_dummy_variadic(Args&&...){}\n"
 	             "template<typename T> int cpp2d_type();\n"
 	             "int cpp2d_name(char const*);\n"
 	             "#define CPP2D_ADD2(A, B) A##B\n"
@@ -82,7 +82,7 @@ void CPP2DPPHandling::InclusionDirective(
   const FileEntry*,		//file,
   StringRef,			//search_path,
   StringRef,			//relative_path,
-  const Module*			//imported
+  const clang::Module*			//imported
 )
 {
 	includes_in_file.insert(file_name);
@@ -95,7 +95,7 @@ auto print_macro_args(MacroInfo const* MI,
 {
 	new_macro << '(';
 	bool first = true;
-	for(IdentifierInfo const* arg : MI->args())
+	for(IdentifierInfo const* arg : MI->params())
 	{
 		if(first)
 			first = false;
@@ -116,9 +116,9 @@ void print_macro_args_expand(MacroInfo const* MI,
 {
 	new_macro << '(';
 	bool first = true;
-	args.resize(MI->getNumArgs(), 'n');
+	args.resize(MI->getNumParams(), 'n');
 	auto arg_type_iter = std::begin(args);
-	for(IdentifierInfo const* arg : MI->args())
+	for(IdentifierInfo const* arg : MI->params())
 	{
 		if(first)
 			first = false;
@@ -167,7 +167,7 @@ std::string print_macro(MacroInfo const* MI)
 std::string make_d_macro(MacroInfo const* MI, std::string const& name)
 {
 	std::set<std::string> arg_names;
-	for(IdentifierInfo const* arg : MI->args())
+	for(IdentifierInfo const* arg : MI->params())
 		arg_names.insert(arg->getName());
 
 	std::stringstream d_templ;
