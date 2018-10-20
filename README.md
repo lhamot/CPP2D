@@ -1,4 +1,4 @@
-﻿# CPP2D
+# CPP2D
 (Clang based) C++ to D language converter
 
 ## Objective
