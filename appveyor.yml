@@ -1,0 +1,60 @@
+install:
+  # Install curl
+  - PATH=C:\Program Files\Git\mingw64\bin;%PATH%
+  - cd %APPVEYOR_BUILD_FOLDER%
+  - cd ..
+  - mkdir deps
+  - cd deps
+  # Install  llvm
+  - curl -o llvm-6.0.1.7z http://www.nogane.net/owncloud/index.php/s/qdUscYbcXtHQTqG/download
+  - 7z x llvm-6.0.1.7z
+  # Install dmd
+  - curl -o dmd.2.081.1.windows.7z http://downloads.dlang.org/releases/2018/dmd.2.081.1.windows.7z
+  - 7z x dmd.2.081.1.windows.7z
+  - PATH=%APPVEYOR_BUILD_FOLDER%/../deps/dmd2/windows/bin;%PATH%
+  # Build CPP2D
+  - cd %APPVEYOR_BUILD_FOLDER%
+  - mkdir -p build
+  - cd build
+  - cmake -G "Visual Studio 14 2015 Win64" .. -DCMAKE_SYSTEM_VERSION=6.1 -DCMAKE_PREFIX_PATH=%APPVEYOR_BUILD_FOLDER%/../deps/llvm-6.0.1 -DCMAKE_EXPORT_COMPILE_COMMANDS=OFF
+  
+platform: x64
+
+configuration: Release
+
+build: 
+  project: build/CPP2D.sln
+  parallel: true
+
+test_script:
+  - cd ..\CPP2D_UT_CPP
+  - ..\build\CPP2D\Release\cpp2d.exe stdlib_testsuite.cpp template_testsuite.cpp test.cpp framework.cpp main.cpp comment.cpp -macro-expr=UT_MACRO_EXPR/nn -macro-expr=CHECK/e -macro-expr=CHECK_EQUAL/ee -macro-expr=UT_MACRO/eee -macro-stmt=UT_MACRO_STMT -macro-stmt=UT_MACRO_STMT_CLASS/ntne
+  - mkdir ..\CPP2D_UT_D
+  - copy *.d ..\CPP2D_UT_D
+  - cd ..\CPP2D_UT_D
+  - dmd -ofCPP2D_UT_D ../cpp_std.d template_testsuite.d main.d framework.d test.d stdlib_testsuite.d comment.d
+  - ..\build\CPP2D_UT_CPP\Release\CPP2D_UT_CPP
+  - .\CPP2D_UT_D
+
+artifacts:
+  - path: build\CPP2D\Release\cpp2d.exe
+    name: cpp2d
+
+before_deploy:
+  - cd %APPVEYOR_BUILD_FOLDER%
+  - cd ..
+  - mkdir export
+  - copy %APPVEYOR_BUILD_FOLDER%\build\CPP2D\Release\cpp2d.exe export
+
+deploy:
+  provider: GitHub
+  name: production
+  artifact: build\CPP2D\Release\cpp2d.exe
+  draft: true
+  prerelease: false
+  auth_token:
+    secure: shGtrmloOL+jiGtSauloOo4irhao45Ei0THf2VPepuIkqLxMpS0P5PEu4lsm8b/5
+  on:
+    branch: master                # release from master branch only
+    appveyor_repo_tag: false # deploy on tag push only
+
